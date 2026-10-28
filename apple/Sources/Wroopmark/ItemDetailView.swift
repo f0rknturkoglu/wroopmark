@@ -1,0 +1,306 @@
+import SwiftUI
+
+struct ItemDetailView: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+    @State private var note = ""
+    @FocusState private var noteFocused: Bool
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                if let title = item.title, !title.isEmpty {
+                    Text(title).font(.system(size: 19, weight: .semibold)).textSelection(.enabled)
+                }
+                if !item.text.isEmpty {
+                    Text(linkified(item.text))
+                        .font(.system(size: 15))
+                        .lineSpacing(4.5)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if !item.media.isEmpty {
+                    MediaGallery(media: item.media) { model.openViewer(owner: item, fromQuote: false, index: $0) }
+                }
+                if let quote = item.quote?.item {
+                    QuoteCard(item: quote) { model.openViewer(owner: item, fromQuote: true, index: $0) }
+                }
+                if let ocr = fullOCR, !ocr.isEmpty {
+                    DisclosureGroup {
+                        Text(ocr)
+                            .font(.system(size: 12.5, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                    } label: {
+                        Label("Görseldeki yazı", systemImage: "text.viewfinder")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                section("Etiketler") {
+                    TagEditor(tags: item.tags, all: model.tags) { tags in
+                        Task { await model.setTags(item.id, tags) }
+                    }
+                }
+                section("Not") {
+                    TextEditor(text: $note)
+                        .font(.system(size: 13.5))
+                        .frame(minHeight: 64)
+                        .scrollContentBackground(.hidden)
+                        .padding(6)
+                        .background(Theme.hairline, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .focused($noteFocused)
+                        .onChange(of: noteFocused) { _, focused in if !focused { saveNote() } }
+                }
+                if !item.links.isEmpty {
+                    section("Linkler") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(item.links, id: \.self) { link in
+                                if let url = URL(string: link) {
+                                    Link(destination: url) {
+                                        Label(link.replacingOccurrences(of: "https://", with: ""), systemImage: "link")
+                                            .lineLimit(1).truncationMode(.middle)
+                                    }
+                                    .font(.system(size: 13))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                actions
+                footer
+            }
+            .padding(24)
+            .frame(maxWidth: 660, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+        .onAppear { note = item.note ?? "" }
+        .task(id: item.id) {
+            let full: Item? = try? await model.core.call(["cmd": "get", "id": item.id])
+            fullOCR = full?.ocr
+        }
+        .onDisappear(perform: saveNote)
+    }
+
+    /// The list rows carry no OCR text; the detail loads it with the item.
+    @State private var fullOCR: String?
+
+    private var header: some View {
+        let platform = Platform(rawValue: item.platform) ?? .web
+        return HStack(spacing: 10) {
+            Avatar(name: item.author ?? platform.label, size: 38)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.authorName ?? item.author ?? URL(string: item.url)?.host() ?? platform.label)
+                    .font(.system(size: 14, weight: .semibold))
+                HStack(spacing: 6) {
+                    if let h = item.authorHandle { Text("@\(h)") }
+                    Label(platform.label, systemImage: platform.symbol)
+                }
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if let created = item.created {
+                Text(created.formatted(.dateTime.day().month(.abbreviated).year().hour().minute().locale(Theme.locale)))
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var actions: some View {
+        HStack(spacing: 8) {
+            Button {
+                if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+            } label: { Label("Kaynağında aç", systemImage: "arrow.up.right.square") }
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.url, forType: .string)
+            } label: { Label("Kopyala", systemImage: "doc.on.doc") }
+            if item.needsDownload {
+                Button {
+                    Task { await model.downloadMedia(item.id) }
+                } label: { Label("Medyayı indir", systemImage: "arrow.down.circle") }
+                    .disabled(model.isBusy)
+            }
+            Spacer()
+            Button(role: .destructive) {
+                Task { await model.delete([item.id]) }
+            } label: { Image(systemName: "trash") }
+                .help("Sil")
+        }
+        .controlSize(.regular)
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Kaydedildi \(item.saved.formatted(.dateTime.day().month(.wide).year().hour().minute().locale(Theme.locale)))")
+            Text(item.id).textSelection(.enabled)
+        }
+        .font(.system(size: 11)).foregroundStyle(.tertiary)
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased(with: Locale(identifier: "tr")))
+                .font(.system(size: 10.5, weight: .semibold)).tracking(0.6).foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func saveNote() {
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != (item.note ?? "") else { return }
+        Task { await model.setNote(item.id, trimmed) }
+    }
+
+    /// Makes URLs in post text clickable.
+    private func linkified(_ text: String) -> AttributedString {
+        var s = AttributedString(text)
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return s }
+        for m in detector.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            guard let r = Range(m.range, in: text), let ar = Range(r, in: s), let url = m.url else { continue }
+            s[ar].link = url
+            s[ar].foregroundColor = Theme.accent
+        }
+        return s
+    }
+}
+
+/// Chips with remove buttons, an inline field with completion, and the
+/// most used tags one click away.
+struct TagEditor: View {
+    let tags: [String]
+    let all: [TagCount]
+    let onChange: ([String]) -> Void
+    @State private var draft = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            FlowLayout(spacing: 6) {
+                ForEach(tags, id: \.self) { tag in
+                    TagChip(name: tag, removable: true, remove: { onChange(tags.filter { $0 != tag }) })
+                }
+                TextField(tags.isEmpty ? "Etiket ekle (Enter)" : "ekle…", text: $draft)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12.5))
+                    .frame(width: 130)
+                    .padding(.vertical, 3)
+                    .onSubmit { add(draft) }
+            }
+            let options = suggestions
+            if !options.isEmpty {
+                FlowLayout(spacing: 5) {
+                    ForEach(options, id: \.key) { tag in
+                        Button { add(tag.name) } label: {
+                            Text("+ \(tag.name)")
+                                .font(.system(size: 11.5))
+                                .padding(.horizontal, 7).padding(.vertical, 3)
+                                .background(Theme.hairline, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var suggestions: [TagCount] {
+        let have = Set(tags.map { $0.lowercased() })
+        let free = all.filter { !have.contains($0.name.lowercased()) }
+        let q = draft.trimmingCharacters(in: .whitespaces)
+        if q.isEmpty { return Array(free.sorted { $0.count > $1.count }.prefix(8)) }
+        return Array(free.filter { $0.name.localizedCaseInsensitiveContains(q) }.prefix(8))
+    }
+
+    private func add(_ text: String) {
+        let new = parseTags(text).filter { t in !tags.contains { $0.caseInsensitiveCompare(t) == .orderedSame } }
+        draft = ""
+        if !new.isEmpty { onChange(tags + new) }
+    }
+}
+
+/// Used by the bulk tag sheet.
+struct TagSuggestions: View {
+    let current: [String]
+    let all: [TagCount]
+    let pick: (String) -> Void
+
+    var body: some View {
+        let lower = Set(current.map { $0.lowercased() })
+        let options = all.filter { !lower.contains($0.name.lowercased()) }.sorted { $0.count > $1.count }.prefix(12)
+        FlowLayout(spacing: 5) {
+            ForEach(Array(options), id: \.key) { tag in
+                Button { pick(tag.name) } label: {
+                    Text("+ \(tag.name)")
+                        .font(.system(size: 11.5))
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Theme.hairline, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+/// One medium full width; several as an even two-column grid.
+struct MediaGallery: View {
+    let media: [Media]
+    let open: (Int) -> Void
+
+    var body: some View {
+        if media.count == 1, let m = media.first {
+            tile(m, index: 0)
+                .aspectRatio(min(max(m.aspect ?? 1.5, 0.6), 2.4), contentMode: .fit)
+        } else {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+                ForEach(Array(media.enumerated()), id: \.offset) { i, m in
+                    tile(m, index: i).frame(height: 170)
+                }
+            }
+        }
+    }
+
+    private func tile(_ m: Media, index: Int) -> some View {
+        ZStack {
+            if let file = m.file {
+                Color.clear.overlay { LocalImage(file: file, maxPixel: 1200) }.clipped()
+            } else {
+                Rectangle().fill(Theme.hairline)
+                    .overlay(Image(systemName: "photo").font(.title2).foregroundStyle(.tertiary))
+            }
+            if m.isVideo {
+                Image(systemName: m.videoFile != nil ? "play.circle.fill" : "arrow.down.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.white, .black.opacity(0.45))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture { open(index) }
+        .help(m.alt ?? (m.isVideo ? (m.videoFile != nil ? "Oynat" : "Video henüz indirilmedi") : "Büyüt"))
+    }
+}
+
+struct QuoteCard: View {
+    let item: Item
+    let open: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AuthorLine(item: item)
+            if !item.text.isEmpty {
+                Text(item.text).font(.system(size: 13.5)).lineSpacing(3).textSelection(.enabled)
+            }
+            if !item.media.isEmpty { MediaGallery(media: item.media, open: open) }
+        }
+        .padding(12)
+        .background(Theme.hairline.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}

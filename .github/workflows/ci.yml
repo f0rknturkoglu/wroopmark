@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  app:
+    runs-on: macos-15
+    needs: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: Rust core (static library)
+        run: cargo build --release
+        working-directory: core
+      - name: SwiftUI app
+        run: swift build -c release -Xlinker -L"$GITHUB_WORKSPACE/core/target/release"
+        working-directory: apple
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "14.0"
+      - name: OCR helper
+        run: xcrun swiftc -O -o "$RUNNER_TEMP/wroopmark-ocr" apple/OCR/main.swift
+      - name: Extension scripts parse
+        run: for f in extensions/chromium/*.js; do node --check "$f"; done

@@ -1,0 +1,3 @@
+# Matches the code as written: wide lines, short bodies kept on one line.
+max_width = 150
+use_small_heuristics = "Max"

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>wroopmark</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --fg: #1d1c1a; --muted: #6f6b66; --line: #e6e2dc; --card: #fff;
+    --accent: #774aed; --accent-fg: #fff; --err: #b3261e; --chip: #efece7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1a19; --fg: #ecebe8; --muted: #a29d96; --line: #34322f; --card: #242321;
+            --accent: #b39bff; --accent-fg: #1d0f45; --err: #f2b8b5; --chip: #2f2d2a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 380px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg); }
+  header { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 8px; }
+  h1 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
+  #status { color: var(--muted); font-size: 12px; flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  section { padding: 8px 14px; border-top: 1px solid var(--line); }
+  input, textarea { width: 100%; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; outline: none; }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: none; height: 34px; }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  button { font: inherit; border: 0; border-radius: 7px; padding: 7px 11px; cursor: pointer; background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  button.ghost { background: var(--chip); color: var(--fg); font-weight: 500; }
+  button:disabled { opacity: .55; cursor: default; }
+  #results { list-style: none; margin: 6px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
+  #results li { padding: 7px 4px; border-bottom: 1px solid var(--line); cursor: pointer; border-radius: 5px; }
+  #results li:hover { background: var(--chip); }
+  .meta { color: var(--muted); font-size: 11.5px; display: flex; gap: 6px; }
+  .body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tag { background: var(--chip); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+  .msg { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 16px; }
+  .msg.err { color: var(--err); }
+  label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  label input { width: auto; }
+  code { font-size: 11px; background: var(--chip); padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <header><h1>wroopmark</h1><span id="status">bağlanıyor…</span></header>
+
+  <section>
+    <input id="q" placeholder="Ara… (tag:dev from:@jack has:image &quot;ifade&quot;)" autocomplete="off" autofocus>
+    <ul id="results"></ul>
+  </section>
+
+  <section>
+    <input id="tags" placeholder="etiketler: dev/rust, okunacak" list="taglist" autocomplete="off">
+    <datalist id="taglist"></datalist>
+    <div class="row"><textarea id="note" placeholder="not (isteğe bağlı)"></textarea></div>
+    <div class="row"><button id="save">Bu sayfayı kaydet</button></div>
+    <div id="saveMsg" class="msg"></div>
+  </section>
+
+  <section>
+    <div class="row">
+      <button id="scan" class="ghost">Tüm X yer imlerini içe aktar</button>
+      <button id="scanTikTok" class="ghost">TikTok kaydedilen + beğenilenler</button>
+    </div>
+    <div class="msg">X yer imleri ve TikTok'ta kendi Kaydedilenler / Beğenilenler / Koleksiyonlar sekmelerin açıldıkça kendiliğinden kaydedilir.</div>
+    <div id="scanMsg" class="msg"></div>
+  </section>
+
+  <script src="popup.js"></script>
+</body>
+</html>

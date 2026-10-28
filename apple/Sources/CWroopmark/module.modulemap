@@ -1,0 +1,5 @@
+module CWroopmark [system] {
+    header "../../../core/include/wroopmark.h"
+    link "wroopmark_core"
+    export *
+}
