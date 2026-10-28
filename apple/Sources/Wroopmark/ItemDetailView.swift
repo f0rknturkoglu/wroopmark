@@ -21,7 +21,9 @@ struct ItemDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if !item.media.isEmpty {
-                    MediaGallery(media: item.media) { model.openViewer(owner: item, fromQuote: false, index: $0) }
+                    MediaGallery(media: item.media, stacked: item.isPhotoCarousel) {
+                        model.openViewer(owner: item, fromQuote: false, index: $0)
+                    }
                 }
                 if let quote = item.quote?.item {
                     QuoteCard(item: quote) { model.openViewer(owner: item, fromQuote: true, index: $0) }
@@ -250,12 +252,17 @@ struct TagSuggestions: View {
 /// One medium full width; several as an even two-column grid.
 struct MediaGallery: View {
     let media: [Media]
+    /// Photo carousels (TikTok) show as one stacked deck; a click opens the
+    /// viewer at the first photo, and ← → go through the rest.
+    var stacked = false
     let open: (Int) -> Void
 
     var body: some View {
         if media.count == 1, let m = media.first {
             tile(m, index: 0)
                 .aspectRatio(min(max(m.aspect ?? 1.5, 0.6), 2.4), contentMode: .fit)
+        } else if stacked {
+            PhotoStack(media: media) { open(0) }
         } else {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
                 ForEach(Array(media.enumerated()), id: \.offset) { i, m in
@@ -284,6 +291,57 @@ struct MediaGallery: View {
         .contentShape(Rectangle())
         .onTapGesture { open(index) }
         .help(m.alt ?? (m.isVideo ? (m.videoFile != nil ? "Oynat" : "Video henüz indirilmedi") : "Büyüt"))
+    }
+}
+
+/// Several photos as a deck: the first on top, two more peeking out behind
+/// it, and the count.
+struct PhotoStack: View {
+    let media: [Media]
+    let open: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        let top = media[0]
+        let aspect = min(max(top.aspect ?? 0.75, 0.6), 1.6)
+        ZStack {
+            ForEach(Array(media.prefix(3).enumerated().reversed()), id: \.offset) { i, m in
+                card(m)
+                    .rotationEffect(.degrees(i == 0 ? 0 : (i == 1 ? 3.5 : -4) * (hovering ? 1.6 : 1)))
+                    .offset(x: CGFloat(i) * (hovering ? 14 : 8), y: CGFloat(i) * -4)
+                    .scaleEffect(1 - CGFloat(i) * 0.04)
+                    .shadow(color: .black.opacity(i == 0 ? 0.25 : 0.12), radius: i == 0 ? 8 : 4, y: 2)
+            }
+        }
+        .aspectRatio(aspect, contentMode: .fit)
+        .padding(.trailing, 18).padding(.top, 8)
+        .overlay(alignment: .bottomLeading) {
+            Label("\(media.count)", systemImage: "square.stack.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(.black.opacity(0.6), in: Capsule())
+                .padding(10)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: open)
+        .onHover { hovering = $0 }
+        .animation(.spring(duration: 0.25), value: hovering)
+        .help("\(media.count) fotoğraf — tıkla, ← → ile gez")
+    }
+
+    private func card(_ m: Media) -> some View {
+        Color.clear
+            .overlay {
+                if let file = m.file {
+                    LocalImage(file: file, maxPixel: 1200)
+                } else {
+                    Rectangle().fill(Theme.hairline)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.15)))
     }
 }
 

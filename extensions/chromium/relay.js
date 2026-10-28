@@ -26,6 +26,21 @@ window.addEventListener("message", (e) => {
   }
 });
 
+// On a TikTok post page, the post's video is fetched if the library has
+// the post but not its video yet (TikTok navigates without reloading).
+let lastPostPage = null;
+function checkPostPage() {
+  const m = location.hostname.endsWith("tiktok.com") && location.pathname.match(/^\/@[^/]+\/video\/(\d+)/);
+  const id = m ? m[1] : null;
+  if (!id || id === lastPostPage) return;
+  lastPostPage = id;
+  chrome.runtime.sendMessage({ type: "post_page", id: `tiktok:${id}` }).catch(() => {});
+}
+if (location.hostname.endsWith("tiktok.com")) {
+  window.addEventListener("load", () => setTimeout(checkPostPage, 1500), { once: true });
+  setInterval(checkPostPage, 2000);
+}
+
 let scroller = null;
 
 function autoscroll(on) {

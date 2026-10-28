@@ -77,6 +77,9 @@ struct Item: Decodable, Identifiable, Hashable {
     /// First picture to show on a card: an image, or a video's poster.
     var cover: Media? { allMedia.first { $0.file != nil } }
 
+    /// A TikTok photo post: several pictures meant to be swiped through.
+    var isPhotoCarousel: Bool { platform == "tiktok" && media.count > 1 && media.allSatisfy { !$0.isVideo } }
+
     /// Something is not on disk yet (an image, a poster or a video).
     var needsDownload: Bool { allMedia.contains { !$0.isOffline } }
 }
@@ -142,6 +145,16 @@ struct Stats: Decodable {
     let mediaPending: Int
     let ocrPending: Int?
     let mediaBytes: Int64?
+    /// Videos only yt-dlp / gallery-dl can fetch (TikTok): still missing,
+    /// and how many of those are waiting for a try.
+    let videosMissing: Int?
+    let videosQueued: Int?
+}
+
+/// An outside downloader the core found (`video_tools`).
+struct VideoTool: Decodable, Hashable {
+    let name: String
+    let path: String
 }
 
 struct ImportReport: Decodable {

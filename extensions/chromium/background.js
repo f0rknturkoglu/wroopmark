@@ -126,8 +126,10 @@ async function handleCapture({ kind, payload }, tabId) {
 // the ones the library lacks (see sendVideos in hook.js).
 async function fetchMissingVideos(tabId, ids) {
   const needed = await call("videos_needed", { ids });
-  if (needed.ok && needed.data.length) {
-    chrome.tabs.sendMessage(tabId, { type: "fetch_videos", ids: needed.data }).catch(() => {});
+  if (!needed.ok) return log(`videos_needed: HATA ${needed.error}`);
+  if (needed.data.length) {
+    log(`tiktok: ${needed.data.length} video sayfadan indirilecek`);
+    chrome.tabs.sendMessage(tabId, { type: "fetch_videos", ids: needed.data }).catch((e) => log(`fetch_videos iletilemedi: ${e}`));
   }
 }
 
@@ -262,6 +264,9 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     case "video_chunk":
       call("upload_chunk", msg.chunk).then(reply);
       return true;
+    case "post_page":
+      if (sender.tab?.id != null) fetchMissingVideos(sender.tab.id, [msg.id]);
+      return false;
     case "autoscroll_done":
       onScrollDone();
       return false;

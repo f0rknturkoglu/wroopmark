@@ -213,8 +213,10 @@
   // TikTok only serves video files to its own pages, so the videos the
   // library still lacks are fetched here, with the user's session, and
   // handed over in chunks; each chunk waits for the core to confirm it.
-  const CHUNK = 1536 * 1024;
+  // Safari silently drops large extension messages, so chunks stay small.
+  const CHUNK = 96 * 1024;
   const acks = new Map();
+  const videoDiag = (id, info) => post("diag", { event: "video", id, ...info });
 
   const waitAck = (key) =>
     new Promise((resolve) => {
@@ -230,27 +232,54 @@
       r.readAsDataURL(blob);
     });
 
-  async function sendVideos(ids) {
-    for (const full of ids) {
-      const id = full.replace(/^tiktok:/, "");
-      const it = seen.get(id) || pageItem(id);
-      const src = it && it.video && (it.video.playAddr || it.video.downloadAddr);
-      if (!src) continue;
+  // Every address the item offers for its video, best first.
+  function videoSources(it) {
+    const v = (it && it.video) || {};
+    const out = [v.playAddr, v.downloadAddr];
+    for (const b of v.bitrateInfo || []) out.push(...((b.PlayAddr && b.PlayAddr.UrlList) || []));
+    return [...new Set(out.filter((u) => typeof u === "string" && u.startsWith("http")))];
+  }
+
+  async function sendVideo(full) {
+    const id = full.replace(/^tiktok:/, "");
+    const sources = videoSources(seen.get(id) || pageItem(id));
+    if (!sources.length) return videoDiag(id, { error: "video adresi yok (sayfada görünmedi)" });
+    let r = null;
+    for (const src of sources) {
       try {
-        const r = await origFetch(src, { credentials: "include" });
-        if (!r.ok) continue;
-        const blob = await r.blob();
-        const type = r.headers.get("content-type") || "video/mp4";
-        for (let seq = 0, off = 0; ; seq++, off += CHUNK) {
-          const last = off + CHUNK >= blob.size;
-          const key = `${full}#${seq}`;
-          const acked = waitAck(key);
-          const data = await base64(blob.slice(off, off + CHUNK));
-          const chunk = { id: full, seq, data, last, content_type: type, offset: off, size: last ? blob.size : undefined };
-          window.postMessage({ __wroopmark: "video_chunk", key, chunk }, location.origin);
-          if (!(await acked) || last) break;
-        }
-      } catch {}
+        r = await origFetch(src, { credentials: "include" });
+        if (r.ok) break;
+      } catch (e) {
+        r = { ok: false, status: String(e) };
+      }
+    }
+    if (!r || !r.ok) return videoDiag(id, { error: `indirilemedi: ${r && r.status}` });
+    const blob = await r.blob();
+    const type = r.headers.get("content-type") || "video/mp4";
+    for (let seq = 0, off = 0; ; seq++, off += CHUNK) {
+      const last = off + CHUNK >= blob.size;
+      const key = `${full}#${seq}`;
+      const acked = waitAck(key);
+      const data = await base64(blob.slice(off, off + CHUNK));
+      const chunk = { id: full, seq, data, last, content_type: type, offset: off, size: last ? blob.size : undefined };
+      window.postMessage({ __wroopmark: "video_chunk", key, chunk }, location.origin);
+      if (!(await acked)) return videoDiag(id, { error: `parça ${seq} kaydedilemedi`, kb: Math.round(blob.size / 1024) });
+      if (last) return videoDiag(id, { ok: true, kb: Math.round(blob.size / 1024) });
+    }
+  }
+
+  // One video at a time: list pages arrive fast, and two uploads of the
+  // same video must not interleave.
+  let videoQueue = Promise.resolve();
+  const queued = new Set();
+  function sendVideos(ids) {
+    for (const full of ids) {
+      if (queued.has(full)) continue;
+      queued.add(full);
+      videoQueue = videoQueue
+        .then(() => sendVideo(full))
+        .catch((e) => videoDiag(full, { error: String(e) }))
+        .finally(() => queued.delete(full));
     }
   }
 

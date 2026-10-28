@@ -318,7 +318,9 @@ struct FeedPost: View {
             }
             if !item.media.isEmpty {
                 // Tall (phone) media would fill several screens; capped.
-                MediaGallery(media: item.media) { model.openViewer(owner: item, fromQuote: false, index: $0) }
+                MediaGallery(media: item.media, stacked: item.isPhotoCarousel) {
+                    model.openViewer(owner: item, fromQuote: false, index: $0)
+                }
                     .frame(maxHeight: 560)
                     .frame(maxWidth: .infinity)
             }
@@ -377,6 +379,7 @@ struct MediaBadge: View {
         let missing = item.needsDownload
         HStack(spacing: 4) {
             if !videos.isEmpty { Image(systemName: "play.fill") }
+            if item.isPhotoCarousel { Image(systemName: "square.stack.fill") }
             if item.allMedia.count > 1 && !compact { Text("\(item.allMedia.count)") }
             if missing { Image(systemName: "icloud.and.arrow.down").help("Bir kısmı henüz indirilmedi") }
         }

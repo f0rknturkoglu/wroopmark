@@ -270,12 +270,59 @@ impl Library {
     }
 
     /// Downloads everything one item has, videos included, right now.
+    /// Pictures and direct video files first, then videos that need an
+    /// outside tool (whatever their earlier tries).
     pub fn download_item(&self, id: &str) -> Result<Item, String> {
         let mut item = self.store().get(id).map_err(|e| e.to_string())?.ok_or("kayıt yok")?;
         self.fill_item(&mut item, true);
+        self.store().set_media(id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
+        if needs_external_video(&item) {
+            self.fetch_external_video(&mut item).map_err(|e| format!("video indirilemedi: {e}"))?;
+        }
+        self.store().get(id).map_err(|e| e.to_string())?.ok_or_else(|| "kayıt yok".into())
+    }
+
+    /// Fetches the item's post-page videos with yt-dlp / gallery-dl and
+    /// stores them. On failure the item waits before it is tried again.
+    fn fetch_external_video(&self, item: &mut Item) -> Result<(), String> {
+        let work = self.root.join(".downloads").join(format!("{}-{}", std::process::id(), item.id.replace(':', "_")));
+        let mut result = Ok(());
+        for m in item.media.iter_mut().filter(|m| m.kind != MediaKind::Image && m.video_file.is_none() && m.downloadable_video().is_none()) {
+            let got = crate::external::download(&m.url, &work).and_then(|file| {
+                let f = std::fs::File::open(&file).map_err(|e| e.to_string())?;
+                self.media.put_reader(f, "").map_err(|e| e.to_string())
+            });
+            match got {
+                Ok(name) => m.video_file = Some(name),
+                Err(e) => result = Err(e),
+            }
+        }
+        let _ = std::fs::remove_dir_all(&work);
         let mut store = self.store();
-        store.set_media(id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
-        store.get(id).map_err(|e| e.to_string())?.ok_or_else(|| "kayıt yok".into())
+        store.set_media(&item.id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
+        if result.is_err() {
+            store.video_failed(&item.id).map_err(|e| e.to_string())?;
+        }
+        result
+    }
+
+    /// Works through up to `limit` queued outside-tool videos. Returns how
+    /// many items were tried; errors are logged, not returned.
+    pub fn download_external_videos(&self, limit: i64) -> Result<usize, String> {
+        if !self.videos_enabled() || crate::external::available().is_empty() {
+            return Ok(0);
+        }
+        let queue = self.store().external_video_queue(limit).map_err(|e| e.to_string())?;
+        for (i, mut item) in queue.iter().cloned().enumerate() {
+            if i > 0 {
+                // One at a time, unhurried: this is a personal archive, not a crawler.
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            }
+            if let Err(e) = self.fetch_external_video(&mut item) {
+                append_log(&self.root, &format!("video {}: {e}", item.id));
+            }
+        }
+        Ok(queue.len())
     }
 
     /// Starts a background media download pass unless one is running.
@@ -316,6 +363,10 @@ impl Library {
         orphans.iter().for_each(|f| self.media.remove(f));
         Ok(orphans.len())
     }
+}
+
+fn needs_external_video(item: &Item) -> bool {
+    item.media.iter().any(|m| m.kind != MediaKind::Image && m.video_file.is_none() && m.downloadable_video().is_none())
 }
 
 #[derive(Deserialize)]
@@ -489,6 +540,13 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
         }
         "upload_chunk" => to_value(lib.upload_chunk(&arg::<Chunk>(req)?)?),
         "download_media" => to_value(lib.download_item(&arg::<Id>(req)?.id)?),
+        // Run by the app (the browser extensions' processes may not start
+        // other programs).
+        "download_videos" => to_value(lib.download_external_videos(arg::<Limit>(req)?.limit)?),
+        "video_tools" => {
+            let tools: Vec<Value> = crate::external::available().into_iter().map(|(t, p)| json!({ "name": t.name(), "path": p })).collect();
+            Ok(json!(tools))
+        }
         "data_version" => to_value(lib.store().data_version().map_err(db)?),
         // Folds the WAL into the main file; the app sends it when quitting.
         "checkpoint" => {

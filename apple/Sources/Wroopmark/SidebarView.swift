@@ -48,6 +48,9 @@ struct SidebarView: View {
                 if let s = model.stats, s.mediaPending > 0 {
                     Label("\(s.mediaPending) kaydın medyası iniyor", systemImage: "arrow.down.circle")
                 }
+                if model.isFetchingVideos, let n = model.stats?.videosMissing, n > 0 {
+                    Label("\(n) video iniyor", systemImage: "film")
+                }
                 if model.isReadingText, let n = model.stats?.ocrPending, n > 0 {
                     Label("\(n) kayıtta yazı okunuyor", systemImage: "text.viewfinder")
                 }

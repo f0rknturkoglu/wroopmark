@@ -19,7 +19,7 @@ use crate::text::{fold, host_of, normalize_url, now};
 
 pub type Result<T> = rusqlite::Result<T>;
 
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 8;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -106,6 +106,20 @@ const MIGRATE_6: &str = "ALTER TABLE links ADD COLUMN fetch_failures INTEGER NOT
 /// v6 → v7: items the user decided to keep in the clean-up view.
 const MIGRATE_7: &str = "ALTER TABLE items ADD COLUMN reviewed_at INTEGER;";
 
+/// v7 → v8: attempts at a video only an outside tool can fetch (TikTok).
+const MIGRATE_8: &str = "ALTER TABLE items ADD COLUMN video_tries INTEGER NOT NULL DEFAULT 0;
+                         ALTER TABLE items ADD COLUMN video_tried_at INTEGER;";
+
+/// A video of the item is not on disk and its URL is a post page, not a
+/// file (TikTok): only an outside downloader can get it.
+const NEEDS_EXTERNAL_VIDEO: &str = "EXISTS (SELECT 1 FROM json_each(i.media) m
+     WHERE json_extract(m.value, '$.kind') != 'image' AND json_extract(m.value, '$.video_file') IS NULL
+       AND json_extract(m.value, '$.url') NOT LIKE '%.mp4%')";
+
+/// Outside downloads: how many tries per video, and the wait between them.
+const VIDEO_TRIES: i64 = 3;
+const VIDEO_RETRY_SECS: i64 = 6 * 3600;
+
 /// Failed link lookups: how many tries, and how long to wait between them.
 const LINK_TRIES: i64 = 3;
 const LINK_RETRY_SECS: i64 = 3600;
@@ -144,6 +158,10 @@ pub struct Stats {
     pub media_pending: i64,
     /// Items with pictures not read by OCR yet.
     pub ocr_pending: i64,
+    /// Videos only an outside tool can fetch, still missing; and how many
+    /// of them are waiting for a (first or next) try.
+    pub videos_missing: i64,
+    pub videos_queued: i64,
 }
 
 pub struct Store {
@@ -560,7 +578,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -583,6 +601,9 @@ impl Store {
         }
         if (1..7).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_7} PRAGMA user_version = 7; COMMIT;"))?;
+        }
+        if (1..8).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_8} PRAGMA user_version = 8; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -1030,6 +1051,23 @@ impl Store {
         Ok(out)
     }
 
+    /// Items whose video only an outside tool can fetch, not tried too
+    /// often or too recently; newest saved first.
+    pub fn external_video_queue(&self, limit: i64) -> Result<Vec<Item>> {
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT {ITEM_COLS} FROM items i WHERE i.has_video = 1 AND {NEEDS_EXTERNAL_VIDEO}
+               AND i.video_tries < ?2 AND coalesce(i.video_tried_at, 0) < ?3
+             ORDER BY i.saved_at DESC LIMIT ?1"
+        ))?;
+        stmt.query_map(params![limit, VIDEO_TRIES, now() - VIDEO_RETRY_SECS], read_item)?.map(|r| r.map(|(_, item)| item)).collect()
+    }
+
+    /// An outside download failed; the item waits before the next try.
+    pub fn video_failed(&mut self, id: &str) -> Result<()> {
+        self.conn.execute("UPDATE items SET video_tries = video_tries + 1, video_tried_at = ?2 WHERE id = ?1", params![id, now()])?;
+        Ok(())
+    }
+
     /// Marks items as kept (or not) in the clean-up view; kept items stay
     /// out of it until reset.
     pub fn set_reviewed(&mut self, ids: &[String], reviewed: bool) -> Result<usize> {
@@ -1091,6 +1129,15 @@ impl Store {
             links: one("SELECT count(*) FROM links")?,
             media_pending: one("SELECT count(*) FROM items WHERE media_pending = 1")?,
             ocr_pending: one("SELECT count(*) FROM items WHERE ocr IS NULL AND media_pending = 0 AND (has_image = 1 OR has_video = 1)")?,
+            videos_missing: one(&format!("SELECT count(*) FROM items i WHERE i.has_video = 1 AND {NEEDS_EXTERNAL_VIDEO}"))?,
+            videos_queued: self.conn.query_row(
+                &format!(
+                    "SELECT count(*) FROM items i WHERE i.has_video = 1 AND {NEEDS_EXTERNAL_VIDEO}
+                       AND i.video_tries < ?1 AND coalesce(i.video_tried_at, 0) < ?2"
+                ),
+                params![VIDEO_TRIES, now() - VIDEO_RETRY_SECS],
+                |r| r.get(0),
+            )?,
         })
     }
 }
@@ -1256,6 +1303,29 @@ mod tests {
     }
 
     #[test]
+    fn outside_video_queue() {
+        let mut s = Store::open_in_memory().unwrap();
+        let mut t = post("1", "tiktok");
+        t.id = "tiktok:1".into();
+        t.platform = Platform::Tiktok;
+        t.media = vec![Media { kind: MediaKind::Video, ..Media::image("https://www.tiktok.com/@a/video/1") }];
+        s.upsert(&t).unwrap();
+        let mut x = post("2", "x video, a direct file");
+        x.media = vec![Media { kind: MediaKind::Video, ..Media::image("https://video.twimg.com/a.mp4?tag=1") }];
+        s.upsert(&x).unwrap();
+        let st = s.stats().unwrap();
+        assert_eq!((st.videos_missing, st.videos_queued), (1, 1));
+        assert_eq!(s.external_video_queue(10).unwrap()[0].id, "tiktok:1");
+        s.video_failed("tiktok:1").unwrap();
+        assert!(s.external_video_queue(10).unwrap().is_empty()); // waits
+        assert_eq!(s.stats().unwrap().videos_missing, 1);
+        let mut done = t.media.clone();
+        done[0].video_file = Some("0123456789abcdef0123456789abcdef.mp4".into());
+        s.set_media("tiktok:1", &done, None).unwrap();
+        assert_eq!(s.stats().unwrap().videos_missing, 0);
+    }
+
+    #[test]
     fn failed_link_lookups_are_retried() {
         let mut s = Store::open_in_memory().unwrap();
         let link = s.add_link("https://example.com/a").unwrap().unwrap();
@@ -1358,7 +1428,8 @@ mod tests {
             // Back to a v3 library: no OCR column, no known files, no link retries.
             s.conn
                 .execute_batch(
-                    "ALTER TABLE items DROP COLUMN ocr; ALTER TABLE items DROP COLUMN reviewed_at; DROP TABLE media_files;
+                    "ALTER TABLE items DROP COLUMN ocr; ALTER TABLE items DROP COLUMN reviewed_at;
+                     ALTER TABLE items DROP COLUMN video_tries; ALTER TABLE items DROP COLUMN video_tried_at; DROP TABLE media_files;
                      ALTER TABLE links DROP COLUMN fetch_failures; ALTER TABLE links DROP COLUMN fetch_tried_at;
                      PRAGMA user_version = 3;",
                 )

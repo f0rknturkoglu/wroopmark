@@ -163,9 +163,11 @@ final class AppModel {
         }
         HostInstaller.registerIfNeeded()
         await loadSettings()
+        await loadVideoTools()
         await reload()
         watch()
         startOCR()
+        startVideoDownloads()
     }
 
     // MARK: Loading
@@ -270,6 +272,7 @@ final class AppModel {
         }
         guard gen == generation, let first else { return }
         items = visible(fresh)
+        syncViewer()
         total = first.total
         links = first.links
         reachedEnd = fresh.count >= first.total
@@ -289,6 +292,7 @@ final class AppModel {
                     self.lastDataVersion = v
                 }
                 if (self.stats?.ocrPending ?? 0) > 0, self.ocrPausedUntil.map({ $0 < .now }) ?? true { self.startOCR() }
+                self.startVideoDownloads()
                 let pending = self.stats?.mediaPending ?? 0
                 if pending > 0 {
                     try? await self.core.run(["cmd": "kick_media"])
@@ -474,7 +478,12 @@ final class AppModel {
     }
 
     /// Downloads one item's media (videos included) now.
-    func downloadMedia(_ id: String) async {
+    /// Downloads one item's media now: direct files, then videos through
+    /// yt-dlp / gallery-dl (in the core). If that fails and `browserFallback`
+    /// is given, the post is loaded in the browser for the extension to
+    /// save. True when everything is on disk.
+    @discardableResult
+    func downloadMedia(_ id: String, browserFallback postURL: String? = nil) async -> Bool {
         isBusy = true
         defer { isBusy = false }
         do {
@@ -487,9 +496,58 @@ final class AppModel {
                 viewer = v.media.isEmpty ? nil : v
             }
             await refreshMeta()
+            return !fresh.needsDownload
         } catch {
-            errorMessage = error.localizedDescription
+            if let postURL {
+                fetchViaBrowser(postURL)
+            } else {
+                errorMessage = error.localizedDescription
+            }
+            return false
         }
+    }
+
+    // MARK: Outside video downloads
+
+    /// yt-dlp / gallery-dl as found by the core; empty when none is installed.
+    var videoTools: [VideoTool] = []
+    var isFetchingVideos: Bool { videoTask != nil }
+    private var videoTask: Task<Void, Never>?
+
+    func loadVideoTools() async {
+        videoTools = (try? await core.call(["cmd": "video_tools"])) ?? []
+    }
+
+    /// Works through the queue of videos only an outside tool can fetch, a
+    /// few at a time, refreshing the screen as they arrive.
+    func startVideoDownloads() {
+        guard downloadVideos, videoTask == nil, !videoTools.isEmpty, (stats?.videosQueued ?? 0) > 0 else { return }
+        videoTask = Task(priority: .utility) { [weak self] in
+            defer { Task { @MainActor in self?.videoTask = nil } }
+            while let self, self.downloadVideos, !Task.isCancelled {
+                guard let n: Int = try? await self.core.call(["cmd": "download_videos", "limit": 3], network: true), n > 0 else { break }
+                await self.refreshLoaded()
+            }
+        }
+    }
+
+    /// Loads a post in the default browser without bringing it forward, so
+    /// the extension can save what only the site's own page may fetch.
+    func fetchViaBrowser(_ postURL: String) {
+        guard let url = URL(string: postURL) else { return }
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false
+        NSWorkspace.shared.open(url, configuration: config)
+    }
+
+    /// Keeps an open viewer in step with a re-read item (a video arrived).
+    private func syncViewer() {
+        guard var v = viewer, let item = items.first(where: { $0.id == v.ownerID }) else { return }
+        let media = v.fromQuote ? (item.quote?.item.media ?? []) : item.media
+        guard media != v.media, !media.isEmpty else { return }
+        v.media = media
+        v.index = min(v.index, media.count - 1)
+        viewer = v
     }
 
     func openViewer(owner: Item, fromQuote: Bool, index: Int) {

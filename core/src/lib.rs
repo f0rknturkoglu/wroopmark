@@ -13,6 +13,7 @@
 
 pub mod api;
 pub mod db;
+pub mod external;
 pub mod fetch;
 pub mod ffi;
 pub mod media;

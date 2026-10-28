@@ -19,6 +19,22 @@ struct SettingsView: View {
                     LabeledContent("Sırada") { Text("\(pending) kayıt") }
                 }
                 Button("Eksik medyayı şimdi indir") { Task { await model.retryMedia() } }
+                LabeledContent("TikTok videoları") {
+                    if model.videoTools.isEmpty {
+                        Text("İndirici yok").foregroundStyle(.secondary)
+                    } else {
+                        Text(model.videoTools.map(\.name).joined(separator: " → "))
+                    }
+                }
+                if model.videoTools.isEmpty {
+                    Text("TikTok videoyu yalnızca tarayıcı gibi davranan istemcilere veriyor. yt-dlp (curl_cffi ile) bunu yapıyor; kurulunca eksik videolar arka planda iner:")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("uv tool install \"yt-dlp[default,curl-cffi]\"")
+                        .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                } else if let n = model.stats?.videosMissing, n > 0 {
+                    Text("\(n) video eksik. Sırayla, birkaç saniye arayla iniyor; başaramayan bir video 6 saat sonra yeniden denenir (en çok 3 kez). Görüntüleyicideki İndir de son çare olarak tarayıcı eklentisini kullanır.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section("Görsellerdeki yazı (OCR)") {
                 Toggle("Görsellerdeki yazıyı tanı ve aranabilir yap", isOn: Binding(
@@ -45,6 +61,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .task { await model.refreshMeta() }
+        .task {
+            await model.refreshMeta()
+            await model.loadVideoTools()
+        }
     }
 }

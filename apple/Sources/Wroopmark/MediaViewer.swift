@@ -7,6 +7,8 @@ struct MediaViewer: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let viewer: Viewer
+    /// The outside tools failed and the browser extension is on it.
+    @State private var viaBrowser = false
 
     private var media: Media { viewer.media[viewer.index] }
 
@@ -19,6 +21,7 @@ struct MediaViewer: View {
             bar
         }
         .frame(minWidth: 820, idealWidth: 1100, minHeight: 600, idealHeight: 800)
+        .onChange(of: viewer.index) { _, _ in viaBrowser = false }
     }
 
     @ViewBuilder
@@ -36,26 +39,31 @@ struct MediaViewer: View {
         }
     }
 
+    /// A video behind a post page (TikTok): yt-dlp / gallery-dl fetch it,
+    /// and if they cannot, the post is loaded in the browser behind this
+    /// window for the extension; it plays here as soon as it arrives.
+    private var pageVideo: Bool { media.isVideo && !media.canDownloadVideo }
+
     private var notDownloaded: some View {
         VStack(spacing: 12) {
             Image(systemName: "icloud.and.arrow.down").font(.system(size: 38)).foregroundStyle(.white.opacity(0.85))
-            Text(media.canDownloadVideo || !media.isVideo ? "Henüz indirilmedi" : "Bu video tarayıcı eklentisiyle iner")
-                .foregroundStyle(.white)
-            if media.isVideo && !media.canDownloadVideo {
-                Text("Gönderiyi tarayıcıda, eklenti açıkken bir kez açman yeterli.")
+            Text(model.isBusy ? "İndiriliyor…" : viaBrowser ? "Tarayıcıyla indiriliyor…" : "Henüz indirilmedi").foregroundStyle(.white)
+            if viaBrowser {
+                Text("İndirici başaramadı; gönderi tarayıcıda arka planda açıldı, video gelince burada oynar.")
                     .font(.caption).foregroundStyle(.white.opacity(0.75))
+                    .multilineTextAlignment(.center)
             }
-            HStack {
-                if media.canDownloadVideo || media.file == nil {
-                    Button("Şimdi indir") { Task { await model.downloadMedia(viewer.ownerID) } }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(model.isBusy)
+            if (media.canDownloadVideo || media.file == nil || pageVideo) && !viaBrowser {
+                Button("İndir") {
+                    Task {
+                        let done = await model.downloadMedia(viewer.ownerID, browserFallback: pageVideo ? viewer.postURL : nil)
+                        if !done && pageVideo { viaBrowser = true }
+                    }
                 }
-                Button("Kaynağında aç") {
-                    if let url = URL(string: viewer.postURL) { NSWorkspace.shared.open(url) }
-                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.isBusy)
             }
-            if model.isBusy { ProgressView().controlSize(.small).tint(.white) }
+            if model.isBusy || viaBrowser { ProgressView().controlSize(.small).tint(.white) }
         }
         .padding(24)
         .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))

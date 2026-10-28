@@ -34,6 +34,17 @@ Uygulama `/Applications/wroopmark.app` olarak kurulur. Kütüphane
 Ad-hoc imzada Safari eklentisi için Safari → Ayarlar → Geliştirici →
 "İmzasız eklentilere izin ver" gerekir (Safari her açılışta sıfırlar).
 
+### TikTok videoları (isteğe bağlı)
+
+TikTok video dosyalarını yalnızca tarayıcı gibi davranan istemcilere veriyor.
+yt-dlp (`curl_cffi` ile) kuruluysa eksik videolar arka planda iner; gallery-dl
+ikinci, tarayıcı eklentisi son yedek:
+
+```bash
+uv tool install "yt-dlp[default,curl-cffi]"
+uv tool install gallery-dl
+```
+
 ### Eklentiler
 
 - **Safari**: uygulamanın içinde gelir; Safari → Ayarlar → Uzantılar'dan açılır.

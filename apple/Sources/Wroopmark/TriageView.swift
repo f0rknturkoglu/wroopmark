@@ -140,7 +140,7 @@ private struct TriageCard: View {
                 AuthorLine(item: item, showHandle: true)
                 if !item.allMedia.isEmpty {
                     let own = !item.media.isEmpty
-                    MediaGallery(media: own ? item.media : item.quote?.item.media ?? []) {
+                    MediaGallery(media: own ? item.media : item.quote?.item.media ?? [], stacked: own && item.isPhotoCarousel) {
                         model.openViewer(owner: item, fromQuote: !own, index: $0)
                     }
                     .frame(maxHeight: 460)

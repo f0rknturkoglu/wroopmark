@@ -72,11 +72,23 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
 |---|---|
 | X yer imleri | Eklenti, x.com'un kendi GraphQL cevaplarını dinler. `/i/bookmarks` bir kez kaydırılınca tüm arşiv gelir. Yer imine eklediğin anda (`CreateBookmark`) o tweet daha önce görülen timeline cevabından alınıp kaydedilir. API ücreti yok, giriş bilgisi bizde değil. |
 | Tek tweet URL'si | `publish.twitter.com/oembed` (metin + yazar, görselsiz) |
-| TikTok | `tiktok.com/oembed` (başlık, yazar, kapak) |
+| TikTok | Eklenti: Kaydedilenler / Beğenilenler listeleri (sayfanın kendi API yanıtları); fotoğraf gönderilerinin tüm görselleri |
 | Pinterest / Facebook / web | Sayfanın `og:` etiketleri + makale metni |
 | Toplu | (sonra) TikTok "Favorite Videos" / Facebook "Saved items" export içe aktarma |
 
-Görseller, video kapakları ve (Ayarlar'dan kapatılabilir) X videoları indirilir; TikTok videoları sitenin oturumunu istediği için indirilemez.
+Görseller, video kapakları ve (Ayarlar'dan kapatılabilir) videolar indirilir.
+Video dosyası doğrudan bir mp4 değilse (TikTok gönderi sayfası) sırayla:
+
+1. **yt-dlp** (`curl_cffi` ile; TikTok'un bot kontrolünü tarayıcı taklidiyle geçer),
+   1080p'ye kadar HEVC tercih edilir (aynı çözünürlükte H.264'ün ~1/5'i, AVFoundation oynatır),
+2. **gallery-dl**,
+3. son çare **tarayıcı eklentisi**: gönderi tarayıcıda arka planda açılır, video
+   sayfanın içinden kullanıcının oturumuyla alınır.
+
+Araçlar uygulamayla gelmez; `$PATH`, `~/.local/bin` ve Homebrew klasörlerinde
+aranır. Kuyruğu yalnızca uygulama işler (eklenti süreçleri program başlatamaz);
+videolar birkaç saniye arayla tek tek iner, başaramayan 6 saat sonra yeniden
+denenir (en çok 3 kez).
 
 ## macOS + iOS ve imzalama
 
