@@ -9,6 +9,10 @@ eklentilerinden oluşur.
 - Metin, görseller, videolar ve linkler diske iner; kaynak silinse de kayıt kalır.
 - Tek arama kutusu: `rust tag:dev -from:@jack has:image after:2024 "tam ifade"`.
   Türkçe katlama yapılır: "istanbul" ⇔ "İSTANBUL" ⇔ "ıstanbul".
+- Gelişmiş filtre paneli (platform, medya, link/not/OCR/alıntı, etiket, kişi,
+  tarih aralığı) ve sıralama (tarih, kişi, karışık).
+- Kart, liste ve akış (gönderiler tam boy, kaydırarak okunur) görünümleri.
+- Ayıkla: kayıtlar tek tek gelir, ← sil, → sakla, ⌘Z geri al.
 - Hiyerarşik etiketler (`dev/rust`), not, link havuzu, foto/video galerisi.
 - İsteğe bağlı OCR (Apple Vision, cihazda): ekran görüntüsündeki yazı da aranır.
 - Aynı medya bir kez indirilir (içerik adresli depo + URL eşlemesi).

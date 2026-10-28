@@ -14,6 +14,7 @@ struct ContentView: View {
                 case .links: LinkPoolView()
                 case .photos: GalleryView(videos: false)
                 case .videos: GalleryView(videos: true)
+                case .triage: TriageView()
                 default: ItemGridView()
                 }
             }
@@ -24,6 +25,8 @@ struct ContentView: View {
         }
         .searchable(text: $model.query, placement: .toolbar, prompt: "Ara: kelime tag:dev from:@kişi has:image \"ifade\"")
         .onChange(of: model.query) { _, _ in model.queryChanged() }
+        .onChange(of: model.filters) { _, _ in model.queryChanged() }
+        .onChange(of: model.sort) { _, _ in Task { await model.reload() } }
         .onChange(of: model.scope) { _, _ in
             model.selection = []
             Task { await model.reload() }
@@ -31,6 +34,15 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if model.isBusy { ProgressView().controlSize(.small) }
+                if model.scope != .links {
+                    SortMenu()
+                    Button { model.showFilters.toggle() } label: {
+                        Label("Filtreler", systemImage: model.filters.isEmpty
+                              ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    }
+                    .help(model.filters.isEmpty ? "Gelişmiş filtreler" : "\(model.filters.activeCount) filtre açık")
+                    .popover(isPresented: $model.showFilters, arrowEdge: .bottom) { FilterPanel().environment(model) }
+                }
                 Button { model.showAdd = true } label: { Label("Bağlantı ekle", systemImage: "plus") }
                     .help("URL kaydet (⌘N)")
             }

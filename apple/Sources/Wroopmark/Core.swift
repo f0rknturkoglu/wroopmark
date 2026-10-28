@@ -12,12 +12,14 @@ final class Core: @unchecked Sendable {
     private let networkQueue = DispatchQueue(label: "wroopmark.core.network", qos: .utility, attributes: .concurrent)
     private struct Handle: @unchecked Sendable { let ptr: OpaquePointer }
     private let handle: Handle?
-    /// Same directory the CLI and the browser extension's host use.
+    /// Same directory the CLI and the browser extension's host use;
+    /// `WROOPMARK_HOME` points the app at another library (testing).
     let libraryURL: URL
 
     private init() {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        libraryURL = support.appendingPathComponent("wroopmark", isDirectory: true)
+        libraryURL = ProcessInfo.processInfo.environment["WROOPMARK_HOME"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? support.appendingPathComponent("wroopmark", isDirectory: true)
         handle = libraryURL.path.withCString { wm_open($0) }.map(Handle.init)
     }
 

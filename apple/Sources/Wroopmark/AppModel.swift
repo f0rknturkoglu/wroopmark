@@ -11,11 +11,14 @@ enum Scope: Hashable {
     case links
     case photos
     case videos
+    /// One post at a time: ← delete, → keep.
+    case triage
 
     /// Filter terms this scope adds to the search box query.
     var filter: String {
         switch self {
         case .all, .links: ""
+        case .triage: "-is:reviewed"
         case .untagged: "is:untagged"
         case .photos: "has:image"
         case .videos: "has:video"
@@ -26,7 +29,13 @@ enum Scope: Hashable {
 }
 
 enum LibraryLayout: String {
-    case grid, list
+    case grid, list, feed
+}
+
+/// One choice in the clean-up view, undoable while it is recent.
+struct TriageDecision {
+    let item: Item
+    let delete: Bool
 }
 
 /// Media open in the in-app viewer. `fromQuote` says whether the media list
@@ -45,8 +54,29 @@ struct Viewer: Identifiable {
 @MainActor
 @Observable
 final class AppModel {
-    var scope: Scope = .all
+    var scope: Scope = .all {
+        didSet {
+            // Leaving the clean-up view makes its deletions final.
+            if oldValue == .triage && scope != .triage { Task { await commitTriage() } }
+        }
+    }
     var query = ""
+    var filters = AdvancedFilters()
+    var showFilters = false
+    var sort: SortOrder = SortOrder(rawValue: UserDefaults.standard.string(forKey: "sort") ?? "") ?? .relevance {
+        didSet {
+            UserDefaults.standard.set(sort.rawValue, forKey: "sort")
+            if sort == .random { shuffleSeed = Int.random(in: 1..<1_000_000) }
+        }
+    }
+    /// Which shuffle "Karışık" shows; a new one each time it is picked.
+    private var shuffleSeed = Int.random(in: 1..<1_000_000)
+    /// Recent clean-up choices, newest last. Deletions wait here (undoable)
+    /// until they fall off the end, the view is left or the app quits.
+    private(set) var triageHistory: [TriageDecision] = []
+    private(set) var triageDeleted = 0
+    private(set) var triageKept = 0
+    private let triageUndoDepth = 10
     var items: [Item] = []
     var total = 0
     /// Links matching the search (items view) or the whole pool (links view).
@@ -97,7 +127,27 @@ final class AppModel {
     let core = Core.shared
 
     var effectiveQuery: String {
-        [scope.filter, query.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: " ")
+        [scope.filter, filters.terms, query.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    private var sortArg: String { sort == .random ? "random:\(shuffleSeed)" : sort.rawValue }
+
+    private func searchRequest(limit: Int, offset: Int) -> [String: Any] {
+        ["cmd": "search", "q": effectiveQuery, "sort": sortArg, "limit": limit, "offset": offset]
+    }
+
+    /// Items waiting to be deleted are hidden everywhere.
+    private var pendingDeleteIDs: Set<String> { Set(triageHistory.filter(\.delete).map(\.item.id)) }
+
+    private func visible(_ items: [Item]) -> [Item] {
+        let hidden = pendingDeleteIDs
+        return hidden.isEmpty ? items : items.filter { !hidden.contains($0.id) }
+    }
+
+    /// Picks a new shuffle for "Karışık".
+    func reshuffle() {
+        shuffleSeed = Int.random(in: 1..<1_000_000)
+        Task { await reload() }
     }
 
     /// The single selected item, if exactly one is selected.
@@ -131,13 +181,14 @@ final class AppModel {
         generation += 1
         let gen = generation
         do {
-            let r: SearchResult = try await core.call(["cmd": "search", "q": effectiveQuery, "limit": pageSize, "offset": 0])
+            let r: SearchResult = try await core.call(searchRequest(limit: pageSize, offset: 0))
             guard gen == generation else { return }
-            items = r.items
+            items = visible(r.items)
             total = r.total
             links = r.links
             reachedEnd = r.items.count < pageSize
             selection = selection.filter { id in items.contains { $0.id == id } }
+            if scope == .triage { selection = items.first.map { [$0.id] } ?? [] }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -149,10 +200,10 @@ final class AppModel {
         defer { isLoading = false }
         let gen = generation
         do {
-            let r: SearchResult = try await core.call(["cmd": "search", "q": effectiveQuery, "limit": pageSize, "offset": items.count])
+            let r: SearchResult = try await core.call(searchRequest(limit: pageSize, offset: items.count))
             guard gen == generation else { return }
             let known = Set(items.map(\.id))
-            items += r.items.filter { !known.contains($0.id) }
+            items += visible(r.items).filter { !known.contains($0.id) }
             reachedEnd = r.items.count < pageSize
         } catch {
             errorMessage = error.localizedDescription
@@ -212,13 +263,13 @@ final class AppModel {
         // In pages: the core caps one call, and a long scroll holds more.
         while fresh.count < want {
             let limit = min(maxPage, want - fresh.count)
-            guard let r: SearchResult = try? await core.call(["cmd": "search", "q": effectiveQuery, "limit": limit, "offset": fresh.count]) else { return }
+            guard let r: SearchResult = try? await core.call(searchRequest(limit: limit, offset: fresh.count)) else { return }
             if first == nil { first = r }
             fresh += r.items
             if r.items.count < limit { break }
         }
         guard gen == generation, let first else { return }
-        items = fresh
+        items = visible(fresh)
         total = first.total
         links = first.links
         reachedEnd = fresh.count >= first.total
@@ -345,6 +396,58 @@ final class AppModel {
                 await self.refreshMeta()
             }
         }
+    }
+
+    // MARK: Clean-up view
+
+    var hasPendingTriage: Bool { triageHistory.contains(where: \.delete) }
+    var canUndoTriage: Bool { !triageHistory.isEmpty }
+
+    /// Decides on the post on screen (the first in the queue) and moves on.
+    /// The screen changes at once (so it can animate); the library is
+    /// updated right after.
+    func triage(delete: Bool) {
+        guard scope == .triage, let item = items.first else { return }
+        items.removeFirst()
+        total = max(0, total - 1)
+        triageHistory.append(TriageDecision(item: item, delete: delete))
+        if delete { triageDeleted += 1 } else { triageKept += 1 }
+        selection = items.first.map { [$0.id] } ?? []
+        let expired = triageHistory.count > triageUndoDepth ? triageHistory.removeFirst() : nil
+        let refill = items.count < 15 && !reachedEnd
+        Task {
+            if !delete { _ = await perform(["cmd": "set_reviewed", "ids": [item.id], "reviewed": true]) }
+            if let expired, expired.delete { _ = await perform(["cmd": "delete", "id": expired.item.id]) }
+            if refill { await reload() }
+        }
+    }
+
+    /// Takes back the last decision and shows that post again.
+    func undoTriage() {
+        guard let last = triageHistory.popLast() else { return }
+        if last.delete { triageDeleted -= 1 } else { triageKept -= 1 }
+        items.insert(last.item, at: 0)
+        total += 1
+        selection = [last.item.id]
+        if !last.delete {
+            Task { _ = await perform(["cmd": "set_reviewed", "ids": [last.item.id], "reviewed": false]) }
+        }
+    }
+
+    /// Carries out the deletions still waiting for an undo.
+    func commitTriage() async {
+        let pending = triageHistory.filter(\.delete)
+        triageHistory = []
+        for d in pending { _ = await perform(["cmd": "delete", "id": d.item.id]) }
+        if !pending.isEmpty { await refreshMeta() }
+    }
+
+    /// Brings every kept post back into the clean-up view.
+    func resetReviewed() async {
+        _ = await perform(["cmd": "reset_reviewed"])
+        triageKept = 0
+        triageDeleted = 0
+        await reload()
     }
 
     func filter(tag name: String) {

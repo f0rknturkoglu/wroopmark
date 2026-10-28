@@ -49,9 +49,16 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
 - Metin indekslenmeden **ve** sorgu çalışmadan önce Rust'ta katlanır:
   `İ I ı → i`, aksanlar atılır (`ş→s, ğ→g, ö→o…`). "istanbul" ⇔ "İSTANBUL" ⇔ "ıstanbul".
 - Sözdizimi: `rust async tag:dev -tag:okundu from:@jack platform:x has:image
-  before:2025-06 after:2024 "tam ifade" -kelime is:untagged is:tagged`.
+  before:2025-06 after:2024 "tam ifade" -kelime is:untagged is:tagged`,
+  ayrıca `has:ocr` (görselde yazı), `has:quote`, `is:reviewed` (ayıklamada
+  saklanan), `savedafter:` / `savedbefore:` (kaydedilme tarihi).
   Her süzgeç başına `-` alarak tersine döner: `-from:@jack`, `-@jack`,
   `-platform:tiktok`, `-has:video`, `-is:untagged`.
+- Sıralama sorgudan ayrı bir parametre (`sort`): önerilen (metin varsa
+  alaka), kaydedilme / paylaşılma tarihi (iki yön), kişi, karışık (tohumlu,
+  sayfalar arasında tutarlı).
+- Uygulamadaki gelişmiş filtre paneli yalnızca bu terimleri üretir; panelde
+  yapılan her şey arama kutusuna yazılarak da yapılabilir.
 - Etiketler hiyerarşik: `tag:dev` → `dev`, `dev/rust`, `dev/swift`.
 - Global arama aynı anda kayıtları ve link havuzunu döndürür. Sorguda kayıt
   süzgeci (etiket, kişi, platform, tarih…) varsa yalnızca bu süzgece uyan

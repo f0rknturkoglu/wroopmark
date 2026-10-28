@@ -12,6 +12,8 @@ struct SidebarView: View {
                 row("Tümü", "tray.full", model.stats?.items).tag(Scope.all)
                 row("Etiketsiz", "tag.slash", nil).tag(Scope.untagged)
                 row("Link havuzu", "link", model.stats?.links).tag(Scope.links)
+                row("Ayıkla", "arrow.left.arrow.right.square", nil).tag(Scope.triage)
+                    .help("Kayıtları tek tek gözden geçir: ← sil, → sakla")
             }
             Section("Galeri") {
                 row("Fotoğraflar", "photo.on.rectangle", nil).tag(Scope.photos)

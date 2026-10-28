@@ -32,6 +32,16 @@ struct ItemGridView: View {
                         }
                     }
                     .padding(.horizontal, 8)
+                case .feed:
+                    LazyVStack(spacing: 16) {
+                        ForEach(model.items) { item in
+                            FeedPost(item: item, selected: model.selection.contains(item.id))
+                                .modifier(Selectable(item: item, owner: self))
+                        }
+                    }
+                    .frame(maxWidth: 640)
+                    .frame(maxWidth: .infinity)
+                    .padding(16)
                 }
             }
         }
@@ -63,6 +73,7 @@ struct ItemGridView: View {
         case .links: "Link havuzu"
         case .photos: "Fotoğraflar"
         case .videos: "Videolar"
+        case .triage: "Ayıkla"
         }
     }
 
@@ -136,6 +147,19 @@ struct TagStrip: View {
         HStack(spacing: 10) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
+                    if !model.filters.isEmpty {
+                        Button { model.showFilters = true } label: {
+                            Label("\(model.filters.activeCount) filtre", systemImage: "line.3.horizontal.decrease")
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Theme.accent, in: Capsule())
+                        Button { model.filters = AdvancedFilters() } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain).foregroundStyle(.secondary)
+                            .help("Filtreleri temizle")
+                    }
                     if case .tag(let key) = model.scope {
                         TagChip(name: key, selected: true, removable: true, action: {}, remove: { model.scope = .all })
                     }
@@ -155,11 +179,12 @@ struct TagStrip: View {
             Picker("Görünüm", selection: $model.layout) {
                 Image(systemName: "square.grid.2x2").tag(LibraryLayout.grid)
                 Image(systemName: "list.bullet").tag(LibraryLayout.list)
+                Image(systemName: "rectangle.grid.1x2").tag(LibraryLayout.feed)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 76)
-            .help("Kart / liste görünümü")
+            .frame(width: 112)
+            .help("Kart / liste / akış görünümü")
         }
         .padding(.horizontal, 16)
         .background(.bar)
@@ -269,6 +294,46 @@ struct ItemCard: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// A whole post in the feed layout: full text and media at their own size,
+/// read by scrolling. Media opens in the viewer.
+struct FeedPost: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+    let selected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            AuthorLine(item: item, showHandle: true)
+            if let title = item.title, !title.isEmpty {
+                Text(title).font(.system(size: 16, weight: .semibold))
+            }
+            if !item.text.isEmpty {
+                Text(item.text)
+                    .font(.system(size: 14.5))
+                    .lineSpacing(3.5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !item.media.isEmpty {
+                // Tall (phone) media would fill several screens; capped.
+                MediaGallery(media: item.media) { model.openViewer(owner: item, fromQuote: false, index: $0) }
+                    .frame(maxHeight: 560)
+                    .frame(maxWidth: .infinity)
+            }
+            if let quote = item.quote?.item {
+                QuoteCard(item: quote) { model.openViewer(owner: item, fromQuote: true, index: $0) }
+            }
+            if !item.tags.isEmpty { CardTags(tags: item.tags) }
+        }
+        .padding(16)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .strokeBorder(selected ? Theme.accent : Theme.hairline, lineWidth: selected ? 2 : 1)
+        )
+        .contentShape(Rectangle())
     }
 }
 

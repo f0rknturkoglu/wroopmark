@@ -15,7 +15,7 @@ use crate::db::{Saved, Store};
 use crate::fetch::Fetcher;
 use crate::media::MediaStore;
 use crate::model::{Item, Media, MediaKind};
-use crate::query::Query;
+use crate::query::{Query, Sort};
 use crate::text::item_id_for_url;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -336,6 +336,9 @@ struct Page {
     limit: i64,
     #[serde(default)]
     offset: i64,
+    /// See [`Sort::parse`].
+    #[serde(default)]
+    sort: String,
 }
 
 fn default_limit() -> i64 {
@@ -516,8 +519,18 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
 
         "search" => {
             let p: Page = arg(req)?;
-            to_value(lib.store().search(&Query::parse(&p.q), p.limit.clamp(1, 500), p.offset.max(0)).map_err(db)?)
+            to_value(lib.store().search(&Query::parse(&p.q), Sort::parse(&p.sort), p.limit.clamp(1, 500), p.offset.max(0)).map_err(db)?)
         }
+        "set_reviewed" => {
+            #[derive(Deserialize)]
+            struct Reviewed {
+                ids: Vec<String>,
+                reviewed: bool,
+            }
+            let a: Reviewed = arg(req)?;
+            to_value(lib.store().set_reviewed(&a.ids, a.reviewed).map_err(db)?)
+        }
+        "reset_reviewed" => to_value(lib.store().reset_reviewed().map_err(db)?),
         "get" => to_value(lib.store().get(&arg::<Id>(req)?.id).map_err(db)?),
         "raw" => to_value(lib.store().raw(&arg::<Id>(req)?.id).map_err(db)?),
         "delete" => to_value(lib.delete(&arg::<Id>(req)?.id)?),

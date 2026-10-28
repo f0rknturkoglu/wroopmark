@@ -14,12 +14,12 @@ use serde::Serialize;
 
 use crate::media::is_name;
 use crate::model::{Item, Link, Media, MediaKind, Platform};
-use crate::query::{Has, Query, tag_key};
+use crate::query::{Has, Query, Sort, tag_key};
 use crate::text::{fold, host_of, normalize_url, now};
 
 pub type Result<T> = rusqlite::Result<T>;
 
-const SCHEMA_VERSION: i64 = 6;
+const SCHEMA_VERSION: i64 = 7;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -102,6 +102,9 @@ const MIGRATE_5: &str = "CREATE TABLE IF NOT EXISTS media_files(url TEXT PRIMARY
 /// (a few times), instead of being marked done with no title.
 const MIGRATE_6: &str = "ALTER TABLE links ADD COLUMN fetch_failures INTEGER NOT NULL DEFAULT 0;
                          ALTER TABLE links ADD COLUMN fetch_tried_at INTEGER;";
+
+/// v6 → v7: items the user decided to keep in the clean-up view.
+const MIGRATE_7: &str = "ALTER TABLE items ADD COLUMN reviewed_at INTEGER;";
 
 /// Failed link lookups: how many tries, and how long to wait between them.
 const LINK_TRIES: i64 = 3;
@@ -390,6 +393,8 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
                 Has::Media => "(i.has_image = 1 OR i.has_video = 1)",
                 Has::Link => "EXISTS (SELECT 1 FROM item_links il2 WHERE il2.item = i.pk)",
                 Has::Note => "coalesce(i.note, '') != ''",
+                Has::Ocr => "coalesce(i.ocr, '') != ''",
+                Has::Quote => "i.quote IS NOT NULL",
             };
             wh.push(format!("{neg}({cond})"));
         }
@@ -400,6 +405,19 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
     }
     if let Some(t) = q.after {
         wh.push("coalesce(i.created_at, i.saved_at) >= ?".into());
+        args.push(t.into());
+    }
+    match q.reviewed {
+        Some(true) => wh.push("i.reviewed_at IS NOT NULL".into()),
+        Some(false) => wh.push("i.reviewed_at IS NULL".into()),
+        None => {}
+    }
+    if let Some(t) = q.saved_before {
+        wh.push("i.saved_at < ?".into());
+        args.push(t.into());
+    }
+    if let Some(t) = q.saved_after {
+        wh.push("i.saved_at >= ?".into());
         args.push(t.into());
     }
 }
@@ -542,7 +560,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -562,6 +580,9 @@ impl Store {
         }
         if (1..6).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_6} PRAGMA user_version = 6; COMMIT;"))?;
+        }
+        if (1..7).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_7} PRAGMA user_version = 7; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -707,9 +728,9 @@ impl Store {
         Ok(blob.flatten().and_then(|b| zstd::decode_all(&b[..]).ok()).and_then(|b| serde_json::from_slice(&b).ok()))
     }
 
-    pub fn search(&self, q: &Query, limit: i64, offset: i64) -> Result<SearchResult> {
+    pub fn search(&self, q: &Query, sort: Sort, limit: i64, offset: i64) -> Result<SearchResult> {
         let mut from = "items i".to_string();
-        let mut order = "i.saved_at DESC, i.pk DESC";
+        let mut order = "i.saved_at DESC, i.pk DESC".to_string();
         let mut wh: Vec<String> = vec![];
         let mut args: Vec<Sql> = vec![];
 
@@ -720,12 +741,15 @@ impl Store {
             };
             from = "items i JOIN (SELECT rowid AS fid, rank FROM items_fts WHERE items_fts MATCH ?) f ON f.fid = i.pk".into();
             args.push(m.into());
-            order = "f.rank, i.saved_at DESC";
+            order = "f.rank, i.saved_at DESC".into();
         } else if let Some(neg) = q.fts_negative() {
             wh.push("i.pk NOT IN (SELECT rowid FROM items_fts WHERE items_fts MATCH ?)".into());
             args.push(neg.into());
         }
         item_filters(q, &mut wh, &mut args);
+        if let Some(o) = sort.sql() {
+            order = o;
+        }
         let where_sql = if wh.is_empty() { String::new() } else { format!("WHERE {}", wh.join(" AND ")) };
 
         let total: i64 = self.conn.query_row(&format!("SELECT count(*) FROM {from} {where_sql}"), params_from_iter(&args), |r| r.get(0))?;
@@ -1006,6 +1030,23 @@ impl Store {
         Ok(out)
     }
 
+    /// Marks items as kept (or not) in the clean-up view; kept items stay
+    /// out of it until reset.
+    pub fn set_reviewed(&mut self, ids: &[String], reviewed: bool) -> Result<usize> {
+        let tx = self.write()?;
+        let mut n = 0;
+        for id in ids {
+            n += tx.execute("UPDATE items SET reviewed_at = CASE WHEN ?2 THEN ?3 ELSE NULL END WHERE id = ?1", params![id, reviewed, now()])?;
+        }
+        tx.commit()?;
+        Ok(n)
+    }
+
+    /// Puts every kept item back in the clean-up view.
+    pub fn reset_reviewed(&mut self) -> Result<usize> {
+        self.conn.execute("UPDATE items SET reviewed_at = NULL WHERE reviewed_at IS NOT NULL", [])
+    }
+
     /// Stores recognized text ('' when there was none) and reindexes.
     pub fn set_ocr(&mut self, id: &str, text: &str) -> Result<()> {
         let pk = pk_of(&self.conn, id)?;
@@ -1079,7 +1120,7 @@ mod tests {
         assert!(s.upsert(&a).unwrap().created);
         s.upsert(&post("2", "swift ve ıspanak")).unwrap();
 
-        let find = |s: &Store, q: &str| s.search(&Query::parse(q), 50, 0).unwrap();
+        let find = |s: &Store, q: &str| s.search(&Query::parse(q), Sort::Default, 50, 0).unwrap();
         assert_eq!(find(&s, "istanbul").total, 1);
         assert_eq!(find(&s, "ISPANAK").total, 1);
         assert_eq!(find(&s, "buluş").total, 1); // prefix
@@ -1122,7 +1163,7 @@ mod tests {
         assert_eq!(s.ocr_pending(10).unwrap(), vec![("x:1".to_string(), vec!["ab.jpg".to_string()])]);
         s.set_ocr("x:1", "İndirim KODU: yaz2026").unwrap();
         assert!(s.ocr_pending(10).unwrap().is_empty());
-        assert_eq!(s.search(&Query::parse("indirim kodu"), 10, 0).unwrap().total, 1);
+        assert_eq!(s.search(&Query::parse("indirim kodu"), Sort::Default, 10, 0).unwrap().total, 1);
         assert_eq!(s.get("x:1").unwrap().unwrap().ocr.as_deref(), Some("İndirim KODU: yaz2026"));
         m.push(Media { file: Some("cd.jpg".into()), ..Media::image("https://pbs.twimg.com/media/b.jpg") });
         s.set_media("x:1", &m, None).unwrap();
@@ -1139,7 +1180,7 @@ mod tests {
         assert_eq!(s.rename_tag("dev", "kod").unwrap(), 1);
         let tags: Vec<(String, i64)> = s.tags().unwrap().into_iter().map(|t| (t.name, t.count)).collect();
         assert_eq!(tags, vec![("Kod".into(), 1), ("kod/rust".into(), 1), ("oku".into(), 1)]);
-        assert_eq!(s.search(&Query::parse("tag:kod"), 10, 0).unwrap().total, 2);
+        assert_eq!(s.search(&Query::parse("tag:kod"), Sort::Default, 10, 0).unwrap().total, 2);
         let orphans = s.delete("x:1").unwrap();
         assert!(orphans.is_empty());
         assert_eq!(s.tags().unwrap().len(), 1);
@@ -1160,7 +1201,7 @@ mod tests {
         s.upsert(&b).unwrap();
         s.add_link("https://manual.example/rust").unwrap();
 
-        let total = |q: &str| s.search(&Query::parse(q), 50, 0).unwrap().total;
+        let total = |q: &str| s.search(&Query::parse(q), Sort::Default, 50, 0).unwrap().total;
         assert_eq!(total("from:@jack"), 1);
         assert_eq!(total("-from:@jack"), 1);
         assert_eq!(total("-@dhh"), 1);
@@ -1177,8 +1218,41 @@ mod tests {
         assert_eq!(links("github before:2021"), vec!["https://github.com/rust-lang/rust"]);
         assert_eq!(links("platform:tiktok"), vec!["https://github.com/other/repo"]);
         // Item search shows links only through matching items.
-        let r = s.search(&Query::parse("github -platform:tiktok"), 50, 0).unwrap();
+        let r = s.search(&Query::parse("github -platform:tiktok"), Sort::Default, 50, 0).unwrap();
         assert_eq!(r.links.iter().map(|l| l.url.as_str()).collect::<Vec<_>>(), vec!["https://github.com/rust-lang/rust"]);
+    }
+
+    #[test]
+    fn sorting_and_review() {
+        let mut s = Store::open_in_memory().unwrap();
+        for (id, posted, saved, author) in [("1", 300, 10, "zed"), ("2", 100, 30, "amy"), ("3", 200, 20, "Bob")] {
+            let mut p = post(id, "kayıt");
+            p.created_at = Some(posted);
+            p.saved_at = saved;
+            p.author_handle = Some(author.into());
+            s.upsert(&p).unwrap();
+        }
+        let ids = |s: &Store, q: &str, sort: &str| -> Vec<String> {
+            s.search(&Query::parse(q), Sort::parse(sort), 10, 0).unwrap().items.into_iter().map(|i| i.id).collect()
+        };
+        assert_eq!(ids(&s, "", ""), ["x:2", "x:3", "x:1"]);
+        assert_eq!(ids(&s, "", "saved_asc"), ["x:1", "x:3", "x:2"]);
+        assert_eq!(ids(&s, "", "posted"), ["x:1", "x:3", "x:2"]);
+        assert_eq!(ids(&s, "kayıt", "posted_asc"), ["x:2", "x:3", "x:1"]);
+        assert_eq!(ids(&s, "", "author"), ["x:2", "x:3", "x:1"]);
+        let shuffled = ids(&s, "", "random:7");
+        assert_eq!(shuffled.len(), 3);
+        assert_eq!(shuffled, ids(&s, "", "random:7")); // stable per seed
+        assert_eq!(ids(&s, "savedbefore:1970-01-02", "").len(), 3);
+        assert_eq!(ids(&s, "savedafter:1970-01-01", "").len(), 0); // "after" a day: from the next one
+
+        assert_eq!(s.set_reviewed(&["x:1".into()], true).unwrap(), 1);
+        assert_eq!(ids(&s, "-is:reviewed", "saved_asc"), ["x:3", "x:2"]);
+        assert_eq!(ids(&s, "is:reviewed", ""), ["x:1"]);
+        s.set_reviewed(&["x:1".into()], false).unwrap();
+        s.set_reviewed(&["x:2".into(), "x:3".into()], true).unwrap();
+        assert_eq!(s.reset_reviewed().unwrap(), 2);
+        assert_eq!(ids(&s, "-is:reviewed", "").len(), 3);
     }
 
     #[test]
@@ -1284,7 +1358,7 @@ mod tests {
             // Back to a v3 library: no OCR column, no known files, no link retries.
             s.conn
                 .execute_batch(
-                    "ALTER TABLE items DROP COLUMN ocr; DROP TABLE media_files;
+                    "ALTER TABLE items DROP COLUMN ocr; ALTER TABLE items DROP COLUMN reviewed_at; DROP TABLE media_files;
                      ALTER TABLE links DROP COLUMN fetch_failures; ALTER TABLE links DROP COLUMN fetch_tried_at;
                      PRAGMA user_version = 3;",
                 )
@@ -1296,7 +1370,7 @@ mod tests {
         assert_eq!(s.known_file("https://pbs.twimg.com/media/a.jpg").unwrap().as_deref(), Some("0123456789abcdef0123456789abcdef.jpg"));
         assert_eq!(s.ocr_pending(10).unwrap().len(), 1);
         assert_eq!(s.links_to_enrich(10).unwrap().len(), 1);
-        assert_eq!(s.search(&Query::parse("eski"), 10, 0).unwrap().total, 1);
+        assert_eq!(s.search(&Query::parse("eski"), Sort::Default, 10, 0).unwrap().total, 1);
         drop(s);
         for ext in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{ext}", path.display()));

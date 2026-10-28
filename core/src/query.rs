@@ -3,12 +3,15 @@
 //! ```text
 //! rust async  "tam ifade"  -kelime
 //! tag:dev  -tag:okundu  is:untagged  is:tagged
-//! from:@jack  @jack  platform:x  has:image|video|media|link|note
+//! from:@jack  @jack  platform:x  has:image|video|media|link|note|ocr|quote
+//! is:reviewed  (kept in the clean-up view)
 //! before:2025-06  after:2024  (post date, falls back to save date)
+//! savedbefore:2026-10  savedafter:2026-01  (when it was saved)
 //! ```
 //!
 //! Every filter can be negated with a leading `-` (`-from:@jack`, `-@jack`,
-//! `-platform:tiktok`, `-has:video`, `-is:untagged`).
+//! `-platform:tiktok`, `-has:video`, `-is:untagged`, `-is:reviewed`).
+//! Sorting is not part of the text; see [`Sort`].
 
 use chrono::NaiveDate;
 
@@ -31,8 +34,63 @@ pub struct Query {
     pub not_has: Vec<Has>,
     /// `is:untagged` → Some(false), `is:tagged` / `-is:untagged` → Some(true).
     pub tagged: Option<bool>,
+    /// `is:reviewed` → Some(true), `-is:reviewed` → Some(false).
+    pub reviewed: Option<bool>,
     pub before: Option<i64>,
     pub after: Option<i64>,
+    pub saved_before: Option<i64>,
+    pub saved_after: Option<i64>,
+}
+
+/// Result order. `Default` is relevance when there is text, else newest
+/// saved first.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum Sort {
+    #[default]
+    Default,
+    SavedNewest,
+    SavedOldest,
+    PostedNewest,
+    PostedOldest,
+    Author,
+    /// A fixed shuffle per seed, so paging through it stays consistent.
+    Random(u32),
+}
+
+impl Sort {
+    /// `saved`, `saved_asc`, `posted`, `posted_asc`, `author`, `random:<seed>`;
+    /// anything else is the default.
+    pub fn parse(s: &str) -> Self {
+        match s.trim() {
+            "saved" => Sort::SavedNewest,
+            "saved_asc" => Sort::SavedOldest,
+            "posted" => Sort::PostedNewest,
+            "posted_asc" => Sort::PostedOldest,
+            "author" => Sort::Author,
+            s => match s.strip_prefix("random:").and_then(|n| n.parse().ok()) {
+                Some(seed) => Sort::Random(seed),
+                None if s == "random" => Sort::Random(1),
+                None => Sort::Default,
+            },
+        }
+    }
+
+    /// ORDER BY terms over `items i`; `None` keeps the search's own order.
+    pub fn sql(self) -> Option<String> {
+        let posted = "coalesce(i.created_at, i.saved_at)";
+        Some(match self {
+            Sort::Default => return None,
+            Sort::SavedNewest => "i.saved_at DESC, i.pk DESC".into(),
+            Sort::SavedOldest => "i.saved_at ASC, i.pk ASC".into(),
+            Sort::PostedNewest => format!("{posted} DESC, i.pk DESC"),
+            Sort::PostedOldest => format!("{posted} ASC, i.pk ASC"),
+            Sort::Author => {
+                "coalesce(i.author_handle, i.author_name) IS NULL, lower(coalesce(i.author_handle, i.author_name)), i.saved_at DESC".into()
+            }
+            // A multiplicative hash of pk + seed; small enough not to overflow.
+            Sort::Random(seed) => format!("((i.pk + {}) * 2654435761) % 4294967291, i.pk", seed % 1_000_000),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -42,6 +100,9 @@ pub enum Has {
     Media,
     Link,
     Note,
+    /// Text was read from its pictures.
+    Ocr,
+    Quote,
 }
 
 /// Splits on whitespace, keeping `"quoted phrases"` (and `key:"quoted"`) whole.
@@ -142,6 +203,8 @@ impl Query {
                             "media" | "medya" => Some(Has::Media),
                             "link" | "links" => Some(Has::Link),
                             "note" | "not" => Some(Has::Note),
+                            "ocr" | "yazi" => Some(Has::Ocr),
+                            "quote" | "alinti" => Some(Has::Quote),
                             _ => None,
                         };
                         h.map(|h| if neg { q.not_has.push(h) } else { q.has.push(h) }).is_some()
@@ -155,8 +218,14 @@ impl Query {
                             q.tagged = Some(!neg);
                             true
                         }
+                        "reviewed" => {
+                            q.reviewed = Some(!neg);
+                            true
+                        }
                         _ => false,
                     },
+                    "savedbefore" | "saved-before" => parse_date(&val, false).map(|t| q.saved_before = Some(t)).is_some(),
+                    "savedafter" | "saved-after" => parse_date(&val, true).map(|t| q.saved_after = Some(t)).is_some(),
                     "before" | "until" => parse_date(&val, false).map(|t| q.before = Some(t)).is_some(),
                     "after" | "since" => parse_date(&val, true).map(|t| q.after = Some(t)).is_some(),
                     _ => false,
@@ -222,8 +291,11 @@ impl Query {
             || !self.has.is_empty()
             || !self.not_has.is_empty()
             || self.tagged.is_some()
+            || self.reviewed.is_some()
             || self.before.is_some()
             || self.after.is_some()
+            || self.saved_before.is_some()
+            || self.saved_after.is_some()
     }
 }
 
@@ -258,6 +330,19 @@ mod tests {
         assert_eq!(Query::parse("is:tagged").tagged, Some(true));
         assert!(q.filters_items());
         assert!(!Query::parse("rust -go").filters_items());
+    }
+
+    #[test]
+    fn review_saved_dates_and_sort() {
+        let q = Query::parse("-is:reviewed savedafter:2026-01 savedbefore:2026-10 has:ocr -has:quote");
+        assert_eq!(q.reviewed, Some(false));
+        assert_eq!(q.saved_after, parse_date("2026-01", true));
+        assert_eq!(q.saved_before, parse_date("2026-10", false));
+        assert_eq!((q.has.as_slice(), q.not_has.as_slice()), (&[Has::Ocr][..], &[Has::Quote][..]));
+        assert_eq!(Sort::parse("random:42"), Sort::Random(42));
+        assert_eq!(Sort::parse("posted_asc"), Sort::PostedOldest);
+        assert_eq!(Sort::parse("nonsense"), Sort::Default);
+        assert!(Sort::Default.sql().is_none());
     }
 
     #[test]
