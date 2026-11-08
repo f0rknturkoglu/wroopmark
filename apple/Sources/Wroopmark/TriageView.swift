@@ -53,6 +53,7 @@ struct TriageView: View {
             }
             .padding(20)
         }
+        .task(id: model.items.first?.id) { await model.loadTriageSuggestions() }
         .onAppear {
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 MainActor.assumeIsolated { handle(event) } ? nil : event
@@ -75,9 +76,24 @@ struct TriageView: View {
         case (123, []): decide(delete: true)
         case (124, []): decide(delete: false)
         case (_, [.command]) where event.charactersIgnoringModifiers == "z" && model.canUndoTriage: undo()
+        // 1–3: the suggested folders.
+        case (_, []) where suggestionIndex(event) != nil:
+            guard let i = suggestionIndex(event), let folder = suggestedFolder(at: i) else { return false }
+            moveToFolder(folder)
         default: return false
         }
         return true
+    }
+
+    private func suggestionIndex(_ event: NSEvent) -> Int? {
+        guard let c = event.charactersIgnoringModifiers, let n = Int(c), n >= 1, n <= model.triageSuggestions.count else { return nil }
+        return n - 1
+    }
+
+    private func suggestedFolder(at i: Int) -> Folder? {
+        guard model.triageSuggestions.indices.contains(i) else { return nil }
+        let id = model.triageSuggestions[i].id
+        return model.folders.first { $0.id == id }
     }
 
     private func decide(delete: Bool) {
@@ -101,6 +117,35 @@ struct TriageView: View {
 
     private var controls: some View {
         VStack(spacing: 12) {
+            if !model.triageSuggestions.isEmpty, !model.items.isEmpty {
+                HStack(spacing: 8) {
+                    Label("Önerilen", systemImage: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                    ForEach(Array(model.triageSuggestions.enumerated()), id: \.element.id) { i, s in
+                        if let folder = suggestedFolder(at: i) {
+                            Button { moveToFolder(folder) } label: {
+                                HStack(spacing: 6) {
+                                    Text("\(i + 1)")
+                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 16, height: 16)
+                                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    Text(s.name.replacingOccurrences(of: "/", with: " › "))
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text(s.reasonLabel)
+                                        .font(.system(size: 10.5))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(Theme.accent)
+                            .help("\"\(s.name)\" klasörüne taşı ve sakla (\(i + 1))")
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
             if !model.folders.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -174,7 +219,8 @@ struct TriageView: View {
 
     private var summary: String {
         var parts = ["← sil", "→ sakla", "⌘Z geri al"]
-        if !model.folders.isEmpty { parts.append("tek tıkla klasöre taşı") }
+        if !model.triageSuggestions.isEmpty { parts.append("1–\(model.triageSuggestions.count) önerilen klasöre taşı") }
+        else if !model.folders.isEmpty { parts.append("tek tıkla klasöre taşı") }
         if model.triageDeleted + model.triageKept > 0 {
             parts.append("bu oturumda \(model.triageDeleted) silindi, \(model.triageKept) saklandı")
         }

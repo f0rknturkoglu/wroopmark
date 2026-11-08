@@ -1,4 +1,5 @@
 import AppKit
+import CoreSpotlight
 import SwiftUI
 
 @MainActor
@@ -22,9 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct WroopmarkApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
+    @AppStorage("menuBarIcon") private var menuBarIcon = true
 
     var body: some Scene {
-        WindowGroup("wroopmark") {
+        WindowGroup("wroopmark", id: "main") {
             ContentView()
                 .environment(model)
                 .frame(minWidth: 980, minHeight: 600)
@@ -32,6 +34,14 @@ struct WroopmarkApp: App {
                 .task {
                     delegate.model = model
                     await model.start()
+                }
+                // wroopmark://item/<id> (the browser extension), …/search, …/add
+                .onOpenURL { model.open(url: $0) }
+                // …in this window, instead of opening a new one per link.
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
+                // A post picked in Spotlight.
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                    if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.reveal(id: id) }
                 }
         }
         .defaultSize(width: 1360, height: 860)
@@ -61,11 +71,17 @@ struct WroopmarkApp: App {
                 Divider()
                 Button("Filtreler…") { model.showFilters = true }
                     .keyboardShortcut("f", modifiers: [.command, .option])
+                Button("Aramayı kaydet…") { model.showSaveSearch = true }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                    .disabled(model.searchToSave.isEmpty)
                 Button("Ayıkla") { model.scope = .triage }
                     .keyboardShortcut("k", modifiers: [.command, .shift])
                 Divider()
                 Button("İndirmeler") { model.showDownloads.toggle() }
                     .keyboardShortcut("j", modifiers: .command)
+                Divider()
+                Button(model.isBackingUp ? "Yedekleniyor…" : "Şimdi yedekle") { Task { await model.runBackup() } }
+                    .disabled(model.backupFolder == nil || model.isBackingUp)
             }
             CommandMenu("Görünüm") {
                 Picker("Tema", selection: $model.theme) {
@@ -75,6 +91,15 @@ struct WroopmarkApp: App {
                 }
             }
         }
+
+        MenuBarExtra(isInserted: $menuBarIcon) {
+            QuickAddMenu()
+                .environment(model)
+                .tint(Theme.accent)
+        } label: {
+            Image(systemName: "bookmark.fill")
+        }
+        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView()

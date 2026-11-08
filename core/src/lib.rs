@@ -7,6 +7,8 @@
 //! - [`media`]   content-addressed media files
 //! - [`x`]       X/Twitter GraphQL timeline parser (fed by the extensions)
 //! - [`tiktok`]  TikTok item parser (video pages and web API responses)
+//! - [`reddit`]  Reddit listing parser (saved posts and comments)
+//! - [`instagram`] Instagram media parser (the Saved page's API responses)
 //! - [`fetch`]   network capture for plain URLs (oEmbed, OpenGraph)
 //! - [`api`]     JSON command surface shared by FFI, CLI and native host
 //! - [`ffi`]     C ABI for Swift
@@ -16,9 +18,11 @@ pub mod db;
 pub mod external;
 pub mod fetch;
 pub mod ffi;
+pub mod instagram;
 pub mod media;
 pub mod model;
 pub mod query;
+pub mod reddit;
 pub mod text;
 pub mod tiktok;
 pub mod x;

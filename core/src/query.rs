@@ -39,6 +39,8 @@ pub struct Query {
     pub folder: Option<String>,
     pub not_folder: Option<String>,
     pub in_folder: Option<bool>,
+    /// `id:x:123` — exactly these items (links from Spotlight, the extension).
+    pub ids: Vec<String>,
     pub before: Option<i64>,
     pub after: Option<i64>,
     pub saved_before: Option<i64>,
@@ -177,6 +179,10 @@ impl Query {
                         } else {
                             q.tags.push(t)
                         }
+                        true
+                    }
+                    "id" if !neg => {
+                        q.ids.push(val.to_string());
                         true
                     }
                     "folder" | "klasor" | "f" => {

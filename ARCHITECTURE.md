@@ -51,7 +51,8 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
 - Sözdizimi: `rust async tag:dev -tag:okundu from:@jack platform:x has:image
   before:2025-06 after:2024 "tam ifade" -kelime is:untagged is:tagged`,
   ayrıca `has:ocr` (görselde yazı), `has:quote`, `is:reviewed` (ayıklamada
-  saklanan), `savedafter:` / `savedbefore:` (kaydedilme tarihi).
+  saklanan), `savedafter:` / `savedbefore:` (kaydedilme tarihi),
+  `folder:ad` (alt klasörler dahil), `is:unfiled`, `id:x:123` (tam o kayıt).
   Her süzgeç başına `-` alarak tersine döner: `-from:@jack`, `-@jack`,
   `-platform:tiktok`, `-has:video`, `-is:untagged`.
 - Sıralama sorgudan ayrı bir parametre (`sort`): önerilen (metin varsa
@@ -73,6 +74,8 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
 | X yer imleri | Eklenti, x.com'un kendi GraphQL cevaplarını dinler. `/i/bookmarks` bir kez kaydırılınca tüm arşiv gelir. Yer imine eklediğin anda (`CreateBookmark`) o tweet daha önce görülen timeline cevabından alınıp kaydedilir. API ücreti yok, giriş bilgisi bizde değil. |
 | Tek tweet URL'si | `publish.twitter.com/oembed` (metin + yazar, görselsiz) |
 | TikTok | Eklenti: Kaydedilenler / Beğenilenler listeleri (sayfanın kendi API yanıtları); fotoğraf gönderilerinin tüm görselleri |
+| Instagram | Eklenti: Kaydedilenler sayfasının kendi API yanıtları (REST ya da GraphQL); kaydet düğmesine basınca o gönderi |
+| Reddit | Eklenti: `/user/<ad>/saved.json` kullanıcının kendi oturumuyla, 100'er 100'er (gönderi + yorum) |
 | Pinterest / Facebook / web | Sayfanın `og:` etiketleri + makale metni |
 | Toplu | (sonra) TikTok "Favorite Videos" / Facebook "Saved items" export içe aktarma |
 

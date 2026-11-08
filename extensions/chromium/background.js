@@ -68,6 +68,8 @@ function defaultCollected() {
     x_ids: [],
     tiktok_payloads: [],
     tiktok_ids: [],
+    ig_payloads: [],
+    ig_codes: [],
     page_items: [],
     page_urls: [],
   };
@@ -90,7 +92,7 @@ async function clearCollected() {
 }
 
 function getTotalCollectedCount(c) {
-  return (c.x_ids?.length || 0) + (c.tiktok_ids?.length || 0) + (c.page_items?.length || 0);
+  return (c.x_ids?.length || 0) + (c.tiktok_ids?.length || 0) + (c.ig_codes?.length || 0) + (c.page_items?.length || 0);
 }
 
 async function updateBadge(collected) {
@@ -170,6 +172,22 @@ async function handleCapture({ kind, payload }, tabId) {
     return;
   }
 
+  if (kind === "instagram_list") {
+    c.ig_codes ||= [];
+    c.ig_payloads ||= [];
+    let added = 0;
+    for (const m of payload?.items || []) {
+      if (m?.code && !c.ig_codes.includes(m.code)) {
+        c.ig_codes.push(m.code);
+        added++;
+      }
+    }
+    if (added) c.ig_payloads.push(payload);
+    await setCollected(c);
+    log(`Instagram: ${payload?.items?.length || 0} gönderi görüldü (+${added} yeni, kuyrukta: ${c.ig_codes.length})`);
+    return;
+  }
+
   if (kind === "x_url") {
     const url = `https://x.com/i/status/${payload}`;
     if (!c.page_urls.includes(url)) {
@@ -239,7 +257,17 @@ async function importCollected() {
     }
   }
 
-  // 3. Import generic page items
+  // 3. Import Instagram payloads
+  for (const payload of c.ig_payloads || []) {
+    const report = await call("import_instagram", { payload });
+    if (report.ok) {
+      totalNew += report.data?.new || 0;
+      totalUpdated += report.data?.updated || 0;
+      if (report.data?.ids) importedIds.push(...report.data.ids);
+    }
+  }
+
+  // 4. Import generic page items
   if (c.page_items.length > 0) {
     const report = await call("import_items", { items: c.page_items });
     if (report.ok) {
@@ -728,43 +756,170 @@ function capturePage(selection) {
 
 // --- Saving the active tab ---------------------------------------------------
 
-async function saveTab(tab, { tags = [], note = null, selection = null } = {}) {
+async function saveTab(tab, { tags = [], note = null, selection = null, folder_id = null } = {}) {
   let item;
   try {
     const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: capturePage, args: [selection] });
     item = res.result;
   } catch {
-    const report = await call("add_url", { url: tab.url, tags, note });
-    return report;
+    const report = await call("add_url", { url: tab.url, tags, note, folder_id });
+    if (report.ok) savedNow(tab);
+    return report.ok ? { ok: true, data: { id: report.data.id } } : report;
   }
 
   item.note = note;
   const allTags = [...new Set([...(item.tags || []), ...tags])];
-  const report = await call("import_items", { items: [item], tags: allTags });
-
-  if (report.ok && report.data?.ids?.length) {
-    chrome.action.setBadgeBackgroundColor({ color: "#2e7d32" });
-    chrome.action.setBadgeText({ text: "✓" });
-    setTimeout(() => chrome.action.setBadgeText({ text: "" }), 3000);
-  }
-
+  const report = await call("import_items", { items: [item], tags: allTags, folder_id });
+  if (report.ok && report.data?.ids?.length) savedNow(tab);
   return report.ok ? { ok: true, data: { id: report.data.ids[0] } } : report;
+}
+
+// --- "Already saved" badge ----------------------------------------------------
+// Each page's own badge shows ✓ when the library has it. Lookups go to the
+// local library only, and are remembered for a couple of minutes.
+
+const LOOKUP_TTL = 120_000;
+const lookups = new Map(); // url -> { at, data }
+
+function setTabBadge(tabId, saved) {
+  try {
+    if (saved) {
+      chrome.action.setBadgeBackgroundColor({ tabId, color: "#2e7d32" });
+      chrome.action.setBadgeText({ tabId, text: "✓" });
+      const where = saved.folder ? ` · ${saved.folder}` : "";
+      chrome.action.setTitle({ tabId, title: `wroopmark: bu sayfa arşivde${where}` });
+    } else {
+      // null falls back to the global badge (the collected count).
+      chrome.action.setBadgeText({ tabId, text: null });
+      chrome.action.setTitle({ tabId, title: "wroopmark" });
+    }
+  } catch {}
+}
+
+async function refreshSavedBadge(tabId, url) {
+  if (tabId == null || !url || !/^https?:/.test(url)) return;
+  let hit = lookups.get(url);
+  if (!hit || Date.now() - hit.at > LOOKUP_TTL) {
+    const r = await call("lookup_url", { url });
+    if (!r.ok) return;
+    hit = { at: Date.now(), data: r.data };
+    lookups.set(url, hit);
+    if (lookups.size > 300) lookups.delete(lookups.keys().next().value);
+  }
+  setTabBadge(tabId, hit.data);
+}
+
+function savedNow(tab) {
+  if (!tab) return;
+  lookups.delete(tab.url);
+  refreshSavedBadge(tab.id, tab.url);
+}
+
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (info.status === "complete" || info.url) refreshSavedBadge(tabId, tab.url);
+});
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs.get(tabId).then((tab) => refreshSavedBadge(tabId, tab.url), () => {});
+});
+
+// --- Reddit: the whole saved list, read with the user's own session ---------
+
+// Runs inside a reddit.com tab.
+async function redditSavedPages(maxPages) {
+  const me = await fetch("/api/me.json", { credentials: "include" })
+    .then((r) => r.json())
+    .catch(() => null);
+  const name = me && me.data && me.data.name;
+  if (!name) return { error: "Reddit'e giriş yapılmamış görünüyor" };
+  const pages = [];
+  let after = null;
+  for (let i = 0; i < maxPages; i++) {
+    const q = `limit=100&raw_json=1${after ? `&after=${after}` : ""}`;
+    const r = await fetch(`/user/${encodeURIComponent(name)}/saved.json?${q}`, { credentials: "include" });
+    if (!r.ok) break;
+    const page = await r.json();
+    pages.push(page);
+    after = page && page.data && page.data.after;
+    if (!after) break;
+    // Unhurried, like the rest of the archive.
+    await new Promise((ok) => setTimeout(ok, 800));
+  }
+  return { name, pages };
+}
+
+async function importReddit() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !/^https:\/\/([a-z0-9-]+\.)?reddit\.com\//.test(tab.url || "")) {
+    return { ok: false, error: "Önce reddit.com'da bir sekme aç" };
+  }
+  let res;
+  try {
+    [{ result: res }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: redditSavedPages, args: [10] });
+  } catch (e) {
+    return { ok: false, error: `Reddit okunamadı: ${e}` };
+  }
+  if (!res || res.error) return { ok: false, error: res?.error || "Reddit okunamadı" };
+  let total = 0;
+  let fresh = 0;
+  for (const payload of res.pages) {
+    const r = await call("import_reddit", { payload });
+    if (!r.ok) return { ok: false, error: r.error };
+    total += r.data.ids.length;
+    fresh += r.data.new;
+  }
+  log(`reddit: u/${res.name} ${res.pages.length} sayfa, ${total} kayıt (${fresh} yeni)`);
+  savedNow(tab);
+  return { ok: true, data: { name: res.name, total, new: fresh } };
 }
 
 // --- Context Menus -----------------------------------------------------------
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({ id: "save", title: "wroopmark'a kaydet", contexts: ["page", "selection", "link", "image"] });
-});
+const MENU_CONTEXTS = ["page", "selection", "link", "image"];
+
+// "Save" plus "Save to folder ›" with the library's folders. Rebuilt when
+// the browser starts and whenever the popup has read the folders.
+let menuBuild = Promise.resolve();
+function buildMenus() {
+  menuBuild = menuBuild.then(async () => {
+    await chrome.contextMenus.removeAll();
+    chrome.contextMenus.create({ id: "save", title: "wroopmark'a kaydet", contexts: MENU_CONTEXTS });
+    const r = await call("folders");
+    if (!r.ok || !r.data.length) return;
+    chrome.contextMenus.create({ id: "save-folder", title: "wroopmark'ta klasöre kaydet", contexts: MENU_CONTEXTS });
+    for (const f of r.data.slice(0, 40)) {
+      chrome.contextMenus.create({ id: `folder:${f.id}`, parentId: "save-folder", title: f.name.replaceAll("/", " › "), contexts: MENU_CONTEXTS });
+    }
+  }).catch(() => {});
+  return menuBuild;
+}
+
+chrome.runtime.onInstalled.addListener(buildMenus);
+chrome.runtime.onStartup.addListener(buildMenus);
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  const m = String(info.menuItemId).match(/^folder:(\d+)$/);
+  const folder_id = m ? Number(m[1]) : null;
   if (info.mediaType === "image" && info.srcUrl) {
     const item = { url: info.srcUrl, title: tab?.title ?? null, text: "", media: [{ kind: "image", url: info.srcUrl }], links: [info.pageUrl] };
-    await call("import_items", { items: [item] });
+    await call("import_items", { items: [item], folder_id });
   } else if (info.linkUrl) {
-    await call("add_url", { url: info.linkUrl });
+    await call("add_url", { url: info.linkUrl, folder_id });
   } else if (tab) {
-    await saveTab(tab, { selection: info.selectionText ?? null });
+    await saveTab(tab, { selection: info.selectionText ?? null, folder_id });
+  }
+});
+
+// ⌥⇧S: save the page in front, into the folder last picked in the popup.
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "save-page") return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  const { lastFolder } = await chrome.storage.local.get("lastFolder");
+  const r = await saveTab(tab, { folder_id: lastFolder ? Number(lastFolder) : null });
+  if (!r.ok) {
+    log(`kısayol: kaydedilemedi: ${r.error}`);
+    chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: "#c62828" });
+    chrome.action.setBadgeText({ tabId: tab.id, text: "!" });
   }
 });
 
@@ -775,6 +930,8 @@ const fromExtensionPage = (sender) => !sender.tab && (!sender.url || sender.url.
 const POPUP_ONLY = new Set([
   "call",
   "save_tab",
+  "import_reddit",
+  "folders_changed",
   "toggle_autoscroll",
   "get_scroll_status",
   "get_collected",
@@ -870,6 +1027,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
             total: getTotalCollectedCount(c),
             x: c.x_ids?.length || 0,
             tiktok: c.tiktok_ids?.length || 0,
+            instagram: c.ig_codes?.length || 0,
             pages: c.page_items?.length || 0,
           },
         });
@@ -879,6 +1037,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     case "import_collected":
       importCollected().then(reply);
       return true;
+
+    case "import_reddit":
+      importReddit().then(reply);
+      return true;
+
+    case "folders_changed":
+      buildMenus();
+      return false;
 
     case "clear_collected":
       clearCollected().then(() => reply({ ok: true }));

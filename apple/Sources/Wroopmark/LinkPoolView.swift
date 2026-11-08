@@ -6,6 +6,7 @@ struct LinkPoolView: View {
     @State private var newLink = ""
     @State private var selectedID: Int64?
     @State private var deletingLink: LinkRow?
+    @State private var onlyDead = false
 
     private var currentCategory: LinkCategory? {
         if case .links(let cat) = model.scope { return cat }
@@ -13,11 +14,13 @@ struct LinkPoolView: View {
     }
 
     private var displayedLinks: [LinkRow] {
-        if let cat = currentCategory {
-            return model.links.filter { cat.matches(host: $0.host, url: $0.url) }
-        }
-        return model.links
+        var links = model.links
+        if let cat = currentCategory { links = links.filter { cat.matches(host: $0.host, url: $0.url) } }
+        if onlyDead { links = links.filter(\.dead) }
+        return links
     }
+
+    private var deadCount: Int { model.links.count(where: \.dead) }
 
     private var title: String {
         if let cat = currentCategory {
@@ -49,6 +52,14 @@ struct LinkPoolView: View {
                                 Text("· \(link.itemCount) kayıtta").monospacedDigit()
                             }
                             if link.manual { Image(systemName: "hand.point.up.left").help("Elle eklendi") }
+                            if link.dead {
+                                Text(link.status == 0 ? "kırık · sunucu yok" : "kırık · \(link.status ?? 0)")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5).padding(.vertical, 1)
+                                    .background(Color.red.opacity(0.8), in: Capsule())
+                                    .help("Son kontrolde sayfa açılmadı. Gönderinin kendisi arşivde duruyor.")
+                            }
                         }
                         .font(.caption).foregroundStyle(.secondary)
                     }
@@ -109,13 +120,32 @@ struct LinkPoolView: View {
                 } label: { Label("Başlıkları getir", systemImage: "text.badge.plus") }
                     .help("Başlığı olmayan linklerin sayfa başlığını indir")
                     .disabled(model.isBusy)
+                if model.isCheckingLinks {
+                    Button { model.stopCheckingLinks() } label: {
+                        Label("Durdur (\(model.linksChecked))", systemImage: "stop.circle")
+                    }
+                    .help("Link kontrolünü durdur")
+                } else {
+                    Button {
+                        Task { await model.checkLinks() }
+                    } label: { Label("Kırıkları bul", systemImage: "stethoscope") }
+                        .help("Bu hafta kontrol edilmemiş linklerin hâlâ açılıp açılmadığına bak")
+                }
+                Toggle(isOn: $onlyDead) {
+                    Label(deadCount > 0 ? "Kırık (\(deadCount))" : "Kırık", systemImage: "exclamationmark.triangle")
+                }
+                .toggleStyle(.button)
+                .help("Yalnızca kırık linkleri göster")
             }
             .padding(10)
             .background(.bar)
         }
         .overlay {
             if displayedLinks.isEmpty {
-                if let cat = currentCategory {
+                if onlyDead {
+                    ContentUnavailableView("Kırık link yok", systemImage: "checkmark.circle",
+                                           description: Text("Kontrol edilen linklerin hepsi açılıyor. \"Kırıkları bul\" yeni kontrol başlatır."))
+                } else if let cat = currentCategory {
                     ContentUnavailableView {
                         Label("\(cat.label) linki yok", systemImage: cat.symbolFallback)
                     } description: {

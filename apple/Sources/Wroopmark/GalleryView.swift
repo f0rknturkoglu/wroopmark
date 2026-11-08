@@ -39,13 +39,75 @@ struct GalleryView: View {
             .padding(8)
         }
         .background(Theme.canvas)
+        .safeAreaInset(edge: .top, spacing: 0) { bar(count: entries.count) }
         .overlay {
             if entries.isEmpty && !model.isLoading {
-                ContentUnavailableView(videos ? "Video yok" : "Fotoğraf yok",
-                                       systemImage: videos ? "play.rectangle" : "photo.on.rectangle")
+                if model.filters.isEmpty && model.query.isEmpty {
+                    ContentUnavailableView(videos ? "Video yok" : "Fotoğraf yok",
+                                           systemImage: videos ? "play.rectangle" : "photo.on.rectangle")
+                } else {
+                    ContentUnavailableView {
+                        Label("Eşleşen \(videos ? "video" : "fotoğraf") yok", systemImage: "line.3.horizontal.decrease.circle")
+                    } actions: {
+                        Button("Filtreleri temizle") {
+                            model.filters = AdvancedFilters()
+                            model.query = ""
+                        }
+                    }
+                }
             }
         }
         .navigationTitle("")
+    }
+
+    /// Title, how many are loaded, and the folder filter one click away.
+    private func bar(count: Int) -> some View {
+        HStack(spacing: 10) {
+            Text(videos ? "Videolar" : "Fotoğraflar")
+                .font(.system(size: 13, weight: .semibold))
+            if count > 0 {
+                // Posts are paged in, so this grows while scrolling.
+                Text(model.reachedEnd ? count.formatted() : "\(count.formatted())+")
+                    .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Color.primary.opacity(0.06), in: Capsule())
+            }
+            Spacer()
+            let others = model.filters.activeCount - (model.filters.folder == .any ? 0 : 1)
+            if others > 0 {
+                Button { model.showFilters = true } label: {
+                    Label("\(others) filtre daha", systemImage: "line.3.horizontal.decrease")
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .help("Filtre panelini aç")
+            }
+            Image(systemName: "folder")
+                .font(.system(size: 12))
+                .foregroundStyle(model.filters.folder == .any ? Color.secondary : Theme.accent)
+            FolderFilterPicker()
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                .help("Klasöre göre süz (alt klasörler dahil)")
+            if model.filters.folder != .any {
+                Button { model.filters.folder = .any } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .frame(minWidth: 22, minHeight: 22)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Klasör filtresini kaldır")
+                .help("Klasör filtresini kaldır")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     private func tile(_ e: Entry) -> some View {

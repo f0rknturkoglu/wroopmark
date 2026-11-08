@@ -239,6 +239,8 @@ fn native_host() -> i32 {
                 let mut r = api::handle_value(&lib, req);
                 match r.get("error").and_then(Value::as_str) {
                     Some(err) => host_log(&root, &format!("{cmd}: HATA {err}")),
+                    // Asked on every page load (the "saved" badge): not logged.
+                    None if matches!(cmd.as_str(), "lookup_url" | "folders") => {}
                     None => host_log(&root, &format!("{cmd}: {}", summary(&r["data"]))),
                 }
                 if let Some(rid) = reply_to {

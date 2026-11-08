@@ -77,11 +77,7 @@ impl MediaStore {
 
     /// Size of a stored file in bytes, if it exists.
     pub fn file_size(&self, name: &str) -> Option<i64> {
-        if is_name(name) {
-            fs::metadata(self.path(name)).map(|m| m.len() as i64).ok()
-        } else {
-            None
-        }
+        if is_name(name) { fs::metadata(self.path(name)).map(|m| m.len() as i64).ok() } else { None }
     }
 
     /// Stores the bytes and returns their name. Writes go through a temp file

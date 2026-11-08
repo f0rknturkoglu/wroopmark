@@ -233,6 +233,39 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  select {
+    width: 100%;
+    font: inherit;
+    font-size: 12.5px;
+    color: inherit;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 6px 8px;
+    outline: none;
+  }
+  .saved-here {
+    display: none;
+    margin-bottom: 8px;
+    padding: 6px 9px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    color: var(--success);
+    background: color-mix(in srgb, var(--success) 12%, transparent);
+  }
+  .saved-here.on { display: block; }
+  #results li { display: flex; gap: 6px; align-items: flex-start; }
+  #results li .res-main { flex: 1; min-width: 0; }
+  #results li .src {
+    flex: none;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    padding: 2px 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  #results li .src:hover { color: var(--accent); }
   .tag {
     background: var(--chip);
     border-radius: 4px;
@@ -268,6 +301,9 @@
         </button>
         <button id="clearCollectedBtn" class="ghost" style="display:none;">Temizle</button>
       </div>
+      <div class="row" id="siteImportRow" style="display:none; margin-top:6px;">
+        <button id="siteImportBtn" class="scroll-btn"></button>
+      </div>
       <div id="collectMsg" class="msg"></div>
     </section>
 
@@ -294,13 +330,17 @@
           <span>💾 Bu Sayfayı Kaydet</span>
         </div>
       </div>
+      <div id="savedHere" class="saved-here"></div>
       <input id="tags" placeholder="etiketler: reddit, dev/rust, makale" list="taglist" autocomplete="off">
+      <div class="row" style="margin-top:6px;">
+        <select id="folder" aria-label="Klasör"><option value="">Klasörsüz</option></select>
+      </div>
       <datalist id="taglist"></datalist>
       <div class="row" style="margin-top:6px;">
         <textarea id="note" placeholder="not (isteğe bağlı)"></textarea>
       </div>
       <div class="row" style="margin-top:6px;">
-        <button id="save" class="primary">Sayfayı Arşive Kaydet</button>
+        <button id="save" class="primary" title="Kısayol: ⌥⇧S">Sayfayı Arşive Kaydet</button>
       </div>
       <div id="saveMsg" class="msg"></div>
     </section>

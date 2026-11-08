@@ -16,6 +16,14 @@ eklentilerinden oluşur.
 - Hiyerarşik etiketler (`dev/rust`), not, link havuzu, foto/video galerisi.
 - İsteğe bağlı OCR (Apple Vision, cihazda): ekran görüntüsündeki yazı da aranır.
 - Aynı medya bir kez indirilir (içerik adresli depo + URL eşlemesi).
+- Yedek: veritabanı + medya + düz bir dışa aktarım (`items.jsonl`) seçilen klasöre;
+  sonrakiler yalnızca yenileri kopyalar, istenirse her gün kendiliğinden.
+- Kayıtlı aramalar kenar çubuğunda; galeride klasöre göre süzme.
+- Spotlight'ta arama (metin, yazar, etiket, görseldeki yazı); seçilen kayıt uygulamada açılır.
+- Menü çubuğundan hızlı kayıt; her uygulamada ⌃⌥⌘S panodaki linki kaydeder.
+- `wroopmark://item/<id>`, `wroopmark://search?q=…`, `wroopmark://add?url=…` bağlantıları.
+- Link havuzunda kırık link kontrolü (404/410/olmayan alan adı).
+- Ayıkla'da klasör önerisi (aynı kişi, benzer etiket, aynı site; 1–3 tuşları).
 
 Ayrıntılar için [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -52,9 +60,16 @@ uv tool install gallery-dl
   modu → "Paketlenmemiş öğe yükle" → `extensions/chromium`. Uygulama ilk açılışta
   native messaging host'unu kaydeder.
 
-Eklenti açıkken X'te yer imleri sayfasını ya da TikTok profilindeki
-Favoriler/Beğenilenler sekmesini kaydırmak yeterli; popup'taki düğmeler bunu
-otomatik yapar.
+Eklenti açıkken X'te yer imleri sayfasını, TikTok profilindeki
+Favoriler/Beğenilenler sekmesini ya da Instagram'da Kaydedilenler'i kaydırmak
+yeterli; popup'taki düğmeler bunu otomatik yapar. Reddit'te popup'taki
+"Reddit kaydedilenlerini aktar" tüm kaydedilen gönderi ve yorumları çeker
+(Reddit videoları sessiz iner: sitenin verdiği tek dosyada ses yok).
+
+- Kaydederken klasör seçilir; sağ tık menüsünde "klasöre kaydet" de var.
+- Arşivdeki sayfalarda simgede ✓ görünür.
+- ⌥⇧S sayfayı kaydeder, ⌥⇧W popup'ı açar (`chrome://extensions/shortcuts`).
+- Popup aramasında sonuca tıklamak kaydı uygulamada açar, ↗ kaynağını.
 
 ## Geliştirme
 

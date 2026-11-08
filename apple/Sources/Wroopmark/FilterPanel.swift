@@ -57,6 +57,15 @@ struct FilterPanel: View {
                     tri("Alıntı", $model.filters.quote)
                 }
 
+                Section("Klasör") {
+                    FolderFilterPicker()
+                    if case .folder(_, let name) = model.scope {
+                        Text("Kenar çubuğunda \"\(name)\" klasörü açık")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(model.scope.isFolder)
+
                 Section("Etiketler") {
                     TagPick(title: "İçersin", picked: $model.filters.includeTags, all: model.tags)
                     TagPick(title: "İçermesin", picked: $model.filters.excludeTags, all: model.tags)
@@ -97,6 +106,28 @@ struct FilterPanel: View {
             Text(no).tag(AdvancedFilters.Tri.no)
         }
         .pickerStyle(.segmented)
+    }
+}
+
+/// Folder choice, shared by the filter panel and the gallery bar. A folder
+/// includes its subfolders.
+struct FolderFilterPicker: View {
+    @Environment(AppModel.self) private var model
+    var title = "Klasör"
+
+    var body: some View {
+        @Bindable var model = model
+        Picker(title, selection: $model.filters.folder) {
+            Text("Fark etmez").tag(AdvancedFilters.FolderFilter.any)
+            Text("Klasörsüz").tag(AdvancedFilters.FolderFilter.unfiled)
+            Text("Herhangi bir klasörde").tag(AdvancedFilters.FolderFilter.filed)
+            let nodes = FolderNode.flattened(model.folderTree)
+            if !nodes.isEmpty { Divider() }
+            ForEach(nodes) { node in
+                Text("\(node.displayPath)  (\(node.count))")
+                    .tag(AdvancedFilters.FolderFilter.folder(path: node.id, id: node.folder?.id))
+            }
+        }
     }
 }
 

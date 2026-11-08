@@ -123,17 +123,11 @@ fn platform_post_id(platform: Platform, url: &Url) -> Option<String> {
             let q = url.query_pairs().find(|(k, _)| k == "story_fbid" || k == "fbid" || k == "v");
             q.map(|(_, v)| v.into_owned()).or_else(|| after("posts").or_else(|| after("videos")))
         }
-        Platform::Reddit => {
-            segs.iter().position(|s| *s == "comments").and_then(|i| segs.get(i + 1)).map(|s| s.to_string())
-        }
+        Platform::Reddit => segs.iter().position(|s| *s == "comments").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
         Platform::Youtube => {
             let q = url.query_pairs().find(|(k, _)| k == "v").map(|(_, v)| v.into_owned());
             let shorts = segs.iter().position(|s| *s == "shorts").and_then(|i| segs.get(i + 1)).map(|s| s.to_string());
-            let short_domain = if url.host_str().is_some_and(|h| h.contains("youtu.be")) {
-                segs.first().map(|s| s.to_string())
-            } else {
-                None
-            };
+            let short_domain = if url.host_str().is_some_and(|h| h.contains("youtu.be")) { segs.first().map(|s| s.to_string()) } else { None };
             q.or(shorts).or(short_domain)
         }
         Platform::Instagram => {
@@ -146,12 +140,8 @@ fn platform_post_id(platform: Platform, url: &Url) -> Option<String> {
                 None
             }
         }
-        Platform::Hackernews => {
-            url.query_pairs().find(|(k, _)| k == "id").map(|(_, v)| v.into_owned())
-        }
-        Platform::Arxiv => {
-            segs.iter().position(|s| *s == "abs" || *s == "pdf").and_then(|i| segs.get(i + 1)).map(|s| s.to_string())
-        }
+        Platform::Hackernews => url.query_pairs().find(|(k, _)| k == "id").map(|(_, v)| v.into_owned()),
+        Platform::Arxiv => segs.iter().position(|s| *s == "abs" || *s == "pdf").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
         Platform::Web => None,
     }
 }

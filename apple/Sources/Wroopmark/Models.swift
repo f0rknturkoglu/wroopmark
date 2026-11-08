@@ -186,6 +186,43 @@ struct LinkRow: Decodable, Identifiable, Hashable, Sendable {
     let firstSeen: Int64
     let manual: Bool
     let itemCount: Int
+    /// The last check found the page gone (404, 410, unknown host).
+    let dead: Bool
+    /// HTTP status of the last check; 0 when the host did not answer.
+    let status: Int?
+    let checkedAt: Int64?
+}
+
+/// A search kept in the sidebar. Stored in the library (so in its backups).
+struct SavedSearch: Codable, Identifiable, Hashable, Sendable {
+    var id: String
+    var name: String
+    var query: String
+}
+
+/// A folder offered for the post on screen in the clean-up view.
+struct FolderSuggestion: Decodable, Identifiable, Hashable, Sendable {
+    let id: Int64
+    let name: String
+    let score: Double
+    let reason: String
+
+    var reasonLabel: String {
+        switch reason {
+        case "author": "aynı kişi"
+        case "tag": "benzer etiket"
+        default: "aynı site"
+        }
+    }
+}
+
+struct BackupReport: Decodable, Equatable, Sendable {
+    let path: String
+    let dbBytes: Int64
+    let items: Int
+    let filesTotal: Int
+    let filesCopied: Int
+    let bytesCopied: Int64
 }
 
 struct SearchResult: Decodable, Sendable {
@@ -365,6 +402,14 @@ struct FolderNode: Identifiable, Hashable, Sendable {
     let folder: Folder?
     var count: Int
     var children: [FolderNode]?
+
+    /// Every node depth-first, for flat pickers.
+    static func flattened(_ nodes: [FolderNode]) -> [FolderNode] {
+        nodes.flatMap { [$0] + flattened($0.children ?? []) }
+    }
+
+    /// `ders › matematik`, for menus.
+    var displayPath: String { id.replacingOccurrences(of: "/", with: " › ") }
 
     static func tree(_ folders: [Folder]) -> [FolderNode] {
         var roots: [FolderNode] = []

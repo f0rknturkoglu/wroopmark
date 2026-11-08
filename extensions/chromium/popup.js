@@ -37,7 +37,100 @@ async function refreshStatus() {
   if (tags.ok) {
     $("taglist").innerHTML = tags.data.map((t) => `<option value="${t.name.replace(/"/g, "&quot;")}">`).join("");
   }
+  await loadFolders();
   return true;
+}
+
+// --- Folders and "already saved" -------------------------------------------
+
+const LAST_FOLDER = "lastFolder";
+
+async function loadFolders() {
+  const r = await call("folders");
+  if (!r.ok) return;
+  const sel = $("folder");
+  sel.replaceChildren(new Option("Klasörsüz", ""));
+  for (const f of r.data) sel.append(new Option(f.name.replaceAll("/", " › "), String(f.id)));
+  const { [LAST_FOLDER]: last } = await chrome.storage.local.get(LAST_FOLDER);
+  if (last && r.data.some((f) => String(f.id) === last)) sel.value = last;
+  // Keeps the right-click menu's folder list current.
+  send({ type: "folders_changed" });
+}
+
+$("folder").addEventListener("change", () => chrome.storage.local.set({ [LAST_FOLDER]: $("folder").value }));
+
+async function activeTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab;
+}
+
+async function showSavedHere() {
+  const tab = await activeTab();
+  if (!tab?.url || !/^https?:/.test(tab.url)) return;
+  const r = await call("lookup_url", { url: tab.url });
+  const box = $("savedHere");
+  if (r.ok && r.data) {
+    const where = r.data.folder ? ` · ${r.data.folder.replaceAll("/", " › ")}` : "";
+    const tags = r.data.tags?.length ? ` · #${r.data.tags.join(" #")}` : "";
+    box.textContent = `✓ Bu sayfa arşivde${where}${tags}`;
+    box.classList.add("on");
+    $("save").textContent = "Yeniden Kaydet (günceller)";
+  } else {
+    box.classList.remove("on");
+  }
+}
+
+// --- Whole-list imports for sites with their own "saved" page --------------
+
+async function setupSiteImport() {
+  const tab = await activeTab();
+  let host = "";
+  try {
+    host = new URL(tab?.url || "").hostname.replace(/^www\./, "");
+  } catch {}
+  const row = $("siteImportRow");
+  const btn = $("siteImportBtn");
+  if (host === "reddit.com" || host.endsWith(".reddit.com")) {
+    row.style.display = "";
+    btn.textContent = "🔖 Reddit kaydedilenlerini aktar";
+    btn.onclick = async () => {
+      btn.disabled = true;
+      setMsg($("collectMsg"), "Reddit kaydedilenleri okunuyor… (100'er 100'er)");
+      const r = await send({ type: "import_reddit" });
+      btn.disabled = false;
+      if (r?.ok) {
+        setMsg($("collectMsg"), `✓ u/${r.data.name}: ${r.data.total} kayıt aktarıldı (${r.data.new} yeni)`, "ok");
+        refreshStatus();
+      } else {
+        setMsg($("collectMsg"), r?.error || "Reddit aktarımı başarısız", "err");
+      }
+    };
+  } else if (host === "instagram.com") {
+    row.style.display = "";
+    btn.textContent = "📌 Instagram Kaydedilenler'i aç";
+    btn.onclick = async () => {
+      // The Saved page lives under the profile, whose name only the page knows.
+      const [res] = await chrome.scripting
+        .executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            const hrefs = [...document.querySelectorAll("a[href]")].map((a) => a.getAttribute("href"));
+            const saved = hrefs.find((h) => /^\/[^/]+\/saved\/?$/.test(h));
+            if (saved) return saved;
+            const img = [...document.querySelectorAll("a[href] img")].find((i) => /profil|profile/i.test(i.alt || ""));
+            const prof = img && img.closest("a").getAttribute("href");
+            return prof && /^\/[^/]+\/?$/.test(prof) ? prof.replace(/\/?$/, "/saved/") : null;
+          },
+        })
+        .catch(() => [{}]);
+      if (res?.result) {
+        await chrome.tabs.update(tab.id, { url: new URL(res.result, tab.url).href });
+        setMsg($("collectMsg"), "Kaydedilenler'de aşağı kaydır (ya da Otomatik Kaydır); gönderiler burada birikir.");
+      } else {
+        setMsg($("collectMsg"), "Profiline gidip Kaydedilenler sekmesini aç ve kaydır; gönderiler burada birikir.");
+      }
+    };
+  }
 }
 
 // --- Collected Queue Management ---------------------------------------------
@@ -58,6 +151,7 @@ async function syncCollected() {
     const parts = [];
     if (x > 0) parts.push(`${x} X`);
     if (tiktok > 0) parts.push(`${tiktok} TikTok`);
+    if (r.data.instagram > 0) parts.push(`${r.data.instagram} Instagram`);
     if (pages > 0) parts.push(`${pages} sayfa/link`);
     $("collectedSummary").textContent = `Kuyrukta: ${parts.join(" · ")}. Tek tıkla aktarabilirsiniz.`;
   } else {
@@ -119,13 +213,15 @@ $("save").addEventListener("click", async () => {
   const tags = $("tags").value.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
   const note = $("note").value.trim() || null;
 
-  const r = await send({ type: "save_tab", tags, note });
+  const folder = $("folder").value;
+  const r = await send({ type: "save_tab", tags, note, folder_id: folder ? Number(folder) : null });
   $("save").disabled = false;
 
   if (r?.ok) {
     setMsg($("saveMsg"), `✓ Kaydedildi: ${r.data.id}`, "ok");
     $("note").value = "";
     refreshStatus();
+    showSavedHere();
   } else {
     setMsg($("saveMsg"), r?.error || "Kaydedilemedi", "err");
   }
@@ -154,8 +250,18 @@ function renderResults(items, links) {
     const body = document.createElement("div");
     body.className = "res-body";
     body.textContent = it.title || it.text || it.url;
-    li.append(meta, body);
-    li.onclick = () => chrome.tabs.create({ url: it.url });
+    const main = document.createElement("div");
+    main.className = "res-main";
+    main.append(meta, body);
+    // Opens the archived copy in the app (works even if the post is gone).
+    main.title = "wroopmark'ta aç";
+    main.onclick = () => openInApp(it.id);
+    const src = document.createElement("button");
+    src.className = "src";
+    src.textContent = "↗";
+    src.title = "Kaynağında aç";
+    src.onclick = () => chrome.tabs.create({ url: it.url });
+    li.append(main, src);
     ul.append(li);
   }
 
@@ -169,6 +275,15 @@ function renderResults(items, links) {
     li.onclick = () => chrome.tabs.create({ url: l.url });
     ul.append(li);
   }
+}
+
+async function openInApp(id) {
+  const url = `wroopmark://item/${encodeURIComponent(id)}`;
+  const tab = await activeTab();
+  // The browser hands a custom scheme to the app and keeps the page as is.
+  if (tab?.id != null) chrome.tabs.update(tab.id, { url }).catch(() => chrome.tabs.create({ url }));
+  else chrome.tabs.create({ url });
+  window.close();
 }
 
 let searchTimer;
@@ -190,5 +305,7 @@ chrome.storage.session.onChanged.addListener(() => {
 
 // Initial boot
 refreshStatus();
+showSavedHere();
+setupSiteImport();
 syncCollected();
 syncScrollStatus();

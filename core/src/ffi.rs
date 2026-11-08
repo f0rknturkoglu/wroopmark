@@ -62,11 +62,7 @@ pub unsafe extern "C" fn wm_call(handle: *mut WmHandle, request: *const c_char) 
         }
     };
     // Sanitize any interior null bytes in response so CString::new never fails silently.
-    let sanitized = if response.contains('\0') {
-        response.replace('\0', " ")
-    } else {
-        response
-    };
+    let sanitized = if response.contains('\0') { response.replace('\0', " ") } else { response };
     CString::new(sanitized).map(CString::into_raw).unwrap_or(std::ptr::null_mut())
 }
 

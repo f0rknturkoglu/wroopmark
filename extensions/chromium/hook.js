@@ -8,6 +8,9 @@
 // TikTok: Favorites, Liked and Collections lists are forwarded whole; items seen
 //         anywhere are remembered for the moment you press "favorite"
 //         (item/collect). What it sees is reported to the log ("diag").
+// Instagram: the Saved page's lists (REST feed/saved or its GraphQL
+//         successor) are forwarded whole; a post seen anywhere is saved the
+//         moment you press its bookmark (web/save).
 (() => {
   if (window.__wroopmarkHooked) return;
   window.__wroopmarkHooked = true;
@@ -16,6 +19,7 @@
 
   const host = location.hostname.replace(/^www\./, "");
   const isX = host === "x.com" || host === "twitter.com";
+  const isIG = host === "instagram.com" || host.endsWith(".instagram.com");
   const seen = new Map(); // post id -> raw object, oldest first
   const SEEN_MAX = 4000;
 
@@ -32,7 +36,7 @@
   // on <html> for relay.js (which finds the profile for the scan button).
   let me = null;
   function readMe() {
-    if (isX || me) return me;
+    if (isX || isIG || me) return me;
     try {
       const el = document.getElementById("__UNIVERSAL_DATA_FOR_REHYDRATION__");
       me = JSON.parse(el.textContent).__DEFAULT_SCOPE__["webapp.app-context"].user.uniqueId || null;
@@ -44,7 +48,7 @@
   document.addEventListener("DOMContentLoaded", readMe);
   // Watch for the element only until it is read or the page has loaded.
   const meWatch = new MutationObserver(() => readMe() && meWatch.disconnect());
-  if (!isX && !me) {
+  if (!isX && !isIG && !me) {
     meWatch.observe(document.documentElement, { childList: true, subtree: true });
     window.addEventListener("load", () => meWatch.disconnect(), { once: true });
   }
@@ -74,6 +78,48 @@
     if (Array.isArray(v)) return v.forEach(indexTikTok);
     if (typeof v.id === "string" && "desc" in v && v.author) remember(v.id, v);
     for (const k in v) indexTikTok(v[k]);
+  }
+
+  // Instagram media objects, wherever a response carries them.
+  const isIGMedia = (v) => typeof v.code === "string" && "taken_at" in v && (v.image_versions2 || v.carousel_media || v.video_versions);
+
+  function indexIG(v, found) {
+    if (!v || typeof v !== "object") return;
+    if (Array.isArray(v)) return v.forEach((x) => indexIG(x, found));
+    if (isIGMedia(v)) {
+      const slim = slimIG(v);
+      if (v.pk != null) remember(String(v.pk), slim);
+      if (v.id != null) remember(String(v.id).split("_")[0], slim);
+      if (found) found.push(slim);
+      return;
+    }
+    for (const k in v) indexIG(v[k], found);
+  }
+
+  // Only what the core reads: one picture size, one video file.
+  function slimIGPart(m) {
+    const c = (m.image_versions2 && m.image_versions2.candidates) || [];
+    const best = c.reduce((a, b) => ((b.width || 0) > ((a && a.width) || 0) ? b : a), null);
+    const v = (m.video_versions || [])[0];
+    return {
+      image_versions2: best ? { candidates: [{ url: best.url, width: best.width, height: best.height }] } : undefined,
+      video_versions: v ? [{ url: v.url, width: v.width, height: v.height }] : undefined,
+      accessibility_caption: m.accessibility_caption || undefined,
+    };
+  }
+
+  function slimIG(m) {
+    const u = m.user || m.owner || {};
+    return {
+      ...slimIGPart(m),
+      code: m.code,
+      pk: m.pk,
+      taken_at: m.taken_at,
+      product_type: m.product_type,
+      caption: m.caption && m.caption.text ? { text: m.caption.text } : null,
+      user: { username: u.username, full_name: u.full_name, profile_pic_url: u.profile_pic_url },
+      carousel_media: Array.isArray(m.carousel_media) ? m.carousel_media.map(slimIGPart) : undefined,
+    };
   }
 
   function bodyVar(body, name) {
@@ -136,6 +182,19 @@
     } catch {
       return;
     }
+    if (isIG) {
+      const found = [];
+      indexIG(json, found);
+      const saved = /\/api\/v1\/feed\/saved\//.test(url) || (url.includes("/graphql") && text.includes("xdt_api__v1__feed__saved"));
+      if (saved && found.length) post("instagram_list", { items: found });
+      const m = url.match(/\/web\/save\/(\d+)\/save\//);
+      if (m) {
+        const obj = seen.get(m[1]);
+        if (obj) post("instagram_list", { items: [obj] });
+        else post("diag", { event: "skip", reason: "instagram: kaydedilen gönderi sayfada görülmedi", id: m[1] });
+      }
+      return;
+    }
     if (isX) {
       const op = (url.match(/\/graphql\/[^/]+\/([A-Za-z]+)/) || [])[1];
       if (!op) return;
@@ -165,7 +224,8 @@
     }
   }
 
-  const interesting = (url) => (isX ? url.includes("/graphql/") : url.includes("/api/"));
+  const interesting = (url) =>
+    isX ? url.includes("/graphql/") : isIG ? url.includes("/api/v1/") || url.includes("/graphql") : url.includes("/api/");
 
   const origFetch = window.fetch;
   window.fetch = async function (input, init) {

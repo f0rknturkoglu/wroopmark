@@ -71,6 +71,7 @@ struct ItemGridView: View {
         case .photos: "Fotoğraflar"
         case .videos: "Videolar"
         case .triage: "Ayıkla"
+        case .saved(let saved): saved.name
         }
     }
 
@@ -194,6 +195,7 @@ struct TagStrip: View {
         case .photos: "Fotoğraflar"
         case .videos: "Videolar"
         case .triage: "Ayıkla"
+        case .saved(let saved): saved.name
         }
     }
 
@@ -236,6 +238,17 @@ struct TagStrip: View {
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("Filtreleri temizle")
                         .help("Filtreleri temizle")
+                    }
+                    if !model.searchToSave.isEmpty {
+                        Button { model.showSaveSearch = true } label: {
+                            Label("Aramayı kaydet", systemImage: "bookmark")
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Theme.accent.opacity(0.12), in: Capsule())
+                        .help("Bu aramayı kenar çubuğuna ekle (⌘⇧S)")
                     }
                     if case .tag(let key) = model.scope {
                         TagChip(name: key, selected: true, removable: true, action: {}, remove: { model.scope = .all })

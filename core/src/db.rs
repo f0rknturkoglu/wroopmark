@@ -19,7 +19,17 @@ use crate::text::{fold, host_of, normalize_url, now};
 
 pub type Result<T> = rusqlite::Result<T>;
 
-const SCHEMA_VERSION: i64 = 9;
+/// A folder offered for a post, and the strongest reason why
+/// (`author`, `tag` or `link`).
+#[derive(Debug, Clone, Serialize)]
+pub struct FolderSuggestion {
+    pub id: i64,
+    pub name: String,
+    pub score: f64,
+    pub reason: String,
+}
+
+const SCHEMA_VERSION: i64 = 10;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -120,6 +130,11 @@ CREATE TABLE IF NOT EXISTS folders(
 ALTER TABLE items ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS items_folder ON items(folder_id);
 "#;
+
+/// v9 → v10: whether a link still opens (HTTP status of the last check).
+const MIGRATE_10: &str = "ALTER TABLE links ADD COLUMN status INTEGER;
+                          ALTER TABLE links ADD COLUMN checked_at INTEGER;
+                          ALTER TABLE links ADD COLUMN dead INTEGER NOT NULL DEFAULT 0;";
 
 /// A video of the item is not on disk and its URL is a post page, not a
 /// file (TikTok): only an outside downloader can get it.
@@ -281,11 +296,14 @@ fn read_link(row: &Row) -> Result<Link> {
         first_seen: row.get(6)?,
         manual: row.get(7)?,
         item_count: row.get(8)?,
+        dead: row.get(9)?,
+        status: row.get(10)?,
+        checked_at: row.get(11)?,
     })
 }
 
 const LINK_COLS: &str = "l.id, l.url, l.host, l.title, l.description, l.image, l.first_seen, l.manual, \
-     (SELECT count(*) FROM item_links il WHERE il.link = l.id)";
+     (SELECT count(*) FROM item_links il WHERE il.link = l.id), l.dead, l.status, l.checked_at";
 
 /// Rebuilds one item's FTS row from what is stored.
 #[allow(clippy::type_complexity)]
@@ -443,12 +461,19 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
         Some(false) => wh.push("i.reviewed_at IS NULL".into()),
         None => {}
     }
+    if !q.ids.is_empty() {
+        wh.push(format!("i.id IN ({})", vec!["?"; q.ids.len()].join(",")));
+        args.extend(q.ids.iter().map(|id| id.clone().into()));
+    }
     if let Some(f) = &q.folder {
         if let Ok(id) = f.parse::<i64>() {
             wh.push("i.folder_id = ?".into());
             args.push(id.into());
         } else {
-            wh.push("EXISTS (SELECT 1 FROM folders f WHERE f.id = i.folder_id AND (lower(f.name) = lower(?) OR lower(f.name) LIKE lower(?) || '/%'))".into());
+            wh.push(
+                "EXISTS (SELECT 1 FROM folders f WHERE f.id = i.folder_id AND (lower(f.name) = lower(?) OR lower(f.name) LIKE lower(?) || '/%'))"
+                    .into(),
+            );
             args.push(f.clone().into());
             args.push(f.clone().into());
         }
@@ -458,7 +483,10 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
             wh.push("(i.folder_id IS NULL OR i.folder_id != ?)".into());
             args.push(id.into());
         } else {
-            wh.push("NOT EXISTS (SELECT 1 FROM folders f WHERE f.id = i.folder_id AND (lower(f.name) = lower(?) OR lower(f.name) LIKE lower(?) || '/%'))".into());
+            wh.push(
+                "NOT EXISTS (SELECT 1 FROM folders f WHERE f.id = i.folder_id AND (lower(f.name) = lower(?) OR lower(f.name) LIKE lower(?) || '/%'))"
+                    .into(),
+            );
             args.push(f.clone().into());
             args.push(f.clone().into());
         }
@@ -619,7 +647,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -648,6 +676,9 @@ impl Store {
         }
         if (1..9).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_9} PRAGMA user_version = 9; COMMIT;"))?;
+        }
+        if (1..10).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_10} PRAGMA user_version = 10; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -913,6 +944,65 @@ impl Store {
         reindex_link(&self.conn, id)
     }
 
+    /// Links not checked in `max_age` seconds, never-checked first.
+    pub fn links_to_check(&self, limit: i64, max_age: i64) -> Result<Vec<(i64, String)>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, url FROM links WHERE coalesce(checked_at, 0) < ?2 ORDER BY checked_at IS NOT NULL, checked_at, id DESC LIMIT ?1",
+        )?;
+        stmt.query_map(params![limit, now() - max_age], |r| Ok((r.get(0)?, r.get(1)?)))?.collect()
+    }
+
+    /// `status` is the HTTP status, or 0 when the host did not answer.
+    pub fn set_link_status(&mut self, id: i64, status: i64, dead: bool) -> Result<()> {
+        self.conn.execute("UPDATE links SET status = ?2, dead = ?3, checked_at = ?4 WHERE id = ?1", params![id, status, dead, now()])?;
+        Ok(())
+    }
+
+    /// The saved item for a page, by its post id or its URL.
+    pub fn lookup(&self, id: &str, url: &str) -> Result<Option<Item>> {
+        let found: Option<String> =
+            self.conn.query_row("SELECT id FROM items WHERE id = ?1 OR url = ?2 LIMIT 1", [id, url], |r| r.get(0)).optional()?;
+        match found {
+            Some(id) => self.get(&id),
+            None => Ok(None),
+        }
+    }
+
+    /// Folders that posts like this one were filed in: same author first,
+    /// then shared tags, then shared link hosts. Highest score first.
+    pub fn suggest_folders(&self, id: &str, limit: i64) -> Result<Vec<FolderSuggestion>> {
+        let pk = pk_of(&self.conn, id)?;
+        let mut stmt = self.conn.prepare_cached(
+            "WITH me AS (SELECT pk, author_handle, platform FROM items WHERE pk = ?1),
+             votes(folder, score, reason) AS (
+               SELECT i.folder_id, 3.0, 'author' FROM items i, me
+                WHERE i.pk != me.pk AND i.folder_id IS NOT NULL AND me.author_handle IS NOT NULL
+                  AND i.author_handle = me.author_handle COLLATE NOCASE
+               UNION ALL
+               SELECT i.folder_id, 1.0, 'tag' FROM item_tags mt JOIN item_tags it ON it.tag = mt.tag AND it.item != mt.item
+                 JOIN items i ON i.pk = it.item
+                WHERE mt.item = ?1 AND i.folder_id IS NOT NULL
+               UNION ALL
+               SELECT i.folder_id, 0.5, 'link' FROM item_links ml JOIN links l ON l.id = ml.link
+                 JOIN links l2 ON l2.host = l.host JOIN item_links il ON il.link = l2.id AND il.item != ml.item
+                 JOIN items i ON i.pk = il.item
+                WHERE ml.item = ?1 AND i.folder_id IS NOT NULL
+             )
+             SELECT f.id, f.name, sum(v.score) AS s,
+                    (SELECT reason FROM votes v2 WHERE v2.folder = f.id GROUP BY reason ORDER BY sum(score) DESC LIMIT 1)
+               FROM votes v JOIN folders f ON f.id = v.folder
+              GROUP BY f.id ORDER BY s DESC, lower(f.name) LIMIT ?2",
+        )?;
+        stmt.query_map(params![pk, limit], |r| Ok(FolderSuggestion { id: r.get(0)?, name: r.get(1)?, score: r.get(2)?, reason: r.get(3)? }))?
+            .collect()
+    }
+
+    /// Copies the database into `dest` as one consistent file (no WAL).
+    pub fn backup_to(&self, dest: &Path) -> Result<()> {
+        self.conn.execute("VACUUM INTO ?1", [dest.to_string_lossy()])?;
+        Ok(())
+    }
+
     /// Replaces an item's tags.
     pub fn set_tags(&mut self, id: &str, tags: &[String]) -> Result<()> {
         let tx = self.write()?;
@@ -1005,15 +1095,7 @@ impl Store {
              GROUP BY f.id
              ORDER BY lower(f.name) ASC",
         )?;
-        stmt.query_map([], |r| {
-            Ok(Folder {
-                id: r.get(0)?,
-                name: r.get(1)?,
-                created_at: r.get(2)?,
-                count: r.get(3)?,
-            })
-        })?
-        .collect()
+        stmt.query_map([], |r| Ok(Folder { id: r.get(0)?, name: r.get(1)?, created_at: r.get(2)?, count: r.get(3)? }))?.collect()
     }
 
     pub fn add_folder(&mut self, name: &str) -> Result<Folder> {
@@ -1024,12 +1106,7 @@ impl Store {
         let now = now();
         self.conn.execute("INSERT INTO folders(name, created_at) VALUES (?1, ?2)", params![clean, now])?;
         let id = self.conn.last_insert_rowid();
-        Ok(Folder {
-            id,
-            name: clean.to_string(),
-            created_at: now,
-            count: 0,
-        })
+        Ok(Folder { id, name: clean.to_string(), created_at: now, count: 0 })
     }
 
     pub fn rename_folder(&mut self, id: i64, name: &str) -> Result<()> {
@@ -1086,18 +1163,12 @@ impl Store {
     }
 
     pub fn retry_video_download(&mut self, id: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE id = ?1",
-            [id],
-        )?;
+        self.conn.execute("UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE id = ?1", [id])?;
         Ok(())
     }
 
     pub fn retry_all_video_downloads(&mut self) -> Result<usize> {
-        self.conn.execute(
-            "UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE has_video = 1 AND video_tries > 0",
-            [],
-        )
+        self.conn.execute("UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE has_video = 1 AND video_tries > 0", [])
     }
 
     pub fn set_note(&mut self, id: &str, note: Option<&str>) -> Result<()> {
@@ -1580,6 +1651,7 @@ mod tests {
                     "ALTER TABLE items DROP COLUMN ocr; ALTER TABLE items DROP COLUMN reviewed_at;
                      ALTER TABLE items DROP COLUMN video_tries; ALTER TABLE items DROP COLUMN video_tried_at; DROP TABLE media_files;
                      ALTER TABLE links DROP COLUMN fetch_failures; ALTER TABLE links DROP COLUMN fetch_tried_at;
+                     ALTER TABLE links DROP COLUMN status; ALTER TABLE links DROP COLUMN checked_at; ALTER TABLE links DROP COLUMN dead;
                      DROP INDEX IF EXISTS items_folder; ALTER TABLE items DROP COLUMN folder_id; DROP TABLE IF EXISTS folders;
                      PRAGMA user_version = 3;",
                 )

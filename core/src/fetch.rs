@@ -50,11 +50,13 @@ static REFRESH_RE: LazyLock<Regex> =
 
 static META_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("meta[content]").expect("static selector"));
 static TITLE_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("title").expect("static selector"));
-static PARAS_SELS: LazyLock<[Selector; 3]> = LazyLock::new(|| [
-    Selector::parse("article p").expect("static selector"),
-    Selector::parse("main p").expect("static selector"),
-    Selector::parse("p").expect("static selector"),
-]);
+static PARAS_SELS: LazyLock<[Selector; 3]> = LazyLock::new(|| {
+    [
+        Selector::parse("article p").expect("static selector"),
+        Selector::parse("main p").expect("static selector"),
+        Selector::parse("p").expect("static selector"),
+    ]
+});
 static OEMBED_P_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("blockquote > p").expect("static selector"));
 static OEMBED_A_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("blockquote > a").expect("static selector"));
 
@@ -142,6 +144,18 @@ impl Fetcher {
         let ct = resp.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
         let bytes = resp.body_mut().with_config().limit(MAX_MEDIA).read_to_vec().map_err(|e| e.to_string())?;
         Ok((bytes, ct))
+    }
+
+    /// Whether a link still opens: `(status, dead)`. Status 0 means the host
+    /// did not answer. Only a missing page (404, 410) or an unknown host
+    /// counts as dead; blocks (403, 429) and timeouts say nothing.
+    pub fn check(&self, url: &str) -> (i64, bool) {
+        match self.agent.get(url).header("Accept-Language", "tr,en;q=0.8").call() {
+            Ok(r) => (i64::from(r.status().as_u16()), false),
+            Err(ureq::Error::StatusCode(code)) => (i64::from(code), matches!(code, 404 | 410)),
+            Err(ureq::Error::HostNotFound) => (0, true),
+            Err(_) => (0, false),
+        }
     }
 
     pub fn page(&self, url: &str) -> Result<PageMeta> {

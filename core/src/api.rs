@@ -66,6 +66,16 @@ pub struct ActiveDownloadInfo {
 }
 
 #[derive(Debug, Default, serde::Serialize)]
+pub struct BackupReport {
+    pub path: String,
+    pub db_bytes: u64,
+    pub items: usize,
+    pub files_total: usize,
+    pub files_copied: usize,
+    pub bytes_copied: u64,
+}
+
+#[derive(Debug, Default, serde::Serialize)]
 pub struct ImportReport {
     pub new: usize,
     pub updated: usize,
@@ -106,6 +116,11 @@ impl Library {
 
     /// Saves a batch in one transaction: all of it or nothing.
     fn save_all(&self, items: Vec<Item>, tags: &[String]) -> Result<ImportReport, String> {
+        self.save_into(items, tags, None)
+    }
+
+    /// Like `save_all`, filing every item in `folder` when one is given.
+    fn save_into(&self, items: Vec<Item>, tags: &[String], folder: Option<i64>) -> Result<ImportReport, String> {
         let items: Vec<Item> = items
             .into_iter()
             .map(|mut item| {
@@ -115,6 +130,9 @@ impl Library {
                     item.id = id;
                 }
                 item.tags.extend(tags.iter().cloned());
+                if folder.is_some() {
+                    item.folder_id = folder;
+                }
                 item
             })
             .collect();
@@ -131,11 +149,11 @@ impl Library {
     }
 
     /// Captures a URL from the network and saves it with its media.
-    pub fn add_url(&self, url: &str, tags: &[String], note: Option<&str>) -> Result<Item, String> {
+    pub fn add_url(&self, url: &str, tags: &[String], note: Option<&str>, folder: Option<i64>) -> Result<Item, String> {
         let mut item = self.fetcher.capture(url)?;
         item.note = note.map(str::to_string);
         self.fetcher.fill_media(&self.media, &mut item.media, self.videos_enabled());
-        let report = self.save_all(vec![item.clone()], tags)?;
+        let report = self.save_into(vec![item.clone()], tags, folder)?;
         let id = &report.ids[0];
         self.store().set_media(id, &item.media, None).map_err(|e| e.to_string())?;
         self.store().get(id).map_err(|e| e.to_string())?.ok_or_else(|| "kaydedilemedi".into())
@@ -158,8 +176,131 @@ impl Library {
     }
 
     /// Saves items already shaped by a capturer (extensions, share sheet).
-    pub fn import_items(&self, items: Vec<Item>, tags: &[String]) -> Result<ImportReport, String> {
-        self.save_all(items, tags)
+    pub fn import_items(&self, items: Vec<Item>, tags: &[String], folder: Option<i64>) -> Result<ImportReport, String> {
+        self.save_into(items, tags, folder)
+    }
+
+    /// Saves every post in a Reddit listing (saved posts and comments).
+    pub fn import_reddit(&self, payload: &Value, tags: &[String]) -> Result<ImportReport, String> {
+        self.save_all(crate::reddit::parse_listing(payload), tags)
+    }
+
+    /// Saves every post in an Instagram web API response (the Saved page).
+    pub fn import_instagram(&self, payload: &Value, tags: &[String]) -> Result<ImportReport, String> {
+        self.save_all(crate::instagram::parse_api(payload), tags)
+    }
+
+    /// Checks up to `limit` links not checked for a week; returns how many.
+    pub fn check_links(&self, limit: i64) -> Result<usize, String> {
+        const WEEK: i64 = 7 * 24 * 3600;
+        let todo = self.store().links_to_check(limit, WEEK).map_err(|e| e.to_string())?;
+        for (id, url) in &todo {
+            let (status, dead) = self.fetcher.check(url);
+            self.store().set_link_status(*id, status, dead).map_err(|e| e.to_string())?;
+        }
+        Ok(todo.len())
+    }
+
+    /// The saved item for a page the browser is on, if any.
+    pub fn lookup_url(&self, url: &str) -> Result<Option<Value>, String> {
+        let (_, id) = item_id_for_url(url);
+        let norm = crate::text::normalize_url(url).unwrap_or_else(|| url.to_string());
+        let store = self.store();
+        let Some(item) = store.lookup(&id, &norm).map_err(|e| e.to_string())? else { return Ok(None) };
+        let folder = match item.folder_id {
+            Some(f) => store.folders().map_err(|e| e.to_string())?.into_iter().find(|x| x.id == f).map(|x| x.name),
+            None => None,
+        };
+        Ok(Some(
+            json!({ "id": item.id, "title": item.title, "tags": item.tags, "folder_id": item.folder_id, "folder": folder, "saved_at": item.saved_at }),
+        ))
+    }
+
+    /// Mirrors the library into `dest`: a consistent copy of the database,
+    /// the media files the copy lacks (names are content hashes, so a file
+    /// already there is the same file), and `items.jsonl`, a plain export
+    /// any other program can read. Nothing in `dest` is ever deleted.
+    pub fn backup(&self, dest: &Path) -> Result<BackupReport, String> {
+        let err = |e: std::io::Error| format!("{}: {e}", dest.display());
+        let root = self.root.canonicalize().unwrap_or_else(|_| self.root.clone());
+        std::fs::create_dir_all(dest).map_err(err)?;
+        let dest_abs = dest.canonicalize().map_err(err)?;
+        if dest_abs.starts_with(&root) {
+            return Err("yedek klasörü kütüphanenin içinde olamaz".into());
+        }
+        let mut report = BackupReport { path: dest_abs.display().to_string(), ..Default::default() };
+
+        let tmp = dest.join("library.sqlite.tmp");
+        let _ = std::fs::remove_file(&tmp);
+        self.store().backup_to(&tmp).map_err(|e| e.to_string())?;
+        std::fs::rename(&tmp, dest.join("library.sqlite")).map_err(err)?;
+        report.db_bytes = std::fs::metadata(dest.join("library.sqlite")).map(|m| m.len()).unwrap_or(0);
+
+        let src_media = self.media.root();
+        if let Ok(shards) = std::fs::read_dir(src_media) {
+            for shard in shards.flatten().filter(|e| e.path().is_dir()) {
+                let out_dir = dest.join("media").join(shard.file_name());
+                for f in std::fs::read_dir(shard.path()).map_err(err)?.flatten() {
+                    let name = f.file_name();
+                    if !crate::media::is_name(&name.to_string_lossy()) {
+                        continue;
+                    }
+                    report.files_total += 1;
+                    let len = f.metadata().map(|m| m.len()).unwrap_or(0);
+                    let target = out_dir.join(&name);
+                    if std::fs::metadata(&target).is_ok_and(|m| m.len() == len) {
+                        continue;
+                    }
+                    std::fs::create_dir_all(&out_dir).map_err(err)?;
+                    let part = out_dir.join(format!(".{}.part", name.to_string_lossy()));
+                    std::fs::copy(f.path(), &part).map_err(err)?;
+                    std::fs::rename(&part, &target).map_err(err)?;
+                    report.files_copied += 1;
+                    report.bytes_copied += len;
+                }
+            }
+        }
+
+        report.items = self.export_jsonl(&dest.join("items.jsonl")).map_err(err)?;
+        let readme = "wroopmark yedeği\n\n\
+            library.sqlite + media/ birlikte tam kütüphanedir. Geri yüklemek için uygulamayı kapat,\n\
+            ikisini ~/Library/Application Support/wroopmark/ içine kopyala (eskisinin yerine), sonra aç.\n\n\
+            items.jsonl: her satır bir kayıt (metin, yazar, etiketler, klasör, not, medya dosya adları);\n\
+            başka programlarla okumak için.\n";
+        std::fs::write(dest.join("OKUBENI.txt"), readme).map_err(err)?;
+        Ok(report)
+    }
+
+    fn export_jsonl(&self, path: &Path) -> std::io::Result<usize> {
+        use std::io::Write;
+        let tmp = path.with_extension("jsonl.tmp");
+        let mut out = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
+        let folders: std::collections::HashMap<i64, String> =
+            self.store().folders().unwrap_or_default().into_iter().map(|f| (f.id, f.name)).collect();
+        let q = Query::parse("");
+        let mut offset = 0;
+        let mut n = 0;
+        loop {
+            let page = self.store().search(&q, Sort::parse("saved_asc"), 500, offset).map_err(std::io::Error::other)?;
+            if page.items.is_empty() {
+                break;
+            }
+            offset += page.items.len() as i64;
+            for mut item in page.items {
+                item.raw = None;
+                let mut v = serde_json::to_value(&item).map_err(std::io::Error::other)?;
+                if let Some(name) = item.folder_id.and_then(|f| folders.get(&f)) {
+                    v["folder"] = json!(name);
+                }
+                serde_json::to_writer(&mut out, &v).map_err(std::io::Error::other)?;
+                out.write_all(b"\n")?;
+                n += 1;
+            }
+        }
+        out.flush()?;
+        drop(out);
+        std::fs::rename(tmp, path)?;
+        Ok(n)
     }
 
     /// Videos are downloaded unless turned off in the settings.
@@ -455,6 +596,7 @@ struct AddUrl {
     #[serde(default)]
     tags: Vec<String>,
     note: Option<String>,
+    folder_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -470,6 +612,7 @@ struct ImportItems {
     items: Vec<Item>,
     #[serde(default)]
     tags: Vec<String>,
+    folder_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -637,21 +780,26 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
 
         "add_url" => {
             let a: AddUrl = arg(req)?;
-            to_value(lib.add_url(&a.url, &a.tags, a.note.as_deref())?)
+            to_value(lib.add_url(&a.url, &a.tags, a.note.as_deref(), a.folder_id)?)
         }
-        "import_x" | "import_tiktok" => {
+        "import_x" | "import_tiktok" | "import_reddit" | "import_instagram" => {
             let a: ImportPayload = arg(req)?;
             let payload = match a.payload {
                 Value::String(s) => serde_json::from_str(&s).map_err(|e| format!("payload JSON değil: {e}"))?,
                 v => v,
             };
-            let report = if cmd == "import_x" { lib.import_x(&payload, &a.tags)? } else { lib.import_tiktok(&payload, &a.tags)? };
+            let report = match cmd.as_str() {
+                "import_x" => lib.import_x(&payload, &a.tags)?,
+                "import_reddit" => lib.import_reddit(&payload, &a.tags)?,
+                "import_instagram" => lib.import_instagram(&payload, &a.tags)?,
+                _ => lib.import_tiktok(&payload, &a.tags)?,
+            };
             lib.kick_media();
             to_value(report)
         }
         "import_items" => {
             let a: ImportItems = arg(req)?;
-            let report = lib.import_items(a.items, &a.tags)?;
+            let report = lib.import_items(a.items, &a.tags, a.folder_id)?;
             lib.kick_media();
             to_value(report)
         }
@@ -727,26 +875,26 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
             let queued: Vec<Value> = queued_items
                 .into_iter()
                 .filter(|i| !active_ids.contains(&i.id))
-                .map(|i| json!({
-                    "id": i.id,
-                    "platform": i.platform.as_str(),
-                    "url": i.url,
-                    "author_handle": i.author_handle,
-                    "author_name": i.author_name,
-                    "title": i.title,
-                    "text": i.text,
-                    "status": "queued",
-                    "saved_at": i.saved_at
-                }))
+                .map(|i| {
+                    json!({
+                        "id": i.id,
+                        "platform": i.platform.as_str(),
+                        "url": i.url,
+                        "author_handle": i.author_handle,
+                        "author_name": i.author_name,
+                        "title": i.title,
+                        "text": i.text,
+                        "status": "queued",
+                        "saved_at": i.saved_at
+                    })
+                })
                 .collect();
             let completed_items = store.completed_video_downloads(30).map_err(db)?;
             let completed: Vec<Value> = completed_items
                 .into_iter()
                 .map(|i| {
-                    let (file, size) = i.media.iter()
-                        .find_map(|m| m.video_file.as_ref())
-                        .map(|f| (Some(f.clone()), lib.media.file_size(f)))
-                        .unwrap_or((None, None));
+                    let (file, size) =
+                        i.media.iter().find_map(|m| m.video_file.as_ref()).map(|f| (Some(f.clone()), lib.media.file_size(f))).unwrap_or((None, None));
                     json!({
                         "id": i.id,
                         "platform": i.platform.as_str(),
@@ -765,18 +913,20 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
             let failed_items = store.failed_video_downloads(20).map_err(db)?;
             let failed: Vec<Value> = failed_items
                 .into_iter()
-                .map(|i| json!({
-                    "id": i.id,
-                    "platform": i.platform.as_str(),
-                    "url": i.url,
-                    "author_handle": i.author_handle,
-                    "author_name": i.author_name,
-                    "title": i.title,
-                    "text": i.text,
-                    "status": "failed",
-                    "tries": i.video_tries,
-                    "saved_at": i.saved_at
-                }))
+                .map(|i| {
+                    json!({
+                        "id": i.id,
+                        "platform": i.platform.as_str(),
+                        "url": i.url,
+                        "author_handle": i.author_handle,
+                        "author_name": i.author_name,
+                        "title": i.title,
+                        "text": i.text,
+                        "status": "failed",
+                        "tries": i.video_tries,
+                        "saved_at": i.saved_at
+                    })
+                })
                 .collect();
             Ok(json!({
                 "active": active,
@@ -842,6 +992,40 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
             Ok(json!(true))
         }
         "enrich_links" => to_value(lib.enrich_links(arg::<Limit>(req)?.limit)?),
+        "check_links" => to_value(lib.check_links(arg::<Limit>(req)?.limit)?),
+        "lookup_url" => to_value(lib.lookup_url(&arg::<Url>(req)?.url)?),
+        "suggest_folders" => {
+            #[derive(Deserialize)]
+            struct Suggest {
+                id: String,
+                #[serde(default = "three")]
+                limit: i64,
+            }
+            fn three() -> i64 {
+                3
+            }
+            let a: Suggest = arg(req)?;
+            to_value(lib.store().suggest_folders(&a.id, a.limit.clamp(1, 20)).map_err(db)?)
+        }
+        "backup" => {
+            #[derive(Deserialize)]
+            struct Dest {
+                dest: String,
+            }
+            to_value(lib.backup(Path::new(&arg::<Dest>(req)?.dest))?)
+        }
+        // Small UI state kept in the library (and so in its backups):
+        // saved searches and the like. Only `ui.` keys.
+        "ui_get" => {
+            let key = req.get("key").and_then(Value::as_str).filter(|k| k.starts_with("ui.")).ok_or("geçersiz anahtar")?;
+            to_value(lib.store().setting(key).map_err(db)?)
+        }
+        "ui_set" => {
+            let key = req.get("key").and_then(Value::as_str).filter(|k| k.starts_with("ui.")).ok_or("geçersiz anahtar")?;
+            let value = req.get("value").and_then(Value::as_str).ok_or("value eksik")?;
+            lib.store().set_setting(key, value).map_err(db)?;
+            Ok(json!(true))
+        }
 
         // Short-lived capturers (the Safari extension process) may die before
         // their downloads finish; the app picks the queue up with this.
@@ -914,5 +1098,72 @@ mod tests {
         assert_eq!(r["ok"], false);
         lib.wait_media();
         let _ = std::fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn lookup_suggest_backup() {
+        let dir = std::env::temp_dir().join(format!("wm-api2-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let lib = Library::open(&dir.join("lib")).unwrap();
+        let f = handle(&lib, r#"{"cmd":"add_folder","name":"filmler"}"#)["data"]["id"].as_i64().unwrap();
+        let r = handle(
+            &lib,
+            &format!(
+                r#"{{"cmd":"import_items","folder_id":{f},"tags":["sinema"],"items":[
+                    {{"url":"https://x.com/ali/status/1","author_handle":"ali","text":"bir"}}]}}"#
+            ),
+        );
+        assert_eq!(r["ok"], true, "{r}");
+        handle(&lib, r#"{"cmd":"import_items","items":[{"url":"https://x.com/ali/status/2","author_handle":"Ali","text":"iki"}]}"#);
+
+        let r = handle(&lib, r#"{"cmd":"search","q":"id:x:2"}"#);
+        assert_eq!(r["data"]["total"], 1, "{r}");
+        assert_eq!(r["data"]["items"][0]["id"], "x:2");
+
+        // Found by post id even from another URL form; unknown pages are null.
+        let r = handle(&lib, r#"{"cmd":"lookup_url","url":"https://twitter.com/ali/status/1?s=20"}"#);
+        assert_eq!(r["data"]["id"], "x:1", "{r}");
+        assert_eq!(r["data"]["folder"], "filmler");
+        assert!(handle(&lib, r#"{"cmd":"lookup_url","url":"https://example.com/yok"}"#)["data"].is_null());
+
+        // Same author (case-insensitive) → that folder.
+        let r = handle(&lib, r#"{"cmd":"suggest_folders","id":"x:2"}"#);
+        assert_eq!(r["data"][0]["name"], "filmler", "{r}");
+        assert_eq!(r["data"][0]["reason"], "author");
+
+        let r = handle(&lib, r#"{"cmd":"ui_set","key":"ui.saved_searches","value":"[]"}"#);
+        assert_eq!(r["ok"], true);
+        assert_eq!(handle(&lib, r#"{"cmd":"ui_get","key":"ui.saved_searches"}"#)["data"], "[]");
+        assert_eq!(handle(&lib, r#"{"cmd":"ui_set","key":"download_videos","value":"0"}"#)["ok"], false);
+
+        // A media file, then two backups: the second copies nothing new.
+        let name = lib.media.put_reader(&b"resim"[..], "image/jpeg").unwrap();
+        let dest = dir.join("yedek");
+        let req = json!({"cmd": "backup", "dest": dest.to_string_lossy()}).to_string();
+        let r = handle(&lib, &req);
+        assert_eq!(r["ok"], true, "{r}");
+        assert_eq!(r["data"]["items"], 2);
+        assert_eq!(r["data"]["files_copied"], 1);
+        assert!(dest.join("media").join(&name[..2]).join(&name).exists());
+        let back = Store::open(&dest.join("library.sqlite")).unwrap();
+        assert_eq!(back.get("x:1").unwrap().unwrap().folder_id, Some(f));
+        let line = std::fs::read_to_string(dest.join("items.jsonl")).unwrap();
+        assert!(line.contains(r#""folder":"filmler""#), "{line}");
+        assert_eq!(handle(&lib, &req)["data"]["files_copied"], 0);
+        // Never into the library itself.
+        let inside = json!({"cmd": "backup", "dest": dir.join("lib/yedek").to_string_lossy()}).to_string();
+        assert_eq!(handle(&lib, &inside)["ok"], false);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn link_status() {
+        let mut s = Store::open_in_memory().unwrap();
+        let l = s.add_link("https://example.com/gitti").unwrap().unwrap();
+        assert_eq!(s.links_to_check(10, 3600).unwrap().len(), 1);
+        s.set_link_status(l.id, 404, true).unwrap();
+        assert!(s.links_to_check(10, 3600).unwrap().is_empty());
+        let back = &s.links("", 10, 0).unwrap()[0];
+        assert!(back.dead);
+        assert_eq!(back.status, Some(404));
     }
 }

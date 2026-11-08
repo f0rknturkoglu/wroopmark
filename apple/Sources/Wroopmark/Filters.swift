@@ -54,6 +54,21 @@ struct AdvancedFilters: Equatable {
         }
     }
 
+    /// Which folder the posts are in. A folder includes its subfolders.
+    enum FolderFilter: Hashable {
+        case any
+        case unfiled
+        case filed
+        /// Full path (`ders/matematik`); `id` is set when the path is a real
+        /// folder rather than only a parent of one.
+        case folder(path: String, id: Int64?)
+
+        var path: String? {
+            if case .folder(let path, _) = self { return path }
+            return nil
+        }
+    }
+
     enum DateField: String, CaseIterable, Identifiable {
         case posted, saved
         var id: String { rawValue }
@@ -62,6 +77,7 @@ struct AdvancedFilters: Equatable {
 
     var platforms: Set<Platform> = []
     var media: MediaFilter = .any
+    var folder: FolderFilter = .any
     var tagged: Tri = .any
     var link: Tri = .any
     var note: Tri = .any
@@ -83,6 +99,7 @@ struct AdvancedFilters: Equatable {
         var n = 0
         if !platforms.isEmpty { n += 1 }
         if media != .any { n += 1 }
+        if folder != .any { n += 1 }
         n += [tagged, link, note, ocr, quote].filter { $0 != .any }.count
         if !includeTags.isEmpty || !excludeTags.isEmpty { n += 1 }
         if !handles(authors).isEmpty || !handles(excludeAuthors).isEmpty { n += 1 }
@@ -100,6 +117,15 @@ struct AdvancedFilters: Equatable {
         case .video: t.append("has:video")
         case .media: t.append("has:media")
         case .none: t.append("-has:media")
+        }
+        switch folder {
+        case .any: break
+        case .unfiled: t.append("is:unfiled")
+        case .filed: t.append("is:infolder")
+        case .folder(let path, let id):
+            // The core reads an all-digit value as a folder id, so such a
+            // name is matched by its id (without subfolders).
+            if Int64(path) != nil, let id { t.append("folder:\(id)") } else { t.append("folder:" + Self.quoted(path)) }
         }
         func tri(_ v: Tri, _ term: String) {
             if v == .yes { t.append(term) } else if v == .no { t.append("-" + term) }

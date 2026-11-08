@@ -63,6 +63,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>MIT — Furkan Türkoğlu</string>
+  <!-- wroopmark://item/<id>, wroopmark://search?q=…, wroopmark://add?url=… -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>com.f0rknturkoglu.wroopmark</string>
+      <key>CFBundleURLSchemes</key><array><string>wroopmark</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST

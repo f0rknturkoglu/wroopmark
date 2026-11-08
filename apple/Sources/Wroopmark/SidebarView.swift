@@ -12,6 +12,8 @@ struct SidebarView: View {
     @State private var parentForSubfolder: Folder?
     @State private var newSubfolderName = ""
     @AppStorage("linkPoolExpanded") private var linkPoolExpanded = true
+    @State private var searchRenaming: SavedSearch?
+    @State private var searchNewName = ""
 
     var body: some View {
         @Bindable var model = model
@@ -83,6 +85,24 @@ struct SidebarView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Yeni klasör ekle")
                     .help("Yeni klasör ekle")
+                }
+            }
+            if !model.savedSearches.isEmpty {
+                Section("Kayıtlı aramalar") {
+                    ForEach(model.savedSearches) { saved in
+                        row(saved.name, "magnifyingglass", nil)
+                            .tag(Scope.saved(saved))
+                            .help(saved.query)
+                            .contextMenu {
+                                Button("Yeniden adlandır…") {
+                                    searchNewName = saved.name
+                                    searchRenaming = saved
+                                }
+                                Button("Aramayı sil", role: .destructive) {
+                                    Task { await model.deleteSavedSearch(saved) }
+                                }
+                            }
+                    }
                 }
             }
             Section("Galeri") {
@@ -157,6 +177,16 @@ struct SidebarView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("wroopmark")
+        .alert("Aramayı yeniden adlandır", isPresented: Binding(get: { searchRenaming != nil }, set: { if !$0 { searchRenaming = nil } })) {
+            TextField("Ad", text: $searchNewName)
+            Button("Adlandır") {
+                if let saved = searchRenaming {
+                    let name = searchNewName
+                    Task { await model.renameSavedSearch(saved, to: name) }
+                }
+            }
+            Button("Vazgeç", role: .cancel) {}
+        }
         .sheet(isPresented: $showNewFolderSheet) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Yeni klasör").font(.headline)

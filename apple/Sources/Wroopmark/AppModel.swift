@@ -14,8 +14,15 @@ enum Scope: Hashable {
     case videos
     /// One post at a time: ← delete, → keep.
     case triage
+    /// A search kept in the sidebar.
+    case saved(SavedSearch)
 
     public static let links: Scope = .links(nil)
+
+    var isFolder: Bool {
+        if case .folder = self { return true }
+        return false
+    }
 
     public var isLinks: Bool {
         if case .links = self { return true }
@@ -32,7 +39,11 @@ enum Scope: Hashable {
         case .videos: "has:video"
         case .platform(let p): "platform:\(p.rawValue)"
         case .tag(let key): key.contains(" ") ? "tag:\"\(key)\"" : "tag:\(key)"
-        case .folder(let id, _): "folder:\(id)"
+        // By path, so a parent folder shows its subfolders' posts too
+        // (an all-digit name would read as an id; those go by id).
+        case .folder(let id, let name): Int64(name) == nil && !name.isEmpty
+            ? "folder:" + (name.contains(" ") ? "\"\(name)\"" : name) : "folder:\(id)"
+        case .saved(let s): s.query
         }
     }
 }
@@ -69,6 +80,8 @@ final class AppModel {
         didSet {
             // Leaving the clean-up view makes its deletions final.
             if oldValue == .triage && scope != .triage { Task { await commitTriage() } }
+            // A folder opened in the sidebar replaces the folder filter.
+            if case .folder = scope, filters.folder != .any { filters.folder = .any }
         }
     }
     var query = ""
@@ -167,11 +180,44 @@ final class AppModel {
         didSet { UserDefaults.standard.set(layout.rawValue, forKey: "layout") }
     }
 
+    // MARK: Added features (see Features.swift)
+
+    /// Searches kept in the sidebar.
+    var savedSearches: [SavedSearch] = []
+    /// Folders offered for the post on screen in the clean-up view.
+    var triageSuggestions: [FolderSuggestion] = []
+    /// An item to select as soon as it is on screen (Spotlight, links).
+    var pendingRevealID: String?
+    var isCheckingLinks = false
+    var linksChecked = 0
+    var isBackingUp = false
+    var lastBackupReport: BackupReport?
+    var backupError: String?
+    var backupFolder: String? = UserDefaults.standard.string(forKey: "backupFolder") {
+        didSet { UserDefaults.standard.set(backupFolder, forKey: "backupFolder") }
+    }
+    var autoBackup: Bool = UserDefaults.standard.bool(forKey: "autoBackup") {
+        didSet { UserDefaults.standard.set(autoBackup, forKey: "autoBackup") }
+    }
+    var lastBackupAt: Date? = UserDefaults.standard.object(forKey: "lastBackupAt") as? Date {
+        didSet { UserDefaults.standard.set(lastBackupAt, forKey: "lastBackupAt") }
+    }
+    var spotlightEnabled: Bool = UserDefaults.standard.object(forKey: "spotlight") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(spotlightEnabled, forKey: "spotlight")
+            spotlightEnabled ? Spotlight.reindex(force: true) : Spotlight.clear()
+        }
+    }
+    /// The "name this search" prompt.
+    var showSaveSearch = false
+    /// Newest saves, for the menu bar.
+    var recentItems: [Item] = []
+
     /// Most used tags first, for the filter strip.
     var topTags: [TagCount] { Array(tags.sorted { $0.count > $1.count }.prefix(30)) }
 
     private let pageSize = 120
-    private var reachedEnd = false
+    private(set) var reachedEnd = false
     private var lastDataVersion: Int64?
     private var searchTask: Task<Void, Never>?
     /// Bumped by every load; a slower, older answer is thrown away instead
@@ -229,6 +275,10 @@ final class AppModel {
         watch()
         startOCR()
         startVideoDownloads()
+        await loadSavedSearches()
+        startBackupSchedule()
+        Spotlight.reindex()
+        QuickSave.shared.attach(self)
     }
 
     // MARK: Loading
@@ -254,6 +304,10 @@ final class AppModel {
             reachedEnd = r.items.count < pageSize
             let ids = Set(items.map(\.id))
             setIfChanged(\.selection, scope == .triage ? (items.first.map { [$0.id] } ?? []) : selection.filter(ids.contains))
+            if let id = pendingRevealID, ids.contains(id) {
+                selection = [id]
+                pendingRevealID = nil
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -399,7 +453,10 @@ final class AppModel {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self, NSApp.isActive else { continue }
                 if let v: Int64 = try? await self.core.call(["cmd": "data_version"]) {
-                    if let last = self.lastDataVersion, last != v { await self.refreshLoaded() }
+                    if let last = self.lastDataVersion, last != v {
+                        await self.refreshLoaded()
+                        Spotlight.indexRecent()
+                    }
                     self.lastDataVersion = v
                 }
                 if (self.stats?.ocrPending ?? 0) > 0, self.ocrPausedUntil.map({ $0 < .now }) ?? true { self.startOCR() }
@@ -416,7 +473,7 @@ final class AppModel {
 
     // MARK: Editing
 
-    private func perform(_ request: [String: Any], network: Bool = false) async -> Bool {
+    func perform(_ request: [String: Any], network: Bool = false) async -> Bool {
         do {
             try await core.run(request, network: network)
             return true
@@ -458,6 +515,7 @@ final class AppModel {
 
     func delete(_ ids: [String]) async {
         for id in ids { _ = await perform(["cmd": "delete", "id": id]) }
+        Spotlight.remove(ids)
         selection.subtract(ids)
         await reload()
     }
@@ -532,7 +590,10 @@ final class AppModel {
         let refill = items.count < 15 && !reachedEnd
         Task {
             if !delete { _ = await perform(["cmd": "set_reviewed", "ids": [item.id], "reviewed": true]) }
-            if let expired, expired.delete { _ = await perform(["cmd": "delete", "id": expired.item.id]) }
+            if let expired, expired.delete {
+                _ = await perform(["cmd": "delete", "id": expired.item.id])
+                Spotlight.remove([expired.item.id])
+            }
             if refill { await reload() }
         }
     }
@@ -550,7 +611,10 @@ final class AppModel {
         Task {
             _ = await perform(["cmd": "move_to_folder", "id": item.id, "folder_id": folder.id])
             _ = await perform(["cmd": "set_reviewed", "ids": [item.id], "reviewed": true])
-            if let expired, expired.delete { _ = await perform(["cmd": "delete", "id": expired.item.id]) }
+            if let expired, expired.delete {
+                _ = await perform(["cmd": "delete", "id": expired.item.id])
+                Spotlight.remove([expired.item.id])
+            }
             await refreshMeta()
             if refill { await reload() }
         }
@@ -581,6 +645,7 @@ final class AppModel {
         let pending = triageHistory.filter(\.delete)
         triageHistory = []
         for d in pending { _ = await perform(["cmd": "delete", "id": d.item.id]) }
+        Spotlight.remove(pending.map(\.item.id))
         if !pending.isEmpty { await refreshMeta() }
     }
 
@@ -710,6 +775,10 @@ final class AppModel {
         guard let fetched: [Folder] = try? await core.call(["cmd": "folders"]), fetched != folders else { return }
         folders = fetched
         folderTree = FolderNode.tree(fetched)
+        // A renamed or deleted folder would leave the filter matching nothing.
+        if let path = filters.folder.path, !FolderNode.flattened(folderTree).contains(where: { $0.id == path }) {
+            filters.folder = .any
+        }
     }
 
     @discardableResult

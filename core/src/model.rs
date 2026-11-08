@@ -232,4 +232,11 @@ pub struct Link {
     pub manual: bool,
     /// How many saved items contain it.
     pub item_count: i64,
+    /// The last check found the page gone (404, 410, or no such host).
+    #[serde(default)]
+    pub dead: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checked_at: Option<i64>,
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @State private var saveSearchName = ""
 
     var body: some View {
         @Bindable var model = model
@@ -33,6 +34,19 @@ struct ContentView: View {
         }
         .animation(.easeOut(duration: 0.16), value: model.viewer?.id)
         .preferredColorScheme(model.theme.colorScheme)
+        .alert("Aramayı kaydet", isPresented: $model.showSaveSearch) {
+            TextField("Ad", text: $saveSearchName)
+            Button("Kaydet") {
+                let name = saveSearchName
+                Task { await model.saveSearch(name: name) }
+            }
+            Button("Vazgeç", role: .cancel) {}
+        } message: {
+            Text("Kenar çubuğunda durur, her açılışta güncel sonuçları gösterir.\n\(model.searchToSave)")
+        }
+        .onChange(of: model.showSaveSearch) { _, shown in
+            if shown { saveSearchName = model.query.trimmingCharacters(in: .whitespaces).isEmpty ? "Yeni arama" : model.query }
+        }
         .onChange(of: model.query) { _, _ in model.queryChanged() }
         .onChange(of: model.filters) { _, _ in model.queryChanged() }
         .onChange(of: model.sort) { _, _ in Task { await model.reload() } }
