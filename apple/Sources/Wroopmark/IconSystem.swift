@@ -57,11 +57,18 @@ enum LinkCategory: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .arxiv:
             return h.contains("arxiv.org")
         case .twitter:
-            return h.contains("x.com") || h.contains("twitter.com") || h.contains("t.co")
+            // Whole domains only: "dropbox.com" contains "x.com" and
+            // "microsoft.com" contains "t.co".
+            return h.isDomain("x.com") || h.isDomain("twitter.com") || h.isDomain("t.co")
         case .other:
             return !LinkCategory.allCases.filter { $0 != .other }.contains { $0.matches(host: host, url: url) }
         }
     }
+}
+
+private extension String {
+    /// This host is `domain` or one of its subdomains.
+    func isDomain(_ domain: String) -> Bool { self == domain || hasSuffix("." + domain) }
 }
 
 // MARK: - Folder Icons & SVGs

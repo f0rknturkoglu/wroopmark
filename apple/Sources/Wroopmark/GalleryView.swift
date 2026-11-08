@@ -76,8 +76,10 @@ struct GalleryView: View {
                 if selected { Rectangle().strokeBorder(Theme.accent, lineWidth: 3) }
             }
             .contentShape(Rectangle())
-            .onTapGesture(count: 2) { model.openViewer(owner: e.item, fromQuote: e.fromQuote, index: e.index) }
-            .onTapGesture { model.selection = [e.item.id] }
+            .onTapGesture {
+                ClickInfo.current.handle(single: model.selection = [e.item.id],
+                                         double: model.openViewer(owner: e.item, fromQuote: e.fromQuote, index: e.index))
+            }
             .contextMenu {
                 Button("Görüntüle") { model.openViewer(owner: e.item, fromQuote: e.fromQuote, index: e.index) }
                 if let file = e.media.videoFile ?? e.media.file {

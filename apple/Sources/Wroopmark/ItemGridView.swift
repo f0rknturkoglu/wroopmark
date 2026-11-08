@@ -139,6 +139,10 @@ struct ItemGridView: View {
 }
 
 /// Click handling shared by cards and rows.
+///
+/// One tap gesture reads the click count and modifiers from the event, so a
+/// single click selects at once. (A separate `count: 2` gesture makes SwiftUI
+/// hold every single click for the double-click interval.)
 private struct Selectable: ViewModifier {
     @Environment(AppModel.self) private var model
     let item: Item
@@ -146,14 +150,32 @@ private struct Selectable: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onTapGesture(count: 2) { owner.open(item) }
-            .simultaneousGesture(TapGesture().modifiers(.command).onEnded { owner.toggle(item) })
-            .simultaneousGesture(TapGesture().modifiers(.shift).onEnded { owner.extend(to: item) })
-            .onTapGesture { owner.select(item) }
+            .onTapGesture { ClickInfo.current.handle(single: owner.select(item), double: owner.open(item),
+                                                     command: owner.toggle(item), shift: owner.extend(to: item)) }
             .contextMenu { owner.menu(for: item) }
             .onAppear {
                 if item.id == model.items.last?.id { Task { await model.loadMore() } }
             }
+    }
+}
+
+/// The click that is being handled, read from AppKit.
+struct ClickInfo {
+    let count: Int
+    let flags: NSEvent.ModifierFlags
+
+    @MainActor static var current: ClickInfo {
+        let e = NSApp.currentEvent
+        return ClickInfo(count: e?.clickCount ?? 1, flags: e?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? [])
+    }
+
+    /// The first click of a double click has already selected; the second opens.
+    func handle(single: @autoclosure () -> Void, double: @autoclosure () -> Void,
+                command: @autoclosure () -> Void = (), shift: @autoclosure () -> Void = ()) {
+        if flags.contains(.command) { command() }
+        else if flags.contains(.shift) { shift() }
+        else if count >= 2 { double() }
+        else { single() }
     }
 }
 
@@ -290,7 +312,9 @@ struct ItemCard: View {
             RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                 .strokeBorder(selected ? Theme.accent : Theme.hairline, lineWidth: selected ? 2 : 1)
         )
-        .shadow(color: .black.opacity(hovering ? 0.12 : 0.04), radius: hovering ? 8 : 2, y: hovering ? 3 : 1)
+        // Only the hovered card casts a soft shadow: a shadow on every card
+        // is an offscreen pass per card on every scroll frame.
+        .shadow(color: .black.opacity(hovering ? 0.12 : 0), radius: hovering ? 8 : 0, y: hovering ? 3 : 0)
         .overlay(alignment: .topTrailing) {
             if hovering || tagging {
                 Button { tagging = true } label: {

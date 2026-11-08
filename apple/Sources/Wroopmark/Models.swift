@@ -200,7 +200,7 @@ struct TagCount: Decodable, Hashable, Sendable {
     let count: Int
 }
 
-struct Stats: Decodable, Sendable {
+struct Stats: Decodable, Equatable, Sendable {
     let items: Int
     let byPlatform: [String: Int]
     let tags: Int
@@ -438,7 +438,7 @@ struct DownloadItem: Identifiable, Decodable, Hashable, Sendable {
     var isQueued: Bool { status == "queued" }
 }
 
-struct DownloadsReport: Decodable, Sendable {
+struct DownloadsReport: Decodable, Equatable, Sendable {
     let active: [DownloadItem]
     let queued: [DownloadItem]
     let completed: [DownloadItem]

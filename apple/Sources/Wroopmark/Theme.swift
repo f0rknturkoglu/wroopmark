@@ -51,19 +51,25 @@ struct Avatar: View {
 }
 
 extension Date {
+    /// Built once: every card asks for its date on every redraw.
+    private static let relative: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.locale = Theme.locale
+        f.unitsStyle = .short
+        f.dateTimeStyle = .named
+        return f
+    }()
+    private static let dayMonth = Date.FormatStyle.dateTime.day().month(.abbreviated).locale(Theme.locale)
+    private static let dayMonthYear = dayMonth.year()
+
     /// "3 sa. önce", "dün", "14 Eki", or "14 Eki 2024" from older years.
     var short: String {
-        let age = Date().timeIntervalSince(self)
-        if age < 7 * 86_400 {
-            let f = RelativeDateTimeFormatter()
-            f.locale = Theme.locale
-            f.unitsStyle = .short
-            f.dateTimeStyle = .named
-            return f.localizedString(for: self, relativeTo: Date())
+        let now = Date()
+        if now.timeIntervalSince(self) < 7 * 86_400 {
+            return Self.relative.localizedString(for: self, relativeTo: now)
         }
-        let sameYear = Calendar.current.isDate(self, equalTo: Date(), toGranularity: .year)
-        let style = Date.FormatStyle.dateTime.day().month(.abbreviated).locale(Theme.locale)
-        return formatted(sameYear ? style : style.year())
+        let sameYear = Calendar.current.isDate(self, equalTo: now, toGranularity: .year)
+        return formatted(sameYear ? Self.dayMonth : Self.dayMonthYear)
     }
 }
 

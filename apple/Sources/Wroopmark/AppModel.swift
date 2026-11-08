@@ -93,7 +93,12 @@ final class AppModel {
     /// Links matching the search (items view) or the whole pool (links view).
     var links: [LinkRow] = []
     /// All links in the library, cached for sidebar category counters so they never reset to 0.
-    var allLinks: [LinkRow] = []
+    var allLinks: [LinkRow] = [] {
+        didSet { linkCounts = Self.countCategories(allLinks) }
+    }
+    /// Per-category link counts, worked out once per link load instead of on
+    /// every sidebar redraw.
+    private var linkCounts: [LinkCategory: Int] = [:]
     var tags: [TagCount] = []
     var tagTree: [TagNode] = []
     var folders: [Folder] = []
@@ -241,14 +246,14 @@ final class AppModel {
         do {
             let r: SearchResult = try await core.call(searchRequest(limit: pageSize, offset: 0))
             guard gen == generation else { return }
-            items = visible(r.items)
-            total = r.total
+            setIfChanged(\.items, visible(r.items))
+            setIfChanged(\.total, r.total)
             if !r.links.isEmpty || !query.isEmpty {
-                links = r.links
+                setIfChanged(\.links, r.links)
             }
             reachedEnd = r.items.count < pageSize
-            selection = selection.filter { id in items.contains { $0.id == id } }
-            if scope == .triage { selection = items.first.map { [$0.id] } ?? [] }
+            let ids = Set(items.map(\.id))
+            setIfChanged(\.selection, scope == .triage ? (items.first.map { [$0.id] } ?? []) : selection.filter(ids.contains))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -271,13 +276,20 @@ final class AppModel {
     }
 
     func refreshMeta() async {
-        if let s: Stats = try? await core.call(["cmd": "stats"]) { stats = s }
-        if let t: [TagCount] = try? await core.call(["cmd": "tags"]) {
+        if let s: Stats = try? await core.call(["cmd": "stats"]) { setIfChanged(\.stats, s) }
+        if let t: [TagCount] = try? await core.call(["cmd": "tags"]), t != tags {
             tags = t
             tagTree = TagNode.tree(t)
         }
         await loadFolders()
         await refreshDownloads()
+    }
+
+    /// @Observable announces every assignment, equal or not; the watcher and
+    /// the download loop re-read the same values every few seconds, which
+    /// would redraw the sidebar, the tag strip and the whole grid each time.
+    private func setIfChanged<T: Equatable>(_ key: ReferenceWritableKeyPath<AppModel, T>, _ value: T) {
+        if self[keyPath: key] != value { self[keyPath: key] = value }
     }
 
     private var loadLinksTask: Task<Void, Never>?
@@ -289,9 +301,9 @@ final class AppModel {
             do {
                 let fetched: [LinkRow] = try await core.call(["cmd": "links", "q": q, "limit": 1000])
                 guard !Task.isCancelled else { return }
-                links = fetched
+                setIfChanged(\.links, fetched)
                 if q.isEmpty {
-                    allLinks = fetched
+                    setIfChanged(\.allLinks, fetched)
                 }
                 if let sel = selectedLink, !links.contains(where: { $0.id == sel.id }) {
                     selectedLink = nil
@@ -308,8 +320,17 @@ final class AppModel {
     }
 
     func linkCategoryCount(_ category: LinkCategory) -> Int {
-        let pool = allLinks.isEmpty ? links : allLinks
-        return pool.filter { category.matches(host: $0.host, url: $0.url) }.count
+        allLinks.isEmpty ? links.filter { category.matches(host: $0.host, url: $0.url) }.count : linkCounts[category, default: 0]
+    }
+
+    private static func countCategories(_ links: [LinkRow]) -> [LinkCategory: Int] {
+        var counts: [LinkCategory: Int] = [:]
+        let named = LinkCategory.allCases.filter { $0 != .other }
+        for link in links {
+            let hit = named.first { $0.matches(host: link.host, url: link.url) } ?? .other
+            counts[hit, default: 0] += 1
+        }
+        return counts
     }
 
     private var selectLinkTask: Task<Void, Never>?
@@ -361,10 +382,10 @@ final class AppModel {
             if r.items.count < limit { break }
         }
         guard gen == generation, let first else { return }
-        items = visible(fresh)
+        setIfChanged(\.items, visible(fresh))
         syncViewer()
-        total = first.total
-        links = first.links
+        setIfChanged(\.total, first.total)
+        setIfChanged(\.links, first.links)
         reachedEnd = fresh.count >= first.total
     }
 
@@ -686,7 +707,7 @@ final class AppModel {
     // MARK: - Folders
 
     func loadFolders() async {
-        let fetched: [Folder] = (try? await core.call(["cmd": "folders"])) ?? []
+        guard let fetched: [Folder] = try? await core.call(["cmd": "folders"]), fetched != folders else { return }
         folders = fetched
         folderTree = FolderNode.tree(fetched)
     }
@@ -759,7 +780,7 @@ final class AppModel {
 
     func refreshDownloads() async {
         if let rep: DownloadsReport = try? await core.call(["cmd": "downloads"]) {
-            downloads = rep
+            setIfChanged(\.downloads, rep)
         }
     }
 
@@ -831,34 +852,47 @@ enum OCRHelper {
 
         let timeoutSeconds = min(perFileTimeoutSeconds * Double(files.count), 300.0)
 
-        return await withTaskGroup(of: [String]?.self) { group in
+        // Lines read so far; on a stall the reader is abandoned and these
+        // are what the helper managed, so the caller skips just the file it
+        // hung on instead of treating the whole helper as broken.
+        let box = LineBox()
+        await withTaskGroup(of: Bool.self) { group in
             group.addTask {
-                var lines: [String] = []
                 do {
                     for try await line in output.fileHandleForReading.bytes.lines {
                         let parsed = (try? JSONSerialization.jsonObject(with: Data(line.utf8), options: [.fragmentsAllowed]) as? String) ?? ""
-                        lines.append(parsed)
-                        if lines.count >= files.count { break }
+                        if box.append(parsed) >= files.count { break }
                     }
-                } catch {
-                    return nil
-                }
-                return lines
+                } catch {}
+                return true
             }
-
             group.addTask {
                 try? await Task.sleep(for: .seconds(timeoutSeconds))
-                return nil
+                return false
             }
-
-            let result = await group.next() ?? nil
+            _ = await group.next()
+            if p.isRunning { p.terminate() }
             group.cancelAll()
-
-            if p.isRunning {
-                p.terminate()
-            }
-            return result
         }
+        return box.lines
+    }
+}
+
+/// Lines from the OCR helper, shared between its reader and the timeout.
+private final class LineBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String] = []
+
+    /// Adds one and returns how many there are now.
+    func append(_ line: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        stored.append(line)
+        return stored.count
+    }
+
+    var lines: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return stored
     }
 }
 

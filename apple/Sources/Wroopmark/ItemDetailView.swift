@@ -85,17 +85,11 @@ struct ItemDetailView: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                // Inline Video Player or Media Gallery
-                let videoMedia = liveItem.media.first(where: { $0.isVideo })
-                if let vm = videoMedia, let vfile = vm.videoFile {
-                    InlineVideoPlayer(file: vfile, alt: vm.alt)
-                    let remainingImages = liveItem.media.filter { !$0.isVideo }
-                    if !remainingImages.isEmpty {
-                        MediaGallery(media: remainingImages, stacked: liveItem.isPhotoCarousel) {
-                            model.openViewer(owner: liveItem, fromQuote: false, index: $0)
-                        }
-                    }
-                } else if !liveItem.media.isEmpty {
+                // Videos show as their poster with a play button and play in
+                // the lightbox. A live AppKit player in this scrolling column
+                // makes SwiftUI drop clicks on every control below it (tags,
+                // note, folder), and would start a player on every selection.
+                if !liveItem.media.isEmpty {
                     MediaGallery(media: liveItem.media, stacked: liveItem.isPhotoCarousel) {
                         model.openViewer(owner: liveItem, fromQuote: false, index: $0)
                     }
@@ -297,17 +291,33 @@ struct ItemDetailView: View {
         Task { await model.setNote(item.id, trimmed) }
     }
 
-    /// Makes URLs in post text clickable.
+    /// Makes URLs in post text clickable. The detail redraws whenever the
+    /// library refreshes; the detector and its result are kept per text.
     private func linkified(_ text: String) -> AttributedString {
+        if let hit = Self.linkCache.object(forKey: text as NSString) { return hit.value }
         var s = AttributedString(text)
-        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return s }
-        for m in detector.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
-            guard let r = Range(m.range, in: text), let ar = Range(r, in: s), let url = m.url else { continue }
-            s[ar].link = url
-            s[ar].foregroundColor = Theme.accent
+        if let detector = Self.detector {
+            for m in detector.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+                guard let r = Range(m.range, in: text), let ar = Range(r, in: s), let url = m.url else { continue }
+                s[ar].link = url
+                s[ar].foregroundColor = Theme.accent
+            }
         }
+        Self.linkCache.setObject(Linked(s), forKey: text as NSString)
         return s
     }
+
+    private final class Linked {
+        let value: AttributedString
+        init(_ value: AttributedString) { self.value = value }
+    }
+
+    private static let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    private static let linkCache: NSCache<NSString, Linked> = {
+        let c = NSCache<NSString, Linked>()
+        c.countLimit = 64
+        return c
+    }()
 }
 
 /// Chips with remove buttons, an inline field with completion, and the
@@ -428,7 +438,9 @@ struct MediaGallery: View {
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
-        .onTapGesture { open(index) }
+        // High priority: inside a feed post or card the post's own click
+        // (select / open) would otherwise swallow it.
+        .highPriorityGesture(TapGesture().onEnded { open(index) })
         .help(m.alt ?? (m.isVideo ? (m.videoFile != nil ? "Oynat" : "Video henüz indirilmedi") : "Büyüt"))
     }
 }
@@ -465,7 +477,7 @@ struct PhotoStack: View {
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
-        .onTapGesture(perform: open)
+        .highPriorityGesture(TapGesture().onEnded(open))
         .onHover { hovering = $0 }
         .animation(.spring(duration: 0.25), value: hovering)
         .help("\(media.count) fotoğraf — tıkla, ← → ile gez")

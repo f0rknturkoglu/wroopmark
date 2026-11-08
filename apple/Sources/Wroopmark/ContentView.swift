@@ -23,6 +23,15 @@ struct ContentView: View {
                     .inspectorColumnWidth(min: 320, ideal: 380, max: 550)
             }
         }
+        // The media viewer is a lightbox over the whole window rather than a
+        // sheet: a click on the backdrop closes it, like Esc.
+        .overlay {
+            if let v = model.viewer {
+                MediaViewer(viewer: v)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.16), value: model.viewer?.id)
         .preferredColorScheme(model.theme.colorScheme)
         .onChange(of: model.query) { _, _ in model.queryChanged() }
         .onChange(of: model.filters) { _, _ in model.queryChanged() }
@@ -116,7 +125,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $model.showAdd) { AddURLSheet() }
         .sheet(isPresented: $model.showDownloads) { DownloadsView().environment(model) }
-        .sheet(item: $model.viewer) { v in MediaViewer(viewer: v) }
         .sheet(isPresented: $model.showBulkTags) { BulkTagSheet(ids: Array(model.selection)) }
         .alert("Hata", isPresented: $model.hasError) {
             Button("Tamam", role: .cancel) {}

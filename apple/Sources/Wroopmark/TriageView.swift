@@ -212,7 +212,8 @@ private struct TriageCard: View {
             VStack(alignment: .leading, spacing: 14) {
                 AuthorLine(item: item, showHandle: true)
                 if let vm = (item.media.first(where: { $0.isVideo }) ?? item.quote?.item.media.first(where: { $0.isVideo })), let vf = vm.videoFile {
-                    InlineVideoPlayer(file: vf, alt: vm.alt, maxHeight: 420)
+                    // Reviewing is quicker when the clip starts by itself.
+                    InlineVideoPlayer(file: vf, alt: vm.alt, aspect: vm.aspect, maxHeight: 420, autoplay: true)
                 } else if !item.allMedia.isEmpty {
                     let own = !item.media.isEmpty
                     MediaGallery(media: own ? item.media : item.quote?.item.media ?? [], stacked: own && item.isPhotoCarousel) {
