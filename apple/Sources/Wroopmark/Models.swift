@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// Mirrors `model::Item` in the core.
-struct Item: Decodable, Identifiable, Hashable {
+struct Item: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let platform: String
     let url: String
@@ -19,15 +19,17 @@ struct Item: Decodable, Identifiable, Hashable {
     let quote: Quote?
     let tags: [String]
     let note: String?
+    let folderId: Int64?
 
-    /// Boxed so `Item` can contain an `Item`.
-    final class Quote: Decodable, @unchecked Sendable {
+    /// Boxed so `Item` can contain an `Item`. Immutable and thread-safe.
+    final class Quote: Decodable, Sendable {
         let item: Item
         init(from decoder: Decoder) throws { item = try Item(from: decoder) }
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, platform, url, authorHandle, authorName, title, text, extra, ocr, createdAt, savedAt, media, links, quote, tags, note
+        case folderId = "folder_id"
     }
 
     init(from decoder: Decoder) throws {
@@ -48,13 +50,74 @@ struct Item: Decodable, Identifiable, Hashable {
         quote = try c.decodeIfPresent(Quote.self, forKey: .quote)
         tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
         note = try c.decodeIfPresent(String.self, forKey: .note)
+        folderId = try c.decodeIfPresent(Int64.self, forKey: .folderId)
+    }
+
+    init(
+        id: String,
+        platform: String,
+        url: String,
+        authorHandle: String?,
+        authorName: String?,
+        title: String?,
+        text: String,
+        extra: String?,
+        ocr: String?,
+        createdAt: Int64?,
+        savedAt: Int64,
+        media: [Media],
+        links: [String],
+        quote: Quote?,
+        tags: [String],
+        note: String?,
+        folderId: Int64?
+    ) {
+        self.id = id
+        self.platform = platform
+        self.url = url
+        self.authorHandle = authorHandle
+        self.authorName = authorName
+        self.title = title
+        self.text = text
+        self.extra = extra
+        self.ocr = ocr
+        self.createdAt = createdAt
+        self.savedAt = savedAt
+        self.media = media
+        self.links = links
+        self.quote = quote
+        self.tags = tags
+        self.note = note
+        self.folderId = folderId
+    }
+
+    func withFolder(_ newFolderId: Int64?) -> Item {
+        Item(
+            id: id,
+            platform: platform,
+            url: url,
+            authorHandle: authorHandle,
+            authorName: authorName,
+            title: title,
+            text: text,
+            extra: extra,
+            ocr: ocr,
+            createdAt: createdAt,
+            savedAt: savedAt,
+            media: media,
+            links: links,
+            quote: quote,
+            tags: tags,
+            note: note,
+            folderId: newFolderId
+        )
     }
 
     /// Everything the views show, so SwiftUI redraws when any of it changes.
     static func == (a: Item, b: Item) -> Bool {
         a.id == b.id && a.tags == b.tags && a.note == b.note && a.media == b.media && a.text == b.text
             && a.title == b.title && a.ocr == b.ocr && a.extra == b.extra && a.savedAt == b.savedAt
-            && a.links == b.links && a.quote?.item == b.quote?.item
+            && a.links == b.links && a.quote?.item == b.quote?.item && a.folderId == b.folderId
     }
 
     func hash(into h: inout Hasher) { h.combine(id) }
@@ -84,7 +147,7 @@ struct Item: Decodable, Identifiable, Hashable {
     var needsDownload: Bool { allMedia.contains { !$0.isOffline } }
 }
 
-struct Media: Decodable, Hashable {
+struct Media: Decodable, Hashable, Sendable {
     let kind: String
     let url: String
     let thumbUrl: String?
@@ -113,7 +176,7 @@ struct Media: Decodable, Hashable {
     }
 }
 
-struct LinkRow: Decodable, Identifiable, Hashable {
+struct LinkRow: Decodable, Identifiable, Hashable, Sendable {
     let id: Int64
     let url: String
     let host: String
@@ -125,19 +188,19 @@ struct LinkRow: Decodable, Identifiable, Hashable {
     let itemCount: Int
 }
 
-struct SearchResult: Decodable {
+struct SearchResult: Decodable, Sendable {
     let items: [Item]
     let total: Int
     let links: [LinkRow]
 }
 
-struct TagCount: Decodable, Hashable {
+struct TagCount: Decodable, Hashable, Sendable {
     let name: String
     let key: String
     let count: Int
 }
 
-struct Stats: Decodable {
+struct Stats: Decodable, Sendable {
     let items: Int
     let byPlatform: [String: Int]
     let tags: Int
@@ -152,19 +215,19 @@ struct Stats: Decodable {
 }
 
 /// An outside downloader the core found (`video_tools`).
-struct VideoTool: Decodable, Hashable {
+struct VideoTool: Decodable, Hashable, Sendable {
     let name: String
     let path: String
 }
 
-struct ImportReport: Decodable {
+struct ImportReport: Decodable, Sendable {
     let new: Int
     let updated: Int
     let ids: [String]
 }
 
-enum Platform: String, CaseIterable, Identifiable {
-    case x, tiktok, pinterest, facebook, web
+enum Platform: String, CaseIterable, Identifiable, Sendable {
+    case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, web
 
     var id: String { rawValue }
 
@@ -174,6 +237,12 @@ enum Platform: String, CaseIterable, Identifiable {
         case .tiktok: "TikTok"
         case .pinterest: "Pinterest"
         case .facebook: "Facebook"
+        case .reddit: "Reddit"
+        case .youtube: "YouTube"
+        case .instagram: "Instagram"
+        case .github: "GitHub"
+        case .hackernews: "Hacker News"
+        case .arxiv: "arXiv"
         case .web: "Web"
         }
     }
@@ -184,6 +253,12 @@ enum Platform: String, CaseIterable, Identifiable {
         case .tiktok: "music.note"
         case .pinterest: "pin"
         case .facebook: "person.2"
+        case .reddit: "bubble.left.and.bubble.right.fill"
+        case .youtube: "play.rectangle.fill"
+        case .instagram: "camera.fill"
+        case .github: "chevron.left.forwardslash.chevron.right"
+        case .hackernews: "y.square.fill"
+        case .arxiv: "doc.text.fill"
         case .web: "globe"
         }
     }
@@ -194,13 +269,19 @@ enum Platform: String, CaseIterable, Identifiable {
         case .tiktok: .pink
         case .pinterest: .red
         case .facebook: .blue
+        case .reddit: .orange
+        case .youtube: .red
+        case .instagram: .purple
+        case .github: .primary
+        case .hackernews: .orange
+        case .arxiv: .red
         case .web: .teal
         }
     }
 }
 
 /// A node of the tag tree built from `a/b/c` names.
-struct TagNode: Identifiable, Hashable {
+struct TagNode: Identifiable, Hashable, Sendable {
     let id: String // full key path, e.g. "dev/rust"
     let name: String // last segment as the user wrote it
     var count: Int
@@ -234,4 +315,134 @@ struct TagNode: Identifiable, Hashable {
             nodes[i].children = kids
         }
     }
+}
+
+enum AppTheme: String, CaseIterable, Identifiable, Codable, Sendable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .system: "Sistem"
+        case .light: "Açık Tema"
+        case .dark: "Koyu Tema"
+        }
+    }
+    var iconName: String {
+        switch self {
+        case .system: "circle.lefthalf.filled"
+        case .light: "sun.max.fill"
+        case .dark: "moon.stars.fill"
+        }
+    }
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+}
+
+struct Folder: Identifiable, Decodable, Hashable, Sendable {
+    let id: Int64
+    let name: String
+    let count: Int
+    let createdAt: Int64?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, count
+        case createdAt = "created_at"
+    }
+}
+
+/// A node in the folder tree built from `parent/child` folder names.
+struct FolderNode: Identifiable, Hashable, Sendable {
+    let id: String // full path e.g. "ders/matematik"
+    let name: String // leaf name e.g. "matematik"
+    let folder: Folder?
+    var count: Int
+    var children: [FolderNode]?
+
+    static func tree(_ folders: [Folder]) -> [FolderNode] {
+        var roots: [FolderNode] = []
+        for f in folders {
+            let parts = f.name.split(separator: "/").map(String.init)
+            insert(&roots, parts: parts[...], folder: f, prefix: "")
+        }
+        return roots
+    }
+
+    private static func insert(_ nodes: inout [FolderNode], parts: ArraySlice<String>, folder: Folder, prefix: String) {
+        guard let name = parts.first else { return }
+        let path = prefix.isEmpty ? name : "\(prefix)/\(name)"
+        let i: Int
+        if let found = nodes.firstIndex(where: { $0.id == path }) {
+            i = found
+        } else {
+            nodes.append(FolderNode(id: path, name: name, folder: parts.count == 1 ? folder : nil, count: 0, children: nil))
+            i = nodes.count - 1
+        }
+        if parts.count == 1 {
+            nodes[i] = FolderNode(id: path, name: name, folder: folder, count: folder.count, children: nodes[i].children)
+        } else {
+            var kids = nodes[i].children ?? []
+            insert(&kids, parts: parts.dropFirst(), folder: folder, prefix: path)
+            nodes[i].children = kids
+            nodes[i].count += folder.count
+        }
+    }
+}
+
+struct DownloadItem: Identifiable, Decodable, Hashable, Sendable {
+    let id: String
+    let platform: String
+    let url: String
+    let authorHandle: String?
+    let authorName: String?
+    let title: String?
+    let text: String
+    let progress: Double?
+    let speed: String?
+    let eta: String?
+    let status: String
+    let tries: Int?
+    let videoFile: String?
+    let fileSize: Int64?
+    let savedAt: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case id, platform, url, title, text, progress, speed, eta, status, tries
+        case authorHandle = "author_handle"
+        case authorName = "author_name"
+        case videoFile = "video_file"
+        case fileSize = "file_size"
+        case savedAt = "saved_at"
+    }
+
+    var author: String? {
+        if let h = authorHandle, !h.isEmpty { return "@\(h)" }
+        return authorName
+    }
+
+    var headline: String {
+        if let t = title, !t.isEmpty { return t }
+        return text
+    }
+
+    var isCompleted: Bool { status == "completed" }
+    var isDownloading: Bool { status == "downloading" }
+    var isFailed: Bool { status == "failed" }
+    var isQueued: Bool { status == "queued" }
+}
+
+struct DownloadsReport: Decodable, Sendable {
+    let active: [DownloadItem]
+    let queued: [DownloadItem]
+    let completed: [DownloadItem]
+    let failed: [DownloadItem]
+
+    var totalActiveOrQueued: Int { active.count + queued.count }
 }

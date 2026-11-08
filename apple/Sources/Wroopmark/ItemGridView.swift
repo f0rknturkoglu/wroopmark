@@ -11,9 +11,6 @@ struct ItemGridView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if !model.links.isEmpty {
-                    MatchingLinks(links: model.links)
-                }
                 switch model.layout {
                 case .grid:
                     LazyVGrid(columns: columns, spacing: 14) {
@@ -60,8 +57,7 @@ struct ItemGridView: View {
                 }
             }
         }
-        .navigationTitle(title)
-        .navigationSubtitle(model.total == 0 ? "" : "\(model.total.formatted()) kayıt")
+        .navigationTitle("")
     }
 
     private var title: String {
@@ -70,7 +66,8 @@ struct ItemGridView: View {
         case .untagged: "Etiketsiz"
         case .platform(let p): p.label
         case .tag(let key): "#\(key)"
-        case .links: "Link havuzu"
+        case .folder(_, let name): name
+        case .links(let cat): cat != nil ? "\(cat!.label) linkleri" : "Link havuzu"
         case .photos: "Fotoğraflar"
         case .videos: "Videolar"
         case .triage: "Ayıkla"
@@ -109,12 +106,34 @@ struct ItemGridView: View {
             Button("Medyayı indir") { Task { await model.downloadMedia(item.id) } }
         }
         Divider()
+        Menu(ids.count > 1 ? "Klasöre taşı…" : "Klasöre taşı") {
+            if !model.folders.isEmpty {
+                ForEach(model.folders) { f in
+                    Button {
+                        Task { await model.moveItemsToFolder(ids: ids, folderID: f.id) }
+                    } label: {
+                        HStack {
+                            Text(f.name)
+                            if item.folderId == f.id && ids.count == 1 {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+                Divider()
+            }
+            if item.folderId != nil || ids.count > 1 {
+                Button("Klasörden çıkar") {
+                    Task { await model.moveItemsToFolder(ids: ids, folderID: nil) }
+                }
+            }
+        }
         Button(ids.count > 1 ? "\(ids.count) kaydı etiketle…" : "Etiketle…") {
             model.selection = Set(ids)
             model.showBulkTags = true
         }
-        Button(ids.count > 1 ? "\(ids.count) kaydı sil" : "Sil", role: .destructive) {
-            Task { await model.delete(ids) }
+        Button(ids.count > 1 ? "\(ids.count) kaydı sil…" : "Sil…", role: .destructive) {
+            model.requestDelete(ids)
         }
     }
 }
@@ -142,9 +161,40 @@ private struct Selectable: ViewModifier {
 struct TagStrip: View {
     @Environment(AppModel.self) private var model
 
+    private var scopeTitle: String {
+        switch model.scope {
+        case .all: "Tümü"
+        case .untagged: "Etiketsiz"
+        case .platform(let p): p.label
+        case .tag(let key): "#\(key)"
+        case .folder(_, let name): name
+        case .links(let cat): cat != nil ? "\(cat!.label) linkleri" : "Link havuzu"
+        case .photos: "Fotoğraflar"
+        case .videos: "Videolar"
+        case .triage: "Ayıkla"
+        }
+    }
+
     var body: some View {
         @Bindable var model = model
         HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Text(scopeTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                if model.total > 0 {
+                    Text(model.total.formatted())
+                        .font(.system(size: 11, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.primary.opacity(0.06), in: Capsule())
+                }
+            }
+
+            Divider().frame(height: 14).opacity(0.5)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     if !model.filters.isEmpty {
@@ -156,9 +206,14 @@ struct TagStrip: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Theme.accent, in: Capsule())
-                        Button { model.filters = AdvancedFilters() } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain).foregroundStyle(.secondary)
-                            .help("Filtreleri temizle")
+                        Button { model.filters = AdvancedFilters() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .frame(minWidth: 24, minHeight: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Filtreleri temizle")
+                        .help("Filtreleri temizle")
                     }
                     if case .tag(let key) = model.scope {
                         TagChip(name: key, selected: true, removable: true, action: {}, remove: { model.scope = .all })
@@ -189,41 +244,6 @@ struct TagStrip: View {
         .padding(.horizontal, 16)
         .background(.bar)
         .overlay(alignment: .bottom) { Divider() }
-    }
-}
-
-/// Links from the pool that match the search, above the posts.
-struct MatchingLinks: View {
-    let links: [LinkRow]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("LİNKLER").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.secondary).tracking(0.6)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(links) { link in
-                        Button {
-                            if let url = URL(string: link.url) { NSWorkspace.shared.open(url) }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "link").foregroundStyle(Theme.accent)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(link.title ?? link.host).lineLimit(1).font(.system(size: 12.5, weight: .medium))
-                                    Text(link.host).font(.system(size: 11)).foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: 240, alignment: .leading)
-                            .padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Theme.hairline))
-                        }
-                        .buttonStyle(.plain)
-                        .help(link.url)
-                    }
-                }
-            }
-        }
-        .padding([.horizontal, .top], 16)
     }
 }
 
@@ -263,7 +283,7 @@ struct ItemCard: View {
             }
             .padding(12)
         }
-        .frame(height: Theme.cardHeight)
+        .frame(minHeight: Theme.cardHeight)
         .background(Theme.card)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .overlay(
@@ -280,6 +300,7 @@ struct ItemCard: View {
                         .background(.regularMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Etiketleri düzenle")
                 .padding(8)
                 .help("Etiketle")
                 .popover(isPresented: $tagging, arrowEdge: .bottom) {
@@ -287,7 +308,7 @@ struct ItemCard: View {
                         Task { await model.setTags(item.id, tags) }
                     }
                     .padding(14)
-                    .frame(width: 300)
+                    .frame(minWidth: 260, idealWidth: 300)
                 }
             }
         }
@@ -378,10 +399,16 @@ struct MediaBadge: View {
         let videos = item.allMedia.filter(\.isVideo)
         let missing = item.needsDownload
         HStack(spacing: 4) {
-            if !videos.isEmpty { Image(systemName: "play.fill") }
-            if item.isPhotoCarousel { Image(systemName: "square.stack.fill") }
-            if item.allMedia.count > 1 && !compact { Text("\(item.allMedia.count)") }
-            if missing { Image(systemName: "icloud.and.arrow.down").help("Bir kısmı henüz indirilmedi") }
+            if !videos.isEmpty { Image(systemName: "play.fill").accessibilityHidden(true) }
+            if item.isPhotoCarousel { Image(systemName: "square.stack.fill").accessibilityHidden(true) }
+            if item.allMedia.count > 1 && !compact {
+                Text("\(item.allMedia.count)").monospacedDigit()
+            }
+            if missing {
+                Image(systemName: "icloud.and.arrow.down")
+                    .accessibilityHidden(true)
+                    .help("Bir kısmı henüz indirilmedi")
+            }
         }
         .font(.system(size: 10, weight: .bold))
         .foregroundStyle(.white)
@@ -419,7 +446,10 @@ struct CardTags: View {
                     TagChip(name: tag, action: { model.filter(tag: tag) })
                 }
                 if tags.count > 3 {
-                    Text("+\(tags.count - 3)").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("+\(tags.count - 3)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
                 }
             }
         }

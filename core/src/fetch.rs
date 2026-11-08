@@ -48,19 +48,25 @@ pub struct PageMeta {
 static REFRESH_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?i)http-equiv=["']?refresh["']?[^>]*?content=["']?\d*\s*;\s*url=([^"'>\s]+)"#).expect("refresh regex"));
 
+static META_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("meta[content]").expect("static selector"));
+static TITLE_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("title").expect("static selector"));
+static PARAS_SELS: LazyLock<[Selector; 3]> = LazyLock::new(|| [
+    Selector::parse("article p").expect("static selector"),
+    Selector::parse("main p").expect("static selector"),
+    Selector::parse("p").expect("static selector"),
+]);
+static OEMBED_P_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("blockquote > p").expect("static selector"));
+static OEMBED_A_SEL: LazyLock<Selector> = LazyLock::new(|| Selector::parse("blockquote > a").expect("static selector"));
+
 fn enc(s: &str) -> String {
     url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
-}
-
-fn sel(css: &str) -> Selector {
-    Selector::parse(css).expect("static selector")
 }
 
 pub fn parse_page(final_url: &str, html: &str) -> PageMeta {
     let doc = Html::parse_document(html);
     let base = Url::parse(final_url).ok();
     let mut metas: Vec<(String, String)> = vec![];
-    for m in doc.select(&sel("meta[content]")) {
+    for m in doc.select(&META_SEL) {
         let key = m.value().attr("property").or_else(|| m.value().attr("name")).unwrap_or("").to_ascii_lowercase();
         let content = m.value().attr("content").unwrap_or("").trim();
         if !key.is_empty() && !content.is_empty() {
@@ -71,10 +77,10 @@ pub fn parse_page(final_url: &str, html: &str) -> PageMeta {
     let abs = |u: String| base.as_ref().and_then(|b| b.join(&u).ok()).map(|u| u.to_string()).unwrap_or(u);
 
     let title = meta(&["og:title", "twitter:title"])
-        .or_else(|| doc.select(&sel("title")).next().map(|t| tidy(&t.text().collect::<String>())).filter(|t| !t.is_empty()));
+        .or_else(|| doc.select(&TITLE_SEL).next().map(|t| tidy(&t.text().collect::<String>())).filter(|t| !t.is_empty()));
     let mut paras: Vec<String> = vec![];
-    for css in ["article p", "main p", "p"] {
-        paras = doc.select(&sel(css)).map(|p| tidy(&p.text().collect::<String>())).filter(|p| p.len() > 40).collect();
+    for sel in &*PARAS_SELS {
+        paras = doc.select(sel).map(|p| tidy(&p.text().collect::<String>())).filter(|p| p.len() > 40).collect();
         if !paras.is_empty() {
             break;
         }
@@ -203,9 +209,9 @@ impl Fetcher {
         let v = self.get_json(&format!("https://publish.twitter.com/oembed?omit_script=1&dnt=true&url={}", enc(url)))?;
         let html = v.get("html").and_then(Value::as_str).ok_or("X oEmbed boş döndü (silinmiş ya da gizli olabilir)")?;
         let doc = Html::parse_fragment(html);
-        let text = doc.select(&sel("blockquote > p")).next().map(|p| tidy(&p.text().collect::<String>())).unwrap_or_default();
+        let text = doc.select(&OEMBED_P_SEL).next().map(|p| tidy(&p.text().collect::<String>())).unwrap_or_default();
         let created_at = doc
-            .select(&sel("blockquote > a"))
+            .select(&OEMBED_A_SEL)
             .next_back()
             .and_then(|a| chrono::NaiveDate::parse_from_str(&a.text().collect::<String>(), "%B %d, %Y").ok())
             .and_then(|d| d.and_hms_opt(12, 0, 0))

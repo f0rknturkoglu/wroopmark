@@ -7,7 +7,33 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+pub type ProgressCallback = Arc<dyn Fn(f32, Option<&str>, Option<&str>) + Send + Sync>;
+
+/// Parses yt-dlp's "[download]  45.2% of  12.34MiB at  2.50MiB/s ETA 00:03" line.
+pub fn parse_progress(line: &str) -> Option<(f32, Option<String>, Option<String>)> {
+    if !line.contains("[download]") || !line.contains('%') {
+        return None;
+    }
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    let mut pct = None;
+    let mut speed = None;
+    let mut eta = None;
+    for (i, p) in parts.iter().enumerate() {
+        if p.ends_with('%') {
+            if let Ok(val) = p.trim_end_matches('%').parse::<f32>() {
+                pct = Some(val);
+            }
+        } else if *p == "at" && i + 1 < parts.len() {
+            speed = Some(parts[i + 1].to_string());
+        } else if *p == "ETA" && i + 1 < parts.len() {
+            eta = Some(parts[i + 1].to_string());
+        }
+    }
+    pct.map(|p| (p, speed, eta))
+}
 
 /// One video may take this long (large files on a slow line).
 const TIMEOUT: Duration = Duration::from_secs(300);
@@ -39,7 +65,7 @@ impl Tool {
         let owned = |v: &[&str]| v.iter().map(|a| a.to_string()).collect::<Vec<_>>();
         match self {
             Tool::YtDlp => {
-                let mut a = owned(&["--no-playlist", "--no-warnings", "--no-progress", "--quiet", "--no-mtime"]);
+                let mut a = owned(&["--no-playlist", "--no-warnings", "--newline"]);
                 a.extend(owned(&["--socket-timeout", "30", "-f", YTDLP_FORMAT, "-o"]));
                 a.push(format!("{dir}/video.%(ext)s"));
                 a.push(url.into());
@@ -79,7 +105,7 @@ pub fn available() -> Vec<(Tool, PathBuf)> {
 }
 
 /// Runs one tool into `dir` and returns the file it wrote.
-fn run(tool: Tool, exe: &Path, dir: &Path, url: &str) -> Result<PathBuf, String> {
+fn run(tool: Tool, exe: &Path, dir: &Path, url: &str, on_progress: Option<&ProgressCallback>) -> Result<PathBuf, String> {
     let log = dir.join(format!("{}.log", tool.name()));
     let stderr = fs::File::create(&log).map_err(|e| e.to_string())?;
     // The tools find their own helpers (deno for yt-dlp's JS challenges)
@@ -90,10 +116,26 @@ fn run(tool: Tool, exe: &Path, dir: &Path, url: &str) -> Result<PathBuf, String>
         .args(tool.args(dir, url))
         .env("PATH", path)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
+        .stdout(if on_progress.is_some() { Stdio::piped() } else { Stdio::null() })
         .stderr(stderr)
         .spawn()
         .map_err(|e| format!("{}: başlatılamadı: {e}", tool.name()))?;
+
+    let progress_thread = child.stdout.take().map(|out| {
+        let cb = on_progress.cloned();
+        std::thread::spawn(move || {
+            use std::io::{BufRead, BufReader};
+            let reader = BufReader::new(out);
+            for line in reader.lines().map_while(Result::ok) {
+                if let Some(cb) = &cb
+                    && let Some((pct, spd, eta)) = parse_progress(&line)
+                {
+                    cb(pct, spd.as_deref(), eta.as_deref());
+                }
+            }
+        })
+    });
+
     let start = Instant::now();
     let status = loop {
         if let Some(s) = child.try_wait().map_err(|e| e.to_string())? {
@@ -106,6 +148,11 @@ fn run(tool: Tool, exe: &Path, dir: &Path, url: &str) -> Result<PathBuf, String>
         }
         std::thread::sleep(Duration::from_millis(250));
     };
+
+    if let Some(handle) = progress_thread {
+        let _ = handle.join();
+    }
+
     let file = fs::read_dir(dir)
         .map_err(|e| e.to_string())?
         .flatten()
@@ -127,6 +174,10 @@ fn run(tool: Tool, exe: &Path, dir: &Path, url: &str) -> Result<PathBuf, String>
 /// fresh folder under `work`. The caller moves the file away and removes
 /// the folder.
 pub fn download(url: &str, work: &Path) -> Result<PathBuf, String> {
+    download_with_progress(url, work, None)
+}
+
+pub fn download_with_progress(url: &str, work: &Path, on_progress: Option<&ProgressCallback>) -> Result<PathBuf, String> {
     let tools = available();
     if tools.is_empty() {
         return Err("yt-dlp ya da gallery-dl kurulu değil".into());
@@ -135,7 +186,7 @@ pub fn download(url: &str, work: &Path) -> Result<PathBuf, String> {
     for (tool, exe) in tools {
         let _ = fs::remove_dir_all(work);
         fs::create_dir_all(work).map_err(|e| e.to_string())?;
-        match run(tool, &exe, work, url) {
+        match run(tool, &exe, work, url, on_progress) {
             Ok(f) => return Ok(f),
             Err(e) => errors.push(e),
         }

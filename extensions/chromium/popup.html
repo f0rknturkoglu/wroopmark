@@ -5,63 +5,312 @@
 <title>wroopmark</title>
 <style>
   :root {
-    --bg: #fbfaf8; --fg: #1d1c1a; --muted: #6f6b66; --line: #e6e2dc; --card: #fff;
-    --accent: #774aed; --accent-fg: #fff; --err: #b3261e; --chip: #efece7;
+    --bg: #fbfaf8; --fg: #1d1c1a; --muted: #736e68; --line: #e6e2dc; --card: #ffffff;
+    --accent: #6e40e6; --accent-hover: #5d32d4; --accent-fg: #ffffff;
+    --danger: #b3261e; --chip: #f0ece6; --chip-hover: #e5e0d7;
+    --success: #1e7e34; --active-scroll: #c5221f; --active-scroll-hover: #a11b18;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1a19; --fg: #ecebe8; --muted: #a29d96; --line: #34322f; --card: #242321;
-            --accent: #b39bff; --accent-fg: #1d0f45; --err: #f2b8b5; --chip: #2f2d2a; }
+    :root {
+      --bg: #1c1b19; --fg: #edebe8; --muted: #9e9992; --line: #33312d; --card: #252421;
+      --accent: #a58bff; --accent-hover: #9375ff; --accent-fg: #1a0b40;
+      --danger: #f28b82; --chip: #2f2d29; --chip-hover: #3b3935;
+      --success: #81c995; --active-scroll: #f28b82; --active-scroll-hover: #e07268;
+    }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; width: 380px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg); }
-  header { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 8px; }
-  h1 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
-  #status { color: var(--muted); font-size: 12px; flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  section { padding: 8px 14px; border-top: 1px solid var(--line); }
-  input, textarea { width: 100%; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; outline: none; }
-  input:focus, textarea:focus { border-color: var(--accent); }
-  textarea { resize: none; height: 34px; }
-  .row { display: flex; gap: 6px; margin-top: 6px; }
-  button { font: inherit; border: 0; border-radius: 7px; padding: 7px 11px; cursor: pointer; background: var(--accent); color: var(--accent-fg); font-weight: 600; }
-  button.ghost { background: var(--chip); color: var(--fg); font-weight: 500; }
-  button:disabled { opacity: .55; cursor: default; }
-  #results { list-style: none; margin: 6px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
-  #results li { padding: 7px 4px; border-bottom: 1px solid var(--line); cursor: pointer; border-radius: 5px; }
-  #results li:hover { background: var(--chip); }
-  .meta { color: var(--muted); font-size: 11.5px; display: flex; gap: 6px; }
-  .body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .tag { background: var(--chip); border-radius: 4px; padding: 0 5px; font-size: 11px; }
-  .msg { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 16px; }
-  .msg.err { color: var(--err); }
-  label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 6px; }
-  label input { width: auto; }
-  code { font-size: 11px; background: var(--chip); padding: 1px 4px; border-radius: 4px; }
+  body {
+    margin: 0;
+    width: 390px;
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    user-select: none;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 15px 9px;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+  }
+  .brand {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .brand-badge {
+    font-size: 10px;
+    background: var(--chip);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  #status {
+    color: var(--muted);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .container {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 11px 12px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .card-title {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-sub {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.35;
+    margin-bottom: 8px;
+  }
+  
+  .badge-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-variant-numeric: tabular-nums;
+  }
+  .badge-count.empty {
+    background: var(--chip);
+    color: var(--muted);
+  }
+
+  .row {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+  }
+
+  button {
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    border: 0;
+    border-radius: 7px;
+    padding: 8px 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+  }
+  button.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    flex: 1;
+  }
+  button.primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+  button.ghost {
+    background: var(--chip);
+    color: var(--fg);
+    font-weight: 500;
+  }
+  button.ghost:hover:not(:disabled) {
+    background: var(--chip-hover);
+  }
+  button.scroll-btn {
+    background: var(--chip);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    width: 100%;
+    padding: 8px 12px;
+  }
+  button.scroll-btn:hover:not(:disabled) {
+    background: var(--chip-hover);
+  }
+  button.scroll-btn.active {
+    background: var(--active-scroll);
+    color: #fff;
+    border-color: var(--active-scroll);
+  }
+  button.scroll-btn.active:hover {
+    background: var(--active-scroll-hover);
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  input, textarea {
+    width: 100%;
+    font: inherit;
+    font-size: 12.5px;
+    color: inherit;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color 0.15s ease;
+    user-select: text;
+  }
+  input:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+  textarea {
+    resize: none;
+    height: 36px;
+    line-height: 1.35;
+  }
+
+  .msg {
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--muted);
+    min-height: 15px;
+    line-height: 1.3;
+  }
+  .msg.err { color: var(--danger); }
+  .msg.ok { color: var(--success); font-weight: 500; }
+
+  #results {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  #results li {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.1s ease;
+  }
+  #results li:hover {
+    background: var(--chip);
+  }
+  .res-meta {
+    color: var(--muted);
+    font-size: 11px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+  .res-body {
+    font-size: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tag {
+    background: var(--chip);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 10.5px;
+  }
 </style>
 </head>
 <body>
-  <header><h1>wroopmark</h1><span id="status">bağlanıyor…</span></header>
-
-  <section>
-    <input id="q" placeholder="Ara… (tag:dev from:@jack has:image &quot;ifade&quot;)" autocomplete="off" autofocus>
-    <ul id="results"></ul>
-  </section>
-
-  <section>
-    <input id="tags" placeholder="etiketler: dev/rust, okunacak" list="taglist" autocomplete="off">
-    <datalist id="taglist"></datalist>
-    <div class="row"><textarea id="note" placeholder="not (isteğe bağlı)"></textarea></div>
-    <div class="row"><button id="save">Bu sayfayı kaydet</button></div>
-    <div id="saveMsg" class="msg"></div>
-  </section>
-
-  <section>
-    <div class="row">
-      <button id="scan" class="ghost">Tüm X yer imlerini içe aktar</button>
-      <button id="scanTikTok" class="ghost">TikTok kaydedilen + beğenilenler</button>
+  <header>
+    <div class="brand">
+      <span>wroopmark</span>
+      <span class="brand-badge">PRO</span>
     </div>
-    <div class="msg">X yer imleri ve TikTok'ta kendi Kaydedilenler / Beğenilenler / Koleksiyonlar sekmelerin açıldıkça kendiliğinden kaydedilir.</div>
-    <div id="scanMsg" class="msg"></div>
-  </section>
+    <span id="status">bağlanıyor…</span>
+  </header>
+
+  <div class="container">
+    <!-- 1. Toplanan İçerikler (Collected Queue) -->
+    <section class="card" id="collectCard">
+      <div class="card-header">
+        <div class="card-title">
+          <span>📦 Toplanan İçerikler</span>
+        </div>
+        <span class="badge-count empty" id="collectedBadge">0</span>
+      </div>
+      <div class="card-sub" id="collectedSummary">
+        Sayfada gezindikçe gönderiler ve linkler burada birikir; tek tıkla kütüphaneye aktarabilirsiniz.
+      </div>
+      <div class="row">
+        <button id="importCollectedBtn" class="primary" disabled>
+          📥 Wroopmark'a Aktar (<span id="collectedBtnCount">0</span>)
+        </button>
+        <button id="clearCollectedBtn" class="ghost" style="display:none;">Temizle</button>
+      </div>
+      <div id="collectMsg" class="msg"></div>
+    </section>
+
+    <!-- 2. Otomatik Kaydırıcı Controller -->
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span>⚡ Otomatik Kaydırıcı</span>
+        </div>
+      </div>
+      <div class="card-sub">
+        Akıcı kaydırma yapar. Kaydırma sırasında mouse veya dokunmatik yüzeyle kendiniz de serbestçe kaydırabilirsiniz.
+      </div>
+      <button id="autoScrollBtn" class="scroll-btn">
+        <span id="scrollIcon">▶</span> <span id="scrollLabel">Otomatik Kaydır</span>
+      </button>
+      <div id="scrollMsg" class="msg"></div>
+    </section>
+
+    <!-- 3. Bu Sayfayı Kaydet -->
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span>💾 Bu Sayfayı Kaydet</span>
+        </div>
+      </div>
+      <input id="tags" placeholder="etiketler: reddit, dev/rust, makale" list="taglist" autocomplete="off">
+      <datalist id="taglist"></datalist>
+      <div class="row" style="margin-top:6px;">
+        <textarea id="note" placeholder="not (isteğe bağlı)"></textarea>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <button id="save" class="primary">Sayfayı Arşive Kaydet</button>
+      </div>
+      <div id="saveMsg" class="msg"></div>
+    </section>
+
+    <!-- 4. Kütüphanede Ara -->
+    <section class="card">
+      <input id="q" placeholder="Kütüphanede Ara… (tag:dev from:@user)" autocomplete="off">
+      <ul id="results"></ul>
+    </section>
+  </div>
 
   <script src="popup.js"></script>
 </body>

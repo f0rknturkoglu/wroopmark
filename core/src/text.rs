@@ -112,18 +112,48 @@ pub fn hash_hex(bytes: &[u8]) -> String {
 /// The numeric post id the platform uses, if the URL carries one.
 fn platform_post_id(platform: Platform, url: &Url) -> Option<String> {
     let segs: Vec<&str> = url.path_segments()?.filter(|s| !s.is_empty()).collect();
-    let after = |key: &str| segs.iter().position(|s| *s == key).and_then(|i| segs.get(i + 1)).filter(|s| s.chars().all(|c| c.is_ascii_digit()));
-    let id = match platform {
+    let after = |key: &str| {
+        segs.iter().position(|s| *s == key).and_then(|i| segs.get(i + 1)).filter(|s| s.chars().all(|c| c.is_ascii_digit())).map(|s| s.to_string())
+    };
+    match platform {
         Platform::X => after("status").or_else(|| after("statuses")),
         Platform::Tiktok => after("video").or_else(|| after("photo")),
         Platform::Pinterest => after("pin"),
         Platform::Facebook => {
             let q = url.query_pairs().find(|(k, _)| k == "story_fbid" || k == "fbid" || k == "v");
-            return q.map(|(_, v)| v.into_owned()).or_else(|| after("posts").or_else(|| after("videos")).map(|s| s.to_string()));
+            q.map(|(_, v)| v.into_owned()).or_else(|| after("posts").or_else(|| after("videos")))
+        }
+        Platform::Reddit => {
+            segs.iter().position(|s| *s == "comments").and_then(|i| segs.get(i + 1)).map(|s| s.to_string())
+        }
+        Platform::Youtube => {
+            let q = url.query_pairs().find(|(k, _)| k == "v").map(|(_, v)| v.into_owned());
+            let shorts = segs.iter().position(|s| *s == "shorts").and_then(|i| segs.get(i + 1)).map(|s| s.to_string());
+            let short_domain = if url.host_str().is_some_and(|h| h.contains("youtu.be")) {
+                segs.first().map(|s| s.to_string())
+            } else {
+                None
+            };
+            q.or(shorts).or(short_domain)
+        }
+        Platform::Instagram => {
+            segs.iter().position(|s| *s == "p" || *s == "reel" || *s == "reels").and_then(|i| segs.get(i + 1)).map(|s| s.to_string())
+        }
+        Platform::Github => {
+            if segs.len() >= 2 {
+                Some(format!("{}_{}", segs[0], segs[1]))
+            } else {
+                None
+            }
+        }
+        Platform::Hackernews => {
+            url.query_pairs().find(|(k, _)| k == "id").map(|(_, v)| v.into_owned())
+        }
+        Platform::Arxiv => {
+            segs.iter().position(|s| *s == "abs" || *s == "pdf").and_then(|i| segs.get(i + 1)).map(|s| s.to_string())
         }
         Platform::Web => None,
-    };
-    id.map(|s| s.to_string())
+    }
 }
 
 /// Deterministic item id for a URL. Posts get the platform's own id so the

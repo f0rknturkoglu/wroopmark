@@ -3,54 +3,167 @@ const send = (msg) => chrome.runtime.sendMessage(msg);
 const call = (cmd, args = {}) => send({ type: "call", cmd, args });
 const fmt = new Intl.NumberFormat("tr-TR");
 
-const PLATFORM = { x: "X", tiktok: "TikTok", pinterest: "Pinterest", facebook: "Facebook", web: "Web" };
+const PLATFORM_NAMES = {
+  x: "X",
+  tiktok: "TikTok",
+  reddit: "Reddit",
+  youtube: "YouTube",
+  instagram: "Instagram",
+  github: "GitHub",
+  hackernews: "Hacker News",
+  arxiv: "arXiv",
+  pinterest: "Pinterest",
+  facebook: "Facebook",
+  web: "Web",
+};
 
-function setMsg(el, text, isErr = false) {
+function setMsg(el, text, type = "normal") {
   el.textContent = text;
-  el.classList.toggle("err", isErr);
+  el.classList.remove("err", "ok");
+  if (type === "err") el.classList.add("err");
+  if (type === "ok") el.classList.add("ok");
 }
 
 async function refreshStatus() {
   const r = await call("stats");
   if (!r.ok) {
     $("status").textContent = "bağlı değil";
-    setMsg($("saveMsg"), `wroopmark'a ulaşılamadı; wroopmark uygulamasını bir kez açman yeterli. (${r.error})`, true);
+    setMsg($("saveMsg"), `wroopmark kütüphanesine ulaşılamadı (${r.error})`, "err");
     return false;
   }
   const s = r.data;
-  $("status").textContent = `${fmt.format(s.items)} kayıt · ${fmt.format(s.tags)} etiket · ${fmt.format(s.links)} link`;
+  $("status").textContent = `${fmt.format(s.items)} kayıt · ${fmt.format(s.tags)} etiket`;
   const tags = await call("tags");
-  if (tags.ok) $("taglist").innerHTML = tags.data.map((t) => `<option value="${t.name.replace(/"/g, "&quot;")}">`).join("");
+  if (tags.ok) {
+    $("taglist").innerHTML = tags.data.map((t) => `<option value="${t.name.replace(/"/g, "&quot;")}">`).join("");
+  }
   return true;
 }
 
-function render(items, links) {
+// --- Collected Queue Management ---------------------------------------------
+
+async function syncCollected() {
+  const r = await send({ type: "get_collected" });
+  if (!r?.ok) return;
+
+  const { total, x, tiktok, pages } = r.data;
+  $("collectedBadge").textContent = total;
+  $("collectedBtnCount").textContent = total;
+
+  if (total > 0) {
+    $("collectedBadge").classList.remove("empty");
+    $("importCollectedBtn").disabled = false;
+    $("clearCollectedBtn").style.display = "";
+
+    const parts = [];
+    if (x > 0) parts.push(`${x} X`);
+    if (tiktok > 0) parts.push(`${tiktok} TikTok`);
+    if (pages > 0) parts.push(`${pages} sayfa/link`);
+    $("collectedSummary").textContent = `Kuyrukta: ${parts.join(" · ")}. Tek tıkla aktarabilirsiniz.`;
+  } else {
+    $("collectedBadge").classList.add("empty");
+    $("importCollectedBtn").disabled = true;
+    $("clearCollectedBtn").style.display = "none";
+    $("collectedSummary").textContent = "Sayfada gezindikçe veya kaydırdıkça gönderiler ve linkler burada birikir.";
+  }
+}
+
+$("importCollectedBtn").addEventListener("click", async () => {
+  $("importCollectedBtn").disabled = true;
+  setMsg($("collectMsg"), "Wroopmark'a aktarılıyor…");
+
+  const r = await send({ type: "import_collected" });
+  $("importCollectedBtn").disabled = false;
+
+  if (r?.ok) {
+    const d = r.data;
+    setMsg($("collectMsg"), `✓ ${d.total} içerik aktarıldı (${d.new} yeni, ${d.updated} güncellendi)`, "ok");
+    await refreshStatus();
+    await syncCollected();
+  } else {
+    setMsg($("collectMsg"), r?.error || "Aktarım sırasında hata oluştu", "err");
+  }
+});
+
+$("clearCollectedBtn").addEventListener("click", async () => {
+  await send({ type: "clear_collected" });
+  setMsg($("collectMsg"), "Toplanan liste temizlendi");
+  await syncCollected();
+});
+
+// --- Auto Scroller -----------------------------------------------------------
+
+async function syncScrollStatus() {
+  const r = await send({ type: "get_scroll_status" });
+  const active = !!r?.active;
+  const btn = $("autoScrollBtn");
+
+  btn.classList.toggle("active", active);
+  $("scrollIcon").textContent = active ? "⏸" : "▶";
+  $("scrollLabel").textContent = active ? "Kaydırmayı Durdur" : "Otomatik Kaydır";
+  setMsg($("scrollMsg"), active ? "Otomatik kaydırılıyor · Sayfayı elle de kaydırabilirsiniz" : "");
+}
+
+$("autoScrollBtn").addEventListener("click", async () => {
+  const r = await send({ type: "toggle_autoscroll" });
+  await syncScrollStatus();
+  await syncCollected();
+});
+
+// --- Save Active Tab ---------------------------------------------------------
+
+$("save").addEventListener("click", async () => {
+  $("save").disabled = true;
+  setMsg($("saveMsg"), "Sayfa analiz edilip kaydediliyor…");
+
+  const tags = $("tags").value.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
+  const note = $("note").value.trim() || null;
+
+  const r = await send({ type: "save_tab", tags, note });
+  $("save").disabled = false;
+
+  if (r?.ok) {
+    setMsg($("saveMsg"), `✓ Kaydedildi: ${r.data.id}`, "ok");
+    $("note").value = "";
+    refreshStatus();
+  } else {
+    setMsg($("saveMsg"), r?.error || "Kaydedilemedi", "err");
+  }
+});
+
+// --- Search ------------------------------------------------------------------
+
+function renderResults(items, links) {
   const ul = $("results");
   ul.replaceChildren();
+
   for (const it of items) {
     const li = document.createElement("li");
     const who = it.author_handle ? `@${it.author_handle}` : it.author_name || "";
     const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.append(PLATFORM[it.platform] || it.platform, who ? ` · ${who}` : "");
+    meta.className = "res-meta";
+    meta.append(PLATFORM_NAMES[it.platform] || it.platform, who ? ` · ${who}` : "");
+
     for (const t of it.tags || []) {
       const span = document.createElement("span");
       span.className = "tag";
       span.textContent = t;
       meta.append(span);
     }
+
     const body = document.createElement("div");
-    body.className = "body";
+    body.className = "res-body";
     body.textContent = it.title || it.text || it.url;
     li.append(meta, body);
     li.onclick = () => chrome.tabs.create({ url: it.url });
     ul.append(li);
   }
+
   for (const l of links) {
     const li = document.createElement("li");
-    li.innerHTML = `<div class="meta">link · ${l.item_count} kayıtta</div>`;
+    li.innerHTML = `<div class="res-meta">link · ${l.item_count} kayıtta</div>`;
     const body = document.createElement("div");
-    body.className = "body";
+    body.className = "res-body";
     body.textContent = l.title || l.url;
     li.append(body);
     li.onclick = () => chrome.tabs.create({ url: l.url });
@@ -64,50 +177,18 @@ $("q").addEventListener("input", () => {
   searchTimer = setTimeout(async () => {
     const q = $("q").value.trim();
     if (!q) return $("results").replaceChildren();
-    const r = await call("search", { q, limit: 20 });
-    if (r.ok) render(r.data.items, r.data.links);
+    const r = await call("search", { q, limit: 15 });
+    if (r.ok) renderResults(r.data.items, r.data.links);
   }, 140);
 });
 
-$("save").addEventListener("click", async () => {
-  $("save").disabled = true;
-  setMsg($("saveMsg"), "kaydediliyor…");
-  const tags = $("tags").value.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
-  const note = $("note").value.trim() || null;
-  const r = await send({ type: "save_tab", tags, note });
-  $("save").disabled = false;
-  if (r?.ok) {
-    setMsg($("saveMsg"), `kaydedildi: ${r.data.id}`);
-    refreshStatus();
-  } else {
-    setMsg($("saveMsg"), r?.error || "kaydedilemedi", true);
-  }
+// Sync on storage change (e.g. background scroller found items)
+chrome.storage.session.onChanged.addListener(() => {
+  syncCollected();
+  syncScrollStatus();
 });
 
-async function syncScan() {
-  const { scanning, session } = await chrome.storage.session.get(["scanning", "session"]);
-  $("scan").textContent = scanning ? "Taramayı durdur" : "Tüm X yer imlerini içe aktar";
-  $("scanTikTok").style.display = scanning ? "none" : "";
-  const s = session || { new: 0, updated: 0 };
-  setMsg($("scanMsg"), scanning ? `taranıyor… ${s.new} yeni, ${s.updated} güncellendi` : s.new || s.updated ? `bu oturum: ${s.new} yeni, ${s.updated} güncellendi` : "");
-  return scanning;
-}
-
-$("scan").addEventListener("click", async () => {
-  if (await syncScan()) await send({ type: "stop_scan" });
-  else await send({ type: "scan_x" });
-  syncScan();
-});
-
-$("scanTikTok").addEventListener("click", async () => {
-  setMsg($("scanMsg"), "TikTok profili açılıyor…");
-  const r = await send({ type: "scan_tiktok" });
-  if (r && r.ok === false) setMsg($("scanMsg"), r.error || "TikTok taraması başlatılamadı", true);
-  syncScan();
-});
-
-
-chrome.storage.session.onChanged.addListener(syncScan);
-chrome.action.setBadgeText({ text: "" });
+// Initial boot
 refreshStatus();
-syncScan();
+syncCollected();
+syncScrollStatus();

@@ -24,14 +24,22 @@ struct FilterPanel: View {
                             Button {
                                 if on { model.filters.platforms.remove(p) } else { model.filters.platforms.insert(p) }
                             } label: {
-                                Label(p.label, systemImage: p.symbol)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .fixedSize()
-                                    .padding(.horizontal, 9).padding(.vertical, 5)
-                                    .foregroundStyle(on ? Color.white : Color.primary)
-                                    .background(on ? Theme.accent : Theme.hairline, in: Capsule())
+                                HStack(spacing: 4) {
+                                    if on {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                    }
+                                    Label(p.label, systemImage: p.symbol)
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .fixedSize()
+                                .padding(.horizontal, 9).padding(.vertical, 5)
+                                .foregroundStyle(on ? Color.white : Color.primary)
+                                .background(on ? Theme.accent : Theme.hairline, in: Capsule())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityAddTraits(on ? [.isSelected] : [])
+                            .accessibilityLabel(p.label)
                         }
                     }
                     Text(model.filters.platforms.isEmpty ? "Hepsi" : "Seçilenlerden herhangi biri")
@@ -79,7 +87,7 @@ struct FilterPanel: View {
                     .help("Aynı sonucu arama kutusuna bunu yazarak da alırsın")
             }
         }
-        .frame(width: 460, height: 640)
+        .frame(minWidth: 420, idealWidth: 480, minHeight: 480, idealHeight: 640)
     }
 
     private func tri(_ title: String, _ value: Binding<AdvancedFilters.Tri>, yes: String = "Var", no: String = "Yok") -> some View {
@@ -113,6 +121,7 @@ private struct TagPick: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Etiket ekle")
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
@@ -125,14 +134,34 @@ private struct DateBound: View {
     let title: String
     @Binding var date: Date?
 
+    private var isEnabled: Binding<Bool> {
+        Binding(
+            get: { date != nil },
+            set: { enabled in
+                if enabled {
+                    if date == nil { date = .now }
+                } else {
+                    date = nil
+                }
+            }
+        )
+    }
+
+    private var selectedDate: Binding<Date> {
+        Binding(
+            get: { date ?? .now },
+            set: { date = $0 }
+        )
+    }
+
     var body: some View {
         HStack {
-            Toggle(title, isOn: Binding(get: { date != nil }, set: { date = $0 ? (date ?? .now) : nil }))
+            Toggle(title, isOn: isEnabled)
             Spacer()
-            if let d = date {
-                DatePicker("", selection: Binding(get: { d }, set: { date = $0 }), displayedComponents: .date)
+            if date != nil {
+                DatePicker("", selection: selectedDate, displayedComponents: .date)
                     .labelsHidden()
-                    .environment(\.locale, Locale(identifier: "tr_TR"))
+                    .environment(\.locale, Theme.locale)
             }
         }
     }

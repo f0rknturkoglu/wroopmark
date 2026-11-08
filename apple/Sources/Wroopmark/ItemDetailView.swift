@@ -6,10 +6,75 @@ struct ItemDetailView: View {
     @State private var note = ""
     @FocusState private var noteFocused: Bool
 
+    private var liveItem: Item {
+        model.items.first(where: { $0.id == item.id }) ?? item
+    }
+
+    private var currentFolder: Folder? {
+        if let fid = liveItem.folderId, let f = model.folders.first(where: { $0.id == fid }) {
+            return f
+        }
+        if case .folder(let fid, _) = model.scope, let f = model.folders.first(where: { $0.id == fid }) {
+            return f
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                if model.scope == .all, let f = currentFolder {
+                    HStack(spacing: 7) {
+                        Image(nsImage: FolderIcons.image(forFolder: f.name))
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 14, height: 14)
+                            .foregroundStyle(Theme.accent)
+                        Text("Klasör:")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Text(f.name)
+                            .font(.system(size: 12.5, weight: .bold))
+                            .foregroundStyle(Theme.accent)
+                        Spacer()
+                        Button("Klasöre Git") {
+                            model.scope = .folder(id: f.id, name: f.name)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Theme.accent.opacity(0.18), lineWidth: 1)
+                    )
+                }
+                if let error = loadError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("Detaylar yüklenemedi: \(error)").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Tekrar Dene") {
+                            Task {
+                                do {
+                                    let full: Item = try await model.core.call(["cmd": "get", "id": item.id])
+                                    fullOCR = full.ocr
+                                    loadError = nil
+                                } catch {
+                                    loadError = error.localizedDescription
+                                }
+                            }
+                        }
+                        .controlSize(.small)
+                    }
+                    .padding(8)
+                    .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
                 if let title = item.title, !title.isEmpty {
                     Text(title).font(.system(size: 19, weight: .semibold)).textSelection(.enabled)
                 }
@@ -20,13 +85,23 @@ struct ItemDetailView: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if !item.media.isEmpty {
-                    MediaGallery(media: item.media, stacked: item.isPhotoCarousel) {
-                        model.openViewer(owner: item, fromQuote: false, index: $0)
+                // Inline Video Player or Media Gallery
+                let videoMedia = liveItem.media.first(where: { $0.isVideo })
+                if let vm = videoMedia, let vfile = vm.videoFile {
+                    InlineVideoPlayer(file: vfile, alt: vm.alt)
+                    let remainingImages = liveItem.media.filter { !$0.isVideo }
+                    if !remainingImages.isEmpty {
+                        MediaGallery(media: remainingImages, stacked: liveItem.isPhotoCarousel) {
+                            model.openViewer(owner: liveItem, fromQuote: false, index: $0)
+                        }
+                    }
+                } else if !liveItem.media.isEmpty {
+                    MediaGallery(media: liveItem.media, stacked: liveItem.isPhotoCarousel) {
+                        model.openViewer(owner: liveItem, fromQuote: false, index: $0)
                     }
                 }
-                if let quote = item.quote?.item {
-                    QuoteCard(item: quote) { model.openViewer(owner: item, fromQuote: true, index: $0) }
+                if let quote = liveItem.quote?.item {
+                    QuoteCard(item: quote) { model.openViewer(owner: liveItem, fromQuote: true, index: $0) }
                 }
                 if let ocr = fullOCR, !ocr.isEmpty {
                     DisclosureGroup {
@@ -43,6 +118,54 @@ struct ItemDetailView: View {
                     }
                 }
 
+                section("Klasör") {
+                    HStack {
+                        Menu {
+                            if !model.folders.isEmpty {
+                                ForEach(model.folders) { f in
+                                    Button {
+                                        Task { await model.moveToFolder(id: liveItem.id, folderID: f.id) }
+                                    } label: {
+                                        HStack {
+                                            Text(f.name)
+                                            if (liveItem.folderId ?? currentFolder?.id) == f.id { Image(systemName: "checkmark") }
+                                        }
+                                    }
+                                }
+                                Divider()
+                            }
+                            if liveItem.folderId != nil || currentFolder != nil {
+                                Button("Klasörden çıkar") {
+                                    Task { await model.moveToFolder(id: liveItem.id, folderID: nil) }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if let f = currentFolder {
+                                    Image(nsImage: FolderIcons.image(forFolder: f.name))
+                                        .renderingMode(.template)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 13, height: 13)
+                                        .foregroundStyle(Theme.accent)
+                                } else {
+                                    Image(systemName: "folder")
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(currentFolder?.name ?? "Klasör seçilmedi")
+                                    .foregroundStyle(currentFolder != nil ? .primary : .secondary)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.system(size: 12.5, weight: .medium))
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Theme.hairline, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .menuStyle(.borderlessButton)
+                        Spacer()
+                    }
+                }
                 section("Etiketler") {
                     TagEditor(tags: item.tags, all: model.tags) { tags in
                         Task { await model.setTags(item.id, tags) }
@@ -83,14 +206,20 @@ struct ItemDetailView: View {
         }
         .onAppear { note = item.note ?? "" }
         .task(id: item.id) {
-            let full: Item? = try? await model.core.call(["cmd": "get", "id": item.id])
-            fullOCR = full?.ocr
+            do {
+                let full: Item = try await model.core.call(["cmd": "get", "id": item.id])
+                fullOCR = full.ocr
+                loadError = nil
+            } catch {
+                loadError = error.localizedDescription
+            }
         }
         .onDisappear(perform: saveNote)
     }
 
     /// The list rows carry no OCR text; the detail loads it with the item.
     @State private var fullOCR: String?
+    @State private var loadError: String?
 
     private var header: some View {
         let platform = Platform(rawValue: item.platform) ?? .web
@@ -108,7 +237,9 @@ struct ItemDetailView: View {
             Spacer()
             if let created = item.created {
                 Text(created.formatted(.dateTime.day().month(.abbreviated).year().hour().minute().locale(Theme.locale)))
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
         }
     }
@@ -118,6 +249,7 @@ struct ItemDetailView: View {
             Button {
                 if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
             } label: { Label("Kaynağında aç", systemImage: "arrow.up.right.square") }
+                .buttonStyle(.borderedProminent)
             Button {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(item.url, forType: .string)
@@ -125,14 +257,19 @@ struct ItemDetailView: View {
             if item.needsDownload {
                 Button {
                     Task { await model.downloadMedia(item.id) }
-                } label: { Label("Medyayı indir", systemImage: "arrow.down.circle") }
-                    .disabled(model.isBusy)
+                } label: {
+                    Label(item.platform == "youtube" ? "Videoyu lokale indir" : "Medyayı indir", systemImage: "arrow.down.circle")
+                }
+                .disabled(model.isBusy)
             }
             Spacer()
             Button(role: .destructive) {
-                Task { await model.delete([item.id]) }
-            } label: { Image(systemName: "trash") }
-                .help("Sil")
+                model.requestDelete([item.id])
+            } label: {
+                Image(systemName: "trash")
+            }
+            .accessibilityLabel("Kaydı sil")
+            .help("Sil")
         }
         .controlSize(.regular)
     }
@@ -140,6 +277,7 @@ struct ItemDetailView: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Kaydedildi \(item.saved.formatted(.dateTime.day().month(.wide).year().hour().minute().locale(Theme.locale)))")
+                .monospacedDigit()
             Text(item.id).textSelection(.enabled)
         }
         .font(.system(size: 11)).foregroundStyle(.tertiary)
@@ -265,7 +403,7 @@ struct MediaGallery: View {
             PhotoStack(media: media) { open(0) }
         } else {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
-                ForEach(Array(media.enumerated()), id: \.offset) { i, m in
+                ForEach(Array(media.enumerated()), id: \.element.url) { i, m in
                     tile(m, index: i).frame(height: 170)
                 }
             }
@@ -284,6 +422,7 @@ struct MediaGallery: View {
                 Image(systemName: m.videoFile != nil ? "play.circle.fill" : "arrow.down.circle.fill")
                     .font(.system(size: 40))
                     .foregroundStyle(.white, .black.opacity(0.45))
+                    .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: .infinity)
@@ -305,7 +444,7 @@ struct PhotoStack: View {
         let top = media[0]
         let aspect = min(max(top.aspect ?? 0.75, 0.6), 1.6)
         ZStack {
-            ForEach(Array(media.prefix(3).enumerated().reversed()), id: \.offset) { i, m in
+            ForEach(Array(media.prefix(3).enumerated().reversed()), id: \.element.url) { i, m in
                 card(m)
                     .rotationEffect(.degrees(i == 0 ? 0 : (i == 1 ? 3.5 : -4) * (hovering ? 1.6 : 1)))
                     .offset(x: CGFloat(i) * (hovering ? 14 : 8), y: CGFloat(i) * -4)
@@ -318,6 +457,7 @@ struct PhotoStack: View {
         .overlay(alignment: .bottomLeading) {
             Label("\(media.count)", systemImage: "square.stack.fill")
                 .font(.system(size: 12, weight: .bold))
+                .monospacedDigit()
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(.black.opacity(0.6), in: Capsule())

@@ -2,22 +2,27 @@ import AppKit
 import ImageIO
 import SwiftUI
 
-/// Downsampled images from the media store. Decoding goes through ImageIO
-/// thumbnails off the main thread, so a grid of 4K photos costs a few MB.
-final class Thumbnails: @unchecked Sendable {
+/// Downsampled images from the media store using modern Swift concurrency.
+actor Thumbnails {
     static let shared = Thumbnails()
 
-    private let cache: NSCache<NSString, NSImage> = {
+    private let cache: NSCache<NSString, NSImage>
+
+    init() {
         let c = NSCache<NSString, NSImage>()
         c.totalCostLimit = 96 << 20
-        return c
-    }()
+        self.cache = c
+    }
 
     func image(file: String, maxPixel: Int) async -> NSImage? {
         let key = "\(file)@\(maxPixel)" as NSString
         if let hit = cache.object(forKey: key) { return hit }
         let url = Core.shared.mediaURL(file)
+
+        if Task.isCancelled { return nil }
+
         let image = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            guard !Task.isCancelled else { return nil }
             guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
             let opts: [CFString: Any] = [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -27,7 +32,8 @@ final class Thumbnails: @unchecked Sendable {
             guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
             return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
         }.value
-        if let image {
+
+        if let image, !Task.isCancelled {
             cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
         }
         return image

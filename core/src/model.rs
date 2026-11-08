@@ -12,12 +12,30 @@ pub enum Platform {
     Facebook,
     Tiktok,
     Pinterest,
+    Reddit,
+    Youtube,
+    Instagram,
+    Github,
+    Hackernews,
+    Arxiv,
     #[default]
     Web,
 }
 
 impl Platform {
-    pub const ALL: [Platform; 5] = [Self::X, Self::Facebook, Self::Tiktok, Self::Pinterest, Self::Web];
+    pub const ALL: [Platform; 11] = [
+        Self::X,
+        Self::Facebook,
+        Self::Tiktok,
+        Self::Pinterest,
+        Self::Reddit,
+        Self::Youtube,
+        Self::Instagram,
+        Self::Github,
+        Self::Hackernews,
+        Self::Arxiv,
+        Self::Web,
+    ];
 
     pub fn as_str(self) -> &'static str {
         match self {
@@ -25,6 +43,12 @@ impl Platform {
             Self::Facebook => "facebook",
             Self::Tiktok => "tiktok",
             Self::Pinterest => "pinterest",
+            Self::Reddit => "reddit",
+            Self::Youtube => "youtube",
+            Self::Instagram => "instagram",
+            Self::Github => "github",
+            Self::Hackernews => "hackernews",
+            Self::Arxiv => "arxiv",
             Self::Web => "web",
         }
     }
@@ -36,6 +60,12 @@ impl Platform {
             "facebook" | "fb" => Self::Facebook,
             "tiktok" | "tt" => Self::Tiktok,
             "pinterest" | "pin" => Self::Pinterest,
+            "reddit" | "rd" => Self::Reddit,
+            "youtube" | "yt" => Self::Youtube,
+            "instagram" | "ig" | "insta" => Self::Instagram,
+            "github" | "gh" => Self::Github,
+            "hackernews" | "hn" | "ycombinator" => Self::Hackernews,
+            "arxiv" => Self::Arxiv,
             "web" | "custom" | "link" => Self::Web,
             _ => return None,
         })
@@ -52,6 +82,18 @@ impl Platform {
             Self::Tiktok
         } else if is("pin.it") || h.split('.').any(|p| p == "pinterest") {
             Self::Pinterest
+        } else if is("reddit.com") || is("redd.it") {
+            Self::Reddit
+        } else if is("youtube.com") || is("youtu.be") {
+            Self::Youtube
+        } else if is("instagram.com") {
+            Self::Instagram
+        } else if is("github.com") {
+            Self::Github
+        } else if is("news.ycombinator.com") || is("lobste.rs") {
+            Self::Hackernews
+        } else if is("arxiv.org") {
+            Self::Arxiv
         } else {
             Self::Web
         }
@@ -155,9 +197,23 @@ pub struct Item {
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<i64>,
+    #[serde(default)]
+    pub video_tries: i64,
     /// Original payload, kept (zstd) so items can be re-parsed later.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raw: Option<Value>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Folder {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub count: i64,
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

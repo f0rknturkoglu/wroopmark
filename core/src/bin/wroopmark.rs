@@ -150,8 +150,9 @@ fn cmd_import_x(lib: &Arc<Library>, args: &[String]) -> Result<String, String> {
 }
 
 fn cmd_search(lib: &Arc<Library>, args: &[String]) -> Result<String, String> {
-    let v = call(lib, json!({ "cmd": "search", "q": args.join(" "), "limit": 30 }))?;
-    let items: Vec<Item> = serde_json::from_value(v["items"].clone()).map_err(|e| e.to_string())?;
+    let mut v = call(lib, json!({ "cmd": "search", "q": args.join(" "), "limit": 30 }))?;
+    let items_val = v.get_mut("items").map(Value::take).unwrap_or(Value::Null);
+    let items: Vec<Item> = serde_json::from_value(items_val).map_err(|e| e.to_string())?;
     let mut out: Vec<String> = items.iter().map(line).collect();
     out.push(format!("— {} kayıt", v["total"]));
     if let Some(links) = v["links"].as_array().filter(|l| !l.is_empty()) {
@@ -231,7 +232,7 @@ fn native_host() -> i32 {
         if stdin.read_exact(&mut buf).is_err() {
             break;
         }
-        let mut resp = match serde_json::from_slice::<Value>(&buf) {
+        let resp = match serde_json::from_slice::<Value>(&buf) {
             Ok(req) => {
                 let reply_to = req.get("rid").cloned();
                 let cmd = req.get("cmd").and_then(Value::as_str).unwrap_or("?").to_string();
@@ -248,11 +249,13 @@ fn native_host() -> i32 {
             Err(e) => json!({ "ok": false, "error": format!("geçersiz JSON: {e}") }),
         };
         // Chromium rejects host messages over 1 MB.
-        if serde_json::to_vec(&resp).map(|v| v.len()).unwrap_or(0) > 1_000_000 {
+        let mut bytes = serde_json::to_vec(&resp).unwrap_or_default();
+        if bytes.len() > 1_000_000 {
             let rid = resp.get("rid").cloned();
-            resp = json!({ "ok": false, "error": "yanıt çok büyük", "rid": rid });
+            let fallback = json!({ "ok": false, "error": "yanıt çok büyük", "rid": rid });
+            bytes = serde_json::to_vec(&fallback).unwrap_or_default();
         }
-        if write_msg(&resp).is_err() {
+        if write_raw_msg(&bytes).is_err() {
             break;
         }
     }
@@ -280,8 +283,13 @@ fn summary(data: &Value) -> String {
 
 fn write_msg(v: &Value) -> io::Result<()> {
     let bytes = serde_json::to_vec(v)?;
+    write_raw_msg(&bytes)
+}
+
+fn write_raw_msg(bytes: &[u8]) -> io::Result<()> {
+    let len: u32 = u32::try_from(bytes.len()).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let mut out = io::stdout().lock();
-    out.write_all(&(bytes.len() as u32).to_le_bytes())?;
-    out.write_all(&bytes)?;
+    out.write_all(&len.to_le_bytes())?;
+    out.write_all(bytes)?;
     out.flush()
 }

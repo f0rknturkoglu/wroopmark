@@ -30,12 +30,13 @@ struct AddURLSheet: View {
                         }
                     }
                 }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(URL(string: url.trimmingCharacters(in: .whitespaces))?.scheme?.hasPrefix("http") != true || model.isBusy)
             }
         }
         .padding(20)
-        .frame(width: 460)
+        .frame(minWidth: 420, idealWidth: 480)
         .onAppear {
             // Pre-fill from the clipboard when it holds a link.
             if let s = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -55,7 +56,9 @@ struct BulkTagSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(ids.count == 1 ? "Etiketle" : "\(ids.count) kaydı etiketle").font(.headline)
+            Text(ids.count == 1 ? "Etiketle" : "\(ids.count) kaydı etiketle")
+                .font(.headline)
+                .monospacedDigit()
             TextField("eklenecek etiketler", text: $add).textFieldStyle(.roundedBorder)
             TextField("kaldırılacak etiketler", text: $remove).textFieldStyle(.roundedBorder)
             if !model.tags.isEmpty {
@@ -71,11 +74,12 @@ struct BulkTagSheet: View {
                     dismiss()
                     Task { await model.editTags(ids, add: a, remove: r) }
                 }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(parseTags(add).isEmpty && parseTags(remove).isEmpty)
             }
         }
         .padding(20)
-        .frame(width: 420)
+        .frame(minWidth: 380, idealWidth: 440)
     }
 }

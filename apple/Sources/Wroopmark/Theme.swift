@@ -4,6 +4,12 @@ import SwiftUI
 enum Theme {
     /// The icon's violet.
     static let accent = Color(red: 0.47, green: 0.29, blue: 0.93)
+    /// High-contrast dynamic accent text for chips and badges (meets WCAG AA 4.5:1 in Light and Dark mode).
+    static let accentText = Color(nsColor: NSColor(name: nil, dynamicProvider: { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(red: 0.76, green: 0.64, blue: 1.0, alpha: 1.0)
+            : NSColor(red: 0.38, green: 0.20, blue: 0.80, alpha: 1.0)
+    }))
     /// Content area behind the cards.
     static let canvas = Color(nsColor: .underPageBackgroundColor)
     /// Card surface: white in light mode, raised dark in dark mode.
@@ -70,19 +76,25 @@ struct TagChip: View {
     var remove: () -> Void = {}
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             Button(action: action) {
                 Text("#\(name)").lineLimit(1)
             }
             .buttonStyle(.plain)
             if removable {
-                Button(action: remove) { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                Button(action: remove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+                .accessibilityLabel("Etiketi kaldır: #\(name)")
             }
         }
         .font(.system(size: 11.5, weight: .medium))
-        .foregroundStyle(selected ? Color.white : Theme.accent)
+        .foregroundStyle(selected ? Color.white : Theme.accentText)
         .padding(.horizontal, 8).padding(.vertical, 3)
         .background(selected ? Theme.accent : Theme.accent.opacity(0.12), in: Capsule())
     }

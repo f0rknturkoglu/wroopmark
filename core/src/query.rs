@@ -36,6 +36,9 @@ pub struct Query {
     pub tagged: Option<bool>,
     /// `is:reviewed` → Some(true), `-is:reviewed` → Some(false).
     pub reviewed: Option<bool>,
+    pub folder: Option<String>,
+    pub not_folder: Option<String>,
+    pub in_folder: Option<bool>,
     pub before: Option<i64>,
     pub after: Option<i64>,
     pub saved_before: Option<i64>,
@@ -176,6 +179,14 @@ impl Query {
                         }
                         true
                     }
+                    "folder" | "klasor" | "f" => {
+                        if neg {
+                            q.not_folder = Some(val);
+                        } else {
+                            q.folder = Some(val);
+                        }
+                        true
+                    }
                     "from" | "by" | "@" => {
                         let a = val.trim_start_matches('@').to_ascii_lowercase();
                         if neg {
@@ -220,6 +231,14 @@ impl Query {
                         }
                         "reviewed" => {
                             q.reviewed = Some(!neg);
+                            true
+                        }
+                        "infolder" | "in-folder" | "klasorlu" => {
+                            q.in_folder = Some(!neg);
+                            true
+                        }
+                        "unfiled" | "no-folder" | "klasorsuz" => {
+                            q.in_folder = Some(neg);
                             true
                         }
                         _ => false,

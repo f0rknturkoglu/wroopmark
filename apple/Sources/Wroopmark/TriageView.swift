@@ -12,6 +12,8 @@ struct TriageView: View {
     /// Keys are read for the whole window: opened from the sidebar, the
     /// focus stays in the sidebar list, which would take the arrows.
     @State private var keyMonitor: Any?
+    @State private var showNewFolderSheet = false
+    @State private var newFolderName = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +31,28 @@ struct TriageView: View {
             controls
         }
         .background(Theme.canvas)
+        .sheet(isPresented: $showNewFolderSheet) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Yeni klasör").font(.headline)
+                Text("Kayıtları tek tıkla bu klasöre taşıyabilirsin.").font(.caption).foregroundStyle(.secondary)
+                TextField("Klasör adı", text: $newFolderName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 260, idealWidth: 320)
+                HStack {
+                    Spacer()
+                    Button("Vazgeç") { showNewFolderSheet = false }.keyboardShortcut(.cancelAction)
+                    Button("Oluştur") {
+                        let name = newFolderName
+                        showNewFolderSheet = false
+                        Task { _ = await model.addFolder(name: name) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(20)
+        }
         .onAppear {
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 MainActor.assumeIsolated { handle(event) } ? nil : event
@@ -38,8 +62,7 @@ struct TriageView: View {
             if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
             keyMonitor = nil
         }
-        .navigationTitle("Ayıkla")
-        .navigationSubtitle(model.total == 0 ? "" : "\(model.total.formatted()) kayıt kaldı")
+        .navigationTitle("")
     }
 
     /// ← → and ⌘Z, unless the user is typing (search, tags, note) or the
@@ -63,13 +86,60 @@ struct TriageView: View {
         withAnimation(.easeOut(duration: 0.18)) { model.triage(delete: delete) }
     }
 
+    private func moveToFolder(_ folder: Folder) {
+        guard !model.items.isEmpty else { return }
+        leaving = .trailing
+        withAnimation(.easeOut(duration: 0.18)) {
+            model.triageMoveToFolder(folder)
+        }
+    }
+
     private func undo() {
         leaving = .leading
         withAnimation(.easeOut(duration: 0.18)) { model.undoTriage() }
     }
 
     private var controls: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
+            if !model.folders.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        Text("Klasöre taşı:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(model.folders) { folder in
+                            Button {
+                                moveToFolder(folder)
+                            } label: {
+                                Label {
+                                    Text(folder.name)
+                                } icon: {
+                                    Image(nsImage: FolderIcons.image(forFolder: folder.name))
+                                        .renderingMode(.template)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 12, height: 12)
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .help("\"\(folder.name)\" klasörüne taşı ve sakla")
+                        }
+                        Button {
+                            newFolderName = ""
+                            showNewFolderSheet = true
+                        } label: {
+                            Label("Yeni klasör…", systemImage: "plus")
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(Theme.accent)
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+
             HStack(spacing: 14) {
                 Button { decide(delete: true) } label: {
                     Label("Sil", systemImage: "arrow.left").frame(minWidth: 110)
@@ -92,7 +162,9 @@ struct TriageView: View {
             .disabled(model.items.isEmpty)
 
             Text(summary)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
@@ -102,6 +174,7 @@ struct TriageView: View {
 
     private var summary: String {
         var parts = ["← sil", "→ sakla", "⌘Z geri al"]
+        if !model.folders.isEmpty { parts.append("tek tıkla klasöre taşı") }
         if model.triageDeleted + model.triageKept > 0 {
             parts.append("bu oturumda \(model.triageDeleted) silindi, \(model.triageKept) saklandı")
         }
@@ -138,7 +211,9 @@ private struct TriageCard: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 AuthorLine(item: item, showHandle: true)
-                if !item.allMedia.isEmpty {
+                if let vm = (item.media.first(where: { $0.isVideo }) ?? item.quote?.item.media.first(where: { $0.isVideo })), let vf = vm.videoFile {
+                    InlineVideoPlayer(file: vf, alt: vm.alt, maxHeight: 420)
+                } else if !item.allMedia.isEmpty {
                     let own = !item.media.isEmpty
                     MediaGallery(media: own ? item.media : item.quote?.item.media ?? [], stacked: own && item.isPhotoCarousel) {
                         model.openViewer(owner: item, fromQuote: !own, index: $0)

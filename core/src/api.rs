@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::db::{Saved, Store};
@@ -16,7 +16,7 @@ use crate::fetch::Fetcher;
 use crate::media::MediaStore;
 use crate::model::{Item, Media, MediaKind};
 use crate::query::{Query, Sort};
-use crate::text::item_id_for_url;
+use crate::text::{item_id_for_url, now};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -41,6 +41,28 @@ pub struct Library {
     pub media: MediaStore,
     fetcher: Fetcher,
     worker: Mutex<Option<JoinHandle<()>>>,
+    pub download_tracker: Arc<Mutex<Option<ActiveDownloadInfo>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveDownloadInfo {
+    pub id: String,
+    pub platform: String,
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_handle: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub text: String,
+    pub progress: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eta: Option<String>,
+    pub status: String,
+    pub started_at: i64,
 }
 
 #[derive(Debug, Default, serde::Serialize)]
@@ -69,6 +91,7 @@ impl Library {
             media: MediaStore::new(root.join("media")),
             fetcher: Fetcher::new(),
             worker: Mutex::new(None),
+            download_tracker: Arc::new(Mutex::new(None)),
         }))
     }
 
@@ -186,13 +209,13 @@ impl Library {
     /// items were processed. The store lock is released during downloads.
     pub fn fetch_pending_media(&self, limit: i64) -> Result<usize, String> {
         let pending = self.store().pending_media(limit).map_err(|e| e.to_string())?;
+        let count = pending.len();
         let videos = self.videos_enabled();
-        for item in &pending {
-            let mut item = item.clone();
+        for mut item in pending {
             self.fill_item(&mut item, videos);
             self.store().set_media(&item.id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
         }
-        Ok(pending.len())
+        Ok(count)
     }
 
     /// Which of these items still lack their video file.
@@ -286,9 +309,35 @@ impl Library {
     /// stores them. On failure the item waits before it is tried again.
     fn fetch_external_video(&self, item: &mut Item) -> Result<(), String> {
         let work = self.root.join(".downloads").join(format!("{}-{}", std::process::id(), item.id.replace(':', "_")));
+        {
+            let mut dt = self.download_tracker.lock().unwrap_or_else(|e| e.into_inner());
+            *dt = Some(ActiveDownloadInfo {
+                id: item.id.clone(),
+                platform: item.platform.as_str().to_string(),
+                url: item.url.clone(),
+                author_handle: item.author_handle.clone(),
+                author_name: item.author_name.clone(),
+                title: item.title.clone(),
+                text: item.text.clone(),
+                progress: 0.0,
+                speed: None,
+                eta: None,
+                status: "downloading".into(),
+                started_at: now(),
+            });
+        }
+        let tracker = self.download_tracker.clone();
+        let on_progress: Option<crate::external::ProgressCallback> = Some(Arc::new(move |pct, speed, eta| {
+            let mut dt = tracker.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(active) = dt.as_mut() {
+                active.progress = pct;
+                active.speed = speed.map(str::to_string);
+                active.eta = eta.map(str::to_string);
+            }
+        }));
         let mut result = Ok(());
         for m in item.media.iter_mut().filter(|m| m.kind != MediaKind::Image && m.video_file.is_none() && m.downloadable_video().is_none()) {
-            let got = crate::external::download(&m.url, &work).and_then(|file| {
+            let got = crate::external::download_with_progress(&m.url, &work, on_progress.as_ref()).and_then(|file| {
                 let f = std::fs::File::open(&file).map_err(|e| e.to_string())?;
                 self.media.put_reader(f, "").map_err(|e| e.to_string())
             });
@@ -298,6 +347,10 @@ impl Library {
             }
         }
         let _ = std::fs::remove_dir_all(&work);
+        {
+            let mut dt = self.download_tracker.lock().unwrap_or_else(|e| e.into_inner());
+            *dt = None;
+        }
         let mut store = self.store();
         store.set_media(&item.id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
         if result.is_err() {
@@ -450,6 +503,34 @@ struct SetNote {
 struct SetExtra {
     id: String,
     text: String,
+}
+
+#[derive(Deserialize)]
+struct AddFolder {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct RenameFolder {
+    id: i64,
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct FolderId {
+    id: i64,
+}
+
+#[derive(Deserialize)]
+struct MoveToFolder {
+    id: String,
+    folder_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct MoveItemsToFolder {
+    ids: Vec<String>,
+    folder_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -607,6 +688,123 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
         "rename_tag" => {
             let a: RenameTag = arg(req)?;
             to_value(lib.store().rename_tag(&a.from, &a.to).map_err(db)?)
+        }
+
+        "folders" => to_value(lib.store().folders().map_err(db)?),
+        "add_folder" => {
+            let a: AddFolder = arg(req)?;
+            to_value(lib.store().add_folder(&a.name).map_err(db)?)
+        }
+        "rename_folder" => {
+            let a: RenameFolder = arg(req)?;
+            lib.store().rename_folder(a.id, &a.name).map_err(db)?;
+            Ok(json!(true))
+        }
+        "delete_folder" => {
+            let a: FolderId = arg(req)?;
+            lib.store().delete_folder(a.id).map_err(db)?;
+            Ok(json!(true))
+        }
+        "move_to_folder" => {
+            let a: MoveToFolder = arg(req)?;
+            lib.store().move_to_folder(&a.id, a.folder_id).map_err(db)?;
+            Ok(json!(true))
+        }
+        "move_items_to_folder" => {
+            let a: MoveItemsToFolder = arg(req)?;
+            lib.store().move_items_to_folder(&a.ids, a.folder_id).map_err(db)?;
+            Ok(json!(true))
+        }
+
+        "downloads" => {
+            let active = {
+                let dt = lib.download_tracker.lock().unwrap_or_else(|e| e.into_inner());
+                dt.clone().map(|a| vec![a]).unwrap_or_default()
+            };
+            let store = lib.store();
+            let active_ids: std::collections::HashSet<String> = active.iter().map(|a| a.id.clone()).collect();
+            let queued_items = store.external_video_queue(25).map_err(db)?;
+            let queued: Vec<Value> = queued_items
+                .into_iter()
+                .filter(|i| !active_ids.contains(&i.id))
+                .map(|i| json!({
+                    "id": i.id,
+                    "platform": i.platform.as_str(),
+                    "url": i.url,
+                    "author_handle": i.author_handle,
+                    "author_name": i.author_name,
+                    "title": i.title,
+                    "text": i.text,
+                    "status": "queued",
+                    "saved_at": i.saved_at
+                }))
+                .collect();
+            let completed_items = store.completed_video_downloads(30).map_err(db)?;
+            let completed: Vec<Value> = completed_items
+                .into_iter()
+                .map(|i| {
+                    let (file, size) = i.media.iter()
+                        .find_map(|m| m.video_file.as_ref())
+                        .map(|f| (Some(f.clone()), lib.media.file_size(f)))
+                        .unwrap_or((None, None));
+                    json!({
+                        "id": i.id,
+                        "platform": i.platform.as_str(),
+                        "url": i.url,
+                        "author_handle": i.author_handle,
+                        "author_name": i.author_name,
+                        "title": i.title,
+                        "text": i.text,
+                        "status": "completed",
+                        "video_file": file,
+                        "file_size": size,
+                        "saved_at": i.saved_at
+                    })
+                })
+                .collect();
+            let failed_items = store.failed_video_downloads(20).map_err(db)?;
+            let failed: Vec<Value> = failed_items
+                .into_iter()
+                .map(|i| json!({
+                    "id": i.id,
+                    "platform": i.platform.as_str(),
+                    "url": i.url,
+                    "author_handle": i.author_handle,
+                    "author_name": i.author_name,
+                    "title": i.title,
+                    "text": i.text,
+                    "status": "failed",
+                    "tries": i.video_tries,
+                    "saved_at": i.saved_at
+                }))
+                .collect();
+            Ok(json!({
+                "active": active,
+                "queued": queued,
+                "completed": completed,
+                "failed": failed,
+            }))
+        }
+        "retry_download" => {
+            let id = arg::<Id>(req)?.id;
+            let mut store = lib.store();
+            store.retry_video_download(&id).map_err(db)?;
+            let item = store.get(&id).ok().flatten();
+            drop(store);
+            if let Some(mut it) = item
+                && it.media.iter().any(|m| m.kind != MediaKind::Image && m.video_file.is_none())
+            {
+                let _ = lib.fetch_external_video(&mut it);
+            }
+            lib.kick_media();
+            Ok(json!(true))
+        }
+        "retry_all_downloads" => {
+            let mut store = lib.store();
+            let n = store.retry_all_video_downloads().map_err(db)?;
+            drop(store);
+            lib.kick_media();
+            Ok(json!(n))
         }
         "set_note" => {
             let a: SetNote = arg(req)?;

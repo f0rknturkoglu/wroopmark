@@ -20,7 +20,14 @@ enum HostInstaller {
         return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
     }
 
-    static func registerIfNeeded() {
+    /// Asynchronously performs disk checks and writes on a background utility thread.
+    static func registerIfNeeded() async {
+        await Task.detached(priority: .utility) {
+            registerSync()
+        }.value
+    }
+
+    private static func registerSync() {
         guard let helper = helperURL else { return }
         let manifest: [String: Any] = [
             "name": hostName,

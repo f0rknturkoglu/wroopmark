@@ -8,11 +8,19 @@ enum Scope: Hashable {
     case untagged
     case platform(Platform)
     case tag(String) // tag key path
-    case links
+    case folder(id: Int64, name: String)
+    case links(LinkCategory? = nil)
     case photos
     case videos
     /// One post at a time: ← delete, → keep.
     case triage
+
+    public static let links: Scope = .links(nil)
+
+    public var isLinks: Bool {
+        if case .links = self { return true }
+        return false
+    }
 
     /// Filter terms this scope adds to the search box query.
     var filter: String {
@@ -24,6 +32,7 @@ enum Scope: Hashable {
         case .videos: "has:video"
         case .platform(let p): "platform:\(p.rawValue)"
         case .tag(let key): key.contains(" ") ? "tag:\"\(key)\"" : "tag:\(key)"
+        case .folder(let id, _): "folder:\(id)"
         }
     }
 }
@@ -36,6 +45,8 @@ enum LibraryLayout: String {
 struct TriageDecision {
     let item: Item
     let delete: Bool
+    var folder: Folder? = nil
+    var previousFolderID: Int64? = nil
 }
 
 /// Media open in the in-app viewer. `fromQuote` says whether the media list
@@ -81,18 +92,60 @@ final class AppModel {
     var total = 0
     /// Links matching the search (items view) or the whole pool (links view).
     var links: [LinkRow] = []
+    /// All links in the library, cached for sidebar category counters so they never reset to 0.
+    var allLinks: [LinkRow] = []
     var tags: [TagCount] = []
     var tagTree: [TagNode] = []
+    var folders: [Folder] = []
+    var folderTree: [FolderNode] = []
+    var theme: AppTheme = {
+        if let saved = UserDefaults.standard.string(forKey: "app_theme"), let t = AppTheme(rawValue: saved) {
+            return t
+        }
+        return .system
+    }() {
+        didSet {
+            UserDefaults.standard.set(theme.rawValue, forKey: "app_theme")
+        }
+    }
     var stats: Stats?
+    var showDetailPane: Bool = {
+        UserDefaults.standard.object(forKey: "show_detail_pane") as? Bool ?? true
+    }() {
+        didSet {
+            UserDefaults.standard.set(showDetailPane, forKey: "show_detail_pane")
+        }
+    }
     var selection: Set<String> = []
     /// Link pool: the selected link and the posts that contain it.
     var selectedLink: LinkRow?
     var linkItems: [Item] = []
     var errorMessage: String?
+    var hasError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
+    var selectedScope: Scope? {
+        get { scope }
+        set { if let newValue { scope = newValue } }
+    }
+    var confirmDeleteIDs: [String]?
+    var hasConfirmDelete: Bool {
+        get { confirmDeleteIDs != nil }
+        set { if !newValue { confirmDeleteIDs = nil } }
+    }
+    func requestDelete(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        confirmDeleteIDs = ids
+    }
     var isLoading = false
     var isBusy = false
     var showAdd = false
     var showBulkTags = false
+    var showDownloads = false
+    var downloads: DownloadsReport?
+    var isDownloading: Bool { !(downloads?.active.isEmpty ?? true) || isFetchingVideos }
+    var activeOrQueuedDownloadsCount: Int { (downloads?.active.count ?? 0) + (downloads?.queued.count ?? 0) }
     var viewer: Viewer?
     var downloadVideos = true
     /// Reads text in saved pictures so it becomes searchable. App-only:
@@ -161,9 +214,12 @@ final class AppModel {
             errorMessage = "Kütüphane açılamadı: \(core.libraryURL.path)"
             return
         }
-        HostInstaller.registerIfNeeded()
+        await HostInstaller.registerIfNeeded()
         await loadSettings()
         await loadVideoTools()
+        await loadFolders()
+        await loadLinks()
+        await refreshDownloads()
         await reload()
         watch()
         startOCR()
@@ -174,7 +230,7 @@ final class AppModel {
 
     func reload() async {
         await refreshMeta()
-        if scope == .links {
+        if scope.isLinks {
             await loadLinks()
             return
         }
@@ -187,7 +243,9 @@ final class AppModel {
             guard gen == generation else { return }
             items = visible(r.items)
             total = r.total
-            links = r.links
+            if !r.links.isEmpty || !query.isEmpty {
+                links = r.links
+            }
             reachedEnd = r.items.count < pageSize
             selection = selection.filter { id in items.contains { $0.id == id } }
             if scope == .triage { selection = items.first.map { [$0.id] } ?? [] }
@@ -197,7 +255,7 @@ final class AppModel {
     }
 
     func loadMore() async {
-        guard !reachedEnd, !isLoading, scope != .links else { return }
+        guard !reachedEnd, !isLoading, !scope.isLinks else { return }
         isLoading = true
         defer { isLoading = false }
         let gen = generation
@@ -218,28 +276,60 @@ final class AppModel {
             tags = t
             tagTree = TagNode.tree(t)
         }
+        await loadFolders()
+        await refreshDownloads()
     }
+
+    private var loadLinksTask: Task<Void, Never>?
 
     func loadLinks() async {
-        do {
-            links = try await core.call(["cmd": "links", "q": query, "limit": 500])
-            if let sel = selectedLink, !links.contains(where: { $0.id == sel.id }) {
-                selectedLink = nil
-                linkItems = []
+        loadLinksTask?.cancel()
+        let q = query
+        let task = Task {
+            do {
+                let fetched: [LinkRow] = try await core.call(["cmd": "links", "q": q, "limit": 1000])
+                guard !Task.isCancelled else { return }
+                links = fetched
+                if q.isEmpty {
+                    allLinks = fetched
+                }
+                if let sel = selectedLink, !links.contains(where: { $0.id == sel.id }) {
+                    selectedLink = nil
+                    linkItems = []
+                }
+            } catch {
+                if !Task.isCancelled {
+                    errorMessage = error.localizedDescription
+                }
             }
-        } catch {
-            errorMessage = error.localizedDescription
         }
+        loadLinksTask = task
+        await task.value
     }
 
+    func linkCategoryCount(_ category: LinkCategory) -> Int {
+        let pool = allLinks.isEmpty ? links : allLinks
+        return pool.filter { category.matches(host: $0.host, url: $0.url) }.count
+    }
+
+    private var selectLinkTask: Task<Void, Never>?
+
     func select(link: LinkRow?) async {
+        selectLinkTask?.cancel()
         selectedLink = link
         selection = []
         guard let link else {
             linkItems = []
             return
         }
-        linkItems = (try? await core.call(["cmd": "link_items", "id": link.id])) ?? []
+        let targetID = link.id
+        let task = Task {
+            let items: [Item] = (try? await core.call(["cmd": "link_items", "id": targetID])) ?? []
+            guard !Task.isCancelled, selectedLink?.id == targetID else { return }
+            linkItems = items
+        }
+        selectLinkTask = task
+        await task.value
     }
 
     /// Debounced search-as-you-type.
@@ -256,7 +346,7 @@ final class AppModel {
     /// the extra pages, unlike `reload`).
     func refreshLoaded() async {
         await refreshMeta()
-        guard scope != .links else { return }
+        guard !scope.isLinks else { return }
         generation += 1
         let gen = generation
         let want = max(items.count, pageSize)
@@ -426,6 +516,25 @@ final class AppModel {
         }
     }
 
+    /// Moves the post on screen to a folder in one click, marks it kept, and advances.
+    func triageMoveToFolder(_ folder: Folder) {
+        guard scope == .triage, let item = items.first else { return }
+        items.removeFirst()
+        total = max(0, total - 1)
+        triageHistory.append(TriageDecision(item: item, delete: false, folder: folder, previousFolderID: item.folderId))
+        triageKept += 1
+        selection = items.first.map { [$0.id] } ?? []
+        let expired = triageHistory.count > triageUndoDepth ? triageHistory.removeFirst() : nil
+        let refill = items.count < 15 && !reachedEnd
+        Task {
+            _ = await perform(["cmd": "move_to_folder", "id": item.id, "folder_id": folder.id])
+            _ = await perform(["cmd": "set_reviewed", "ids": [item.id], "reviewed": true])
+            if let expired, expired.delete { _ = await perform(["cmd": "delete", "id": expired.item.id]) }
+            await refreshMeta()
+            if refill { await reload() }
+        }
+    }
+
     /// Takes back the last decision and shows that post again.
     func undoTriage() {
         guard let last = triageHistory.popLast() else { return }
@@ -434,7 +543,15 @@ final class AppModel {
         total += 1
         selection = [last.item.id]
         if !last.delete {
-            Task { _ = await perform(["cmd": "set_reviewed", "ids": [last.item.id], "reviewed": false]) }
+            let prevFolder = last.previousFolderID
+            let hadFolder = last.folder != nil
+            Task {
+                _ = await perform(["cmd": "set_reviewed", "ids": [last.item.id], "reviewed": false])
+                if hadFolder {
+                    _ = await perform(["cmd": "move_to_folder", "id": last.item.id, "folder_id": prevFolder as Any])
+                    await refreshMeta()
+                }
+            }
         }
     }
 
@@ -565,6 +682,105 @@ final class AppModel {
             await loadLinks()
         }
     }
+
+    // MARK: - Folders
+
+    func loadFolders() async {
+        let fetched: [Folder] = (try? await core.call(["cmd": "folders"])) ?? []
+        folders = fetched
+        folderTree = FolderNode.tree(fetched)
+    }
+
+    @discardableResult
+    func addFolder(name: String) async -> Folder? {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+        guard let folder: Folder = try? await core.call(["cmd": "add_folder", "name": clean]) else { return nil }
+        await loadFolders()
+        return folder
+    }
+
+    @discardableResult
+    func addSubfolder(parent: Folder, name: String) async -> Folder? {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !clean.isEmpty else { return nil }
+        let fullPath = "\(parent.name)/\(clean)"
+        return await addFolder(name: fullPath)
+    }
+
+    func renameFolder(id: Int64, name: String) async {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        _ = await perform(["cmd": "rename_folder", "id": id, "name": clean])
+        await loadFolders()
+        if case .folder(let curId, _) = scope, curId == id {
+            scope = .folder(id: id, name: clean)
+        }
+    }
+
+    func deleteFolder(id: Int64) async {
+        _ = await perform(["cmd": "delete_folder", "id": id])
+        await loadFolders()
+        if case .folder(let curId, _) = scope, curId == id {
+            scope = .all
+        }
+        await reload()
+    }
+
+    func moveToFolder(id: String, folderID: Int64?) async {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx] = items[idx].withFolder(folderID)
+        }
+        var params: [String: Any] = ["cmd": "move_to_folder", "id": id]
+        if let folderID {
+            params["folder_id"] = folderID
+        }
+        _ = await perform(params)
+        await refreshLoaded()
+    }
+
+    func moveItemsToFolder(ids: [String], folderID: Int64?) async {
+        guard !ids.isEmpty else { return }
+        let idSet = Set(ids)
+        for i in items.indices {
+            if idSet.contains(items[i].id) {
+                items[i] = items[i].withFolder(folderID)
+            }
+        }
+        var params: [String: Any] = ["cmd": "move_items_to_folder", "ids": ids]
+        if let folderID {
+            params["folder_id"] = folderID
+        }
+        _ = await perform(params)
+        await refreshLoaded()
+    }
+
+    // MARK: - Downloads
+
+    func refreshDownloads() async {
+        if let rep: DownloadsReport = try? await core.call(["cmd": "downloads"]) {
+            downloads = rep
+        }
+    }
+
+    func retryDownload(id: String) async {
+        _ = await perform(["cmd": "retry_download", "id": id])
+        startVideoDownloads()
+        await refreshDownloads()
+        await refreshMeta()
+    }
+
+    func retryAllDownloads() async {
+        _ = await perform(["cmd": "retry_all_downloads"])
+        startVideoDownloads()
+        await refreshDownloads()
+        await refreshMeta()
+    }
+
+    func openInFinder(fileName: String) {
+        let url = core.mediaURL(fileName)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
 }
 
 /// Runs the `wroopmark-ocr` helper shipped in Contents/Helpers.
@@ -575,9 +791,8 @@ enum OCRHelper {
     }
 
     /// Longest a single image may take. Vision occasionally deadlocks inside
-    /// its text recognizer (seen: hours, 0% CPU, waiting on a semaphore);
-    /// that file is skipped instead of stalling the whole queue.
-    static let perFileTimeout: TimeInterval = 45
+    /// its text recognizer; that file is skipped instead of stalling the whole queue.
+    static let perFileTimeoutSeconds: Double = 45
 
     /// One recognized text per file, in order ("" for files skipped after a
     /// stall); nil only if the helper cannot start at all.
@@ -586,7 +801,7 @@ enum OCRHelper {
             var results: [String] = []
             var remaining = files[...]
             while !remaining.isEmpty {
-                guard let got = runOnce(helper, files: Array(remaining)) else { return nil }
+                guard let got = await runOnce(helper, files: Array(remaining)) else { return nil }
                 results += got
                 remaining = remaining.dropFirst(got.count)
                 // The helper stopped short: it hung (or crashed) on the next
@@ -600,61 +815,50 @@ enum OCRHelper {
         }.value
     }
 
-    /// Lines the helper produced before it finished or stalled.
-    private final class Output: @unchecked Sendable {
-        let lock = NSLock()
-        let signal = DispatchSemaphore(value: 0)
-        var buffer = Data()
-        var lines: [String] = []
-        var eof = false
-    }
-
-    private static func runOnce(_ helper: URL, files: [String]) -> [String]? {
+    private static func runOnce(_ helper: URL, files: [String]) async -> [String]? {
         let p = Process()
         p.executableURL = helper
         let input = Pipe(), output = Pipe()
         p.standardInput = input
         p.standardOutput = output
         p.standardError = FileHandle.nullDevice
-        let out = Output()
-        output.fileHandleForReading.readabilityHandler = { h in
-            let chunk = h.availableData
-            out.lock.lock()
-            if chunk.isEmpty {
-                out.eof = true
-                h.readabilityHandler = nil
-            } else {
-                out.buffer.append(chunk)
-                while let nl = out.buffer.firstIndex(of: 0x0A) {
-                    let line = out.buffer[out.buffer.startIndex..<nl]
-                    out.buffer.removeSubrange(out.buffer.startIndex...nl)
-                    out.lines.append((try? JSONSerialization.jsonObject(with: Data(line), options: [.fragmentsAllowed]) as? String) ?? "")
-                }
-            }
-            out.lock.unlock()
-            out.signal.signal()
-        }
+
         do { try p.run() } catch { return nil }
-        input.fileHandleForWriting.write(Data((files.joined(separator: "\n") + "\n").utf8))
+        if let data = (files.joined(separator: "\n") + "\n").data(using: .utf8) {
+            try? input.fileHandleForWriting.write(contentsOf: data)
+        }
         try? input.fileHandleForWriting.close()
 
-        // Each wake-up is new output or EOF; silence for perFileTimeout
-        // means the current file is stuck.
-        while true {
-            out.lock.lock()
-            let (count, eof) = (out.lines.count, out.eof)
-            out.lock.unlock()
-            if count >= files.count || eof { break }
-            if out.signal.wait(timeout: .now() + perFileTimeout) == .timedOut { break }
+        let timeoutSeconds = min(perFileTimeoutSeconds * Double(files.count), 300.0)
+
+        return await withTaskGroup(of: [String]?.self) { group in
+            group.addTask {
+                var lines: [String] = []
+                do {
+                    for try await line in output.fileHandleForReading.bytes.lines {
+                        let parsed = (try? JSONSerialization.jsonObject(with: Data(line.utf8), options: [.fragmentsAllowed]) as? String) ?? ""
+                        lines.append(parsed)
+                        if lines.count >= files.count { break }
+                    }
+                } catch {
+                    return nil
+                }
+                return lines
+            }
+
+            group.addTask {
+                try? await Task.sleep(for: .seconds(timeoutSeconds))
+                return nil
+            }
+
+            let result = await group.next() ?? nil
+            group.cancelAll()
+
+            if p.isRunning {
+                p.terminate()
+            }
+            return result
         }
-        if p.isRunning {
-            p.terminate()
-            DispatchQueue.global().asyncAfter(deadline: .now() + 2) { if p.isRunning { kill(p.processIdentifier, SIGKILL) } }
-        }
-        output.fileHandleForReading.readabilityHandler = nil
-        out.lock.lock()
-        defer { out.lock.unlock() }
-        return Array(out.lines.prefix(files.count))
     }
 }
 

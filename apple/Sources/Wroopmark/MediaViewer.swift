@@ -16,6 +16,10 @@ struct MediaViewer: View {
         VStack(spacing: 0) {
             ZStack {
                 Color.black
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        model.viewer = nil
+                    }
                 content
             }
             bar
@@ -71,13 +75,21 @@ struct MediaViewer: View {
 
     private var bar: some View {
         HStack(spacing: 12) {
-            Button { move(-1) } label: { Image(systemName: "chevron.left") }
-                .keyboardShortcut(.leftArrow, modifiers: [])
-                .disabled(viewer.index == 0)
+            Button { move(-1) } label: {
+                Image(systemName: "chevron.left")
+                    .frame(minWidth: 28, minHeight: 28)
+            }
+            .keyboardShortcut(.leftArrow, modifiers: [])
+            .accessibilityLabel("Önceki medya")
+            .disabled(viewer.index == 0)
             Text("\(viewer.index + 1) / \(viewer.media.count)").monospacedDigit().foregroundStyle(.secondary)
-            Button { move(1) } label: { Image(systemName: "chevron.right") }
-                .keyboardShortcut(.rightArrow, modifiers: [])
-                .disabled(viewer.index >= viewer.media.count - 1)
+            Button { move(1) } label: {
+                Image(systemName: "chevron.right")
+                    .frame(minWidth: 28, minHeight: 28)
+            }
+            .keyboardShortcut(.rightArrow, modifiers: [])
+            .accessibilityLabel("Sonraki medya")
+            .disabled(viewer.index >= viewer.media.count - 1)
             if let alt = media.alt {
                 Text(alt).lineLimit(1).font(.caption).foregroundStyle(.secondary)
             }
@@ -104,28 +116,65 @@ struct MediaViewer: View {
     }
 }
 
+/// Inline player that embeds video playback directly within the frame/card.
+struct InlineVideoPlayer: View {
+    let file: String
+    var alt: String? = nil
+    var maxHeight: CGFloat = 380
+
+    private var videoURL: URL {
+        Core.shared.mediaURL(file)
+    }
+
+    var body: some View {
+        LocalVideo(url: videoURL, controlsStyle: .inline)
+            .frame(maxWidth: .infinity)
+            .frame(height: maxHeight)
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Theme.hairline, lineWidth: 1)
+            )
+    }
+}
+
 /// AppKit's own player view. SwiftUI's `VideoPlayer` lives in the
 /// `_AVKit_SwiftUI` overlay, which aborts at runtime when built with the
 /// Command Line Tools; `AVPlayerView` has no such overlay and also brings
 /// the QuickTime controls, full screen and picture in picture.
 struct LocalVideo: NSViewRepresentable {
     let url: URL
+    var isMuted: Bool = false
+    var controlsStyle: AVPlayerViewControlsStyle = .floating
 
     func makeNSView(context: Context) -> AVPlayerView {
         let view = AVPlayerView()
-        view.controlsStyle = .floating
+        view.controlsStyle = controlsStyle
         view.showsFullScreenToggleButton = true
         view.allowsPictureInPicturePlayback = true
         let player = AVPlayer(url: url)
+        player.isMuted = isMuted
         view.player = player
         player.play()
         return view
     }
 
     func updateNSView(_ view: AVPlayerView, context: Context) {
-        if (view.player?.currentItem?.asset as? AVURLAsset)?.url != url {
-            view.player?.pause()
+        if let player = view.player {
+            if player.isMuted != isMuted {
+                player.isMuted = isMuted
+            }
+            if (player.currentItem?.asset as? AVURLAsset)?.url != url {
+                player.pause()
+                let newPlayer = AVPlayer(url: url)
+                newPlayer.isMuted = isMuted
+                view.player = newPlayer
+                newPlayer.play()
+            }
+        } else {
             let player = AVPlayer(url: url)
+            player.isMuted = isMuted
             view.player = player
             player.play()
         }

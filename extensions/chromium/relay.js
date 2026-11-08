@@ -50,17 +50,17 @@ function autoscroll(on) {
   let lastHeight = 0;
   let idle = 0;
   scroller = setInterval(() => {
-    const h = document.scrollingElement.scrollHeight;
+    const h = document.scrollingElement ? document.scrollingElement.scrollHeight : document.body.scrollHeight;
     idle = h === lastHeight ? idle + 1 : 0;
     lastHeight = h;
-    // ~10 s without new content: the end of the list.
-    if (idle >= 8) {
+    // ~8 s without new content: the end of the list.
+    if (idle >= 10) {
       autoscroll(false);
       chrome.runtime.sendMessage({ type: "autoscroll_done" }).catch(() => {});
       return;
     }
-    window.scrollBy(0, window.innerHeight * 0.9);
-  }, 1250);
+    window.scrollBy({ top: 650, behavior: "smooth" });
+  }, 850);
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {

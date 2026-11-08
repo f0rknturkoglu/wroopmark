@@ -2,3 +2,13 @@ core/target/
 .DS_Store
 apple/.build/
 apple/build/
+*.sqlite*
+*.db*
+*.log
+.env*
+*.pem
+*.key
+*.p8
+*.p12
+*.local
+media/

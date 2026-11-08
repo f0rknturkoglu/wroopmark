@@ -13,13 +13,13 @@ use rusqlite::{Connection, OptionalExtension, Row, Transaction, TransactionBehav
 use serde::Serialize;
 
 use crate::media::is_name;
-use crate::model::{Item, Link, Media, MediaKind, Platform};
+use crate::model::{Folder, Item, Link, Media, MediaKind, Platform};
 use crate::query::{Has, Query, Sort, tag_key};
 use crate::text::{fold, host_of, normalize_url, now};
 
 pub type Result<T> = rusqlite::Result<T>;
 
-const SCHEMA_VERSION: i64 = 8;
+const SCHEMA_VERSION: i64 = 9;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -110,6 +110,17 @@ const MIGRATE_7: &str = "ALTER TABLE items ADD COLUMN reviewed_at INTEGER;";
 const MIGRATE_8: &str = "ALTER TABLE items ADD COLUMN video_tries INTEGER NOT NULL DEFAULT 0;
                          ALTER TABLE items ADD COLUMN video_tried_at INTEGER;";
 
+/// v8 → v9: folders and item-folder association.
+const MIGRATE_9: &str = r#"
+CREATE TABLE IF NOT EXISTS folders(
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL
+);
+ALTER TABLE items ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS items_folder ON items(folder_id);
+"#;
+
 /// A video of the item is not on disk and its URL is a post page, not a
 /// file (TikTok): only an outside downloader can get it.
 const NEEDS_EXTERNAL_VIDEO: &str = "EXISTS (SELECT 1 FROM json_each(i.media) m
@@ -124,7 +135,7 @@ const VIDEO_RETRY_SECS: i64 = 6 * 3600;
 const LINK_TRIES: i64 = 3;
 const LINK_RETRY_SECS: i64 = 3600;
 
-const ITEM_COLS: &str = "i.pk, i.id, i.platform, i.url, i.author_handle, i.author_name, i.author_avatar, i.title, i.text, i.created_at, i.saved_at, i.media, i.quote, i.note";
+const ITEM_COLS: &str = "i.pk, i.id, i.platform, i.url, i.author_handle, i.author_name, i.author_avatar, i.title, i.text, i.created_at, i.saved_at, i.media, i.quote, i.note, i.folder_id, i.video_tries";
 
 /// Hosts that only wrap the post's own media; never interesting as links.
 const NOISE_HOSTS: [&str; 4] = ["pic.twitter.com", "pic.x.com", "t.co", "pbs.twimg.com"];
@@ -252,6 +263,8 @@ fn read_item(row: &Row) -> Result<(i64, Item)> {
             media: serde_json::from_str(&media).unwrap_or_default(),
             quote: quote.and_then(|q| serde_json::from_str(&q).ok()),
             note: row.get(13)?,
+            folder_id: row.get(14)?,
+            video_tries: row.get(15)?,
             ..Default::default()
         },
     ))
@@ -430,6 +443,31 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
         Some(false) => wh.push("i.reviewed_at IS NULL".into()),
         None => {}
     }
+    if let Some(f) = &q.folder {
+        if let Ok(id) = f.parse::<i64>() {
+            wh.push("i.folder_id = ?".into());
+            args.push(id.into());
+        } else {
+            wh.push("EXISTS (SELECT 1 FROM folders f WHERE f.id = i.folder_id AND (lower(f.name) = lower(?) OR lower(f.name) LIKE lower(?) || '/%'))".into());
+            args.push(f.clone().into());
+            args.push(f.clone().into());
+        }
+    }
+    if let Some(f) = &q.not_folder {
+        if let Ok(id) = f.parse::<i64>() {
+            wh.push("(i.folder_id IS NULL OR i.folder_id != ?)".into());
+            args.push(id.into());
+        } else {
+            wh.push("NOT EXISTS (SELECT 1 FROM folders f WHERE f.id = i.folder_id AND (lower(f.name) = lower(?) OR lower(f.name) LIKE lower(?) || '/%'))".into());
+            args.push(f.clone().into());
+            args.push(f.clone().into());
+        }
+    }
+    match q.in_folder {
+        Some(true) => wh.push("i.folder_id IS NOT NULL".into()),
+        Some(false) => wh.push("i.folder_id IS NULL".into()),
+        None => {}
+    }
     if let Some(t) = q.saved_before {
         wh.push("i.saved_at < ?".into());
         args.push(t.into());
@@ -473,7 +511,8 @@ fn upsert_in(tx: &Connection, item: &Item) -> Result<Saved> {
                 "UPDATE items SET platform=?2, url=?3, author_handle=?4, author_name=?5, author_avatar=?6, title=?7, text=?8,
                    extra=coalesce(?9, extra), note=coalesce(?10, note), created_at=coalesce(?11, created_at), updated_at=?12,
                    media=?13, quote=?14, has_image=?15, has_video=?16, media_pending=?17, raw=coalesce(?18, raw),
-                   saved_at=CASE WHEN ?19 > 0 THEN ?19 ELSE saved_at END
+                   saved_at=CASE WHEN ?19 > 0 THEN ?19 ELSE saved_at END,
+                   folder_id=coalesce(?20, folder_id)
                  WHERE pk=?1",
                 params![
                     pk,
@@ -494,7 +533,8 @@ fn upsert_in(tx: &Connection, item: &Item) -> Result<Saved> {
                     vid,
                     pending,
                     raw,
-                    item.saved_at
+                    item.saved_at,
+                    item.folder_id
                 ],
             )?;
             (pk, false)
@@ -503,8 +543,8 @@ fn upsert_in(tx: &Connection, item: &Item) -> Result<Saved> {
             let saved = if item.saved_at > 0 { item.saved_at } else { ts };
             tx.execute(
                 "INSERT INTO items(id, platform, url, author_handle, author_name, author_avatar, title, text, extra, note,
-                   created_at, saved_at, updated_at, media, quote, has_image, has_video, media_pending, raw)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
+                   created_at, saved_at, updated_at, media, quote, has_image, has_video, media_pending, raw, folder_id)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
                 params![
                     item.id,
                     item.platform.as_str(),
@@ -524,7 +564,8 @@ fn upsert_in(tx: &Connection, item: &Item) -> Result<Saved> {
                     img,
                     vid,
                     pending,
-                    raw
+                    raw,
+                    item.folder_id
                 ],
             )?;
             (tx.last_insert_rowid(), true)
@@ -578,7 +619,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -604,6 +645,9 @@ impl Store {
         }
         if (1..8).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_8} PRAGMA user_version = 8; COMMIT;"))?;
+        }
+        if (1..9).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_9} PRAGMA user_version = 9; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -735,8 +779,8 @@ impl Store {
             .conn
             .query_row(&format!("SELECT {ITEM_COLS}, i.extra, i.ocr FROM items i WHERE i.id = ?1"), [id], |r| {
                 let (pk, mut item) = read_item(r)?;
-                item.extra = r.get(14)?;
-                item.ocr = r.get(15)?;
+                item.extra = r.get(16)?;
+                item.ocr = r.get(17)?;
                 Ok((pk, item))
             })
             .optional()?;
@@ -923,7 +967,9 @@ impl Store {
                 Some(s) => format!("{to_name}/{s}"),
                 None => to_name.clone(),
             };
-            let new_id = ensure_tag(&tx, &new_name)?.expect("non-empty tag");
+            let Some(new_id) = ensure_tag(&tx, &new_name)? else {
+                continue;
+            };
             if new_id == *old_id {
                 tx.execute("UPDATE tags SET name = ?2 WHERE id = ?1", params![old_id, new_name])?;
                 continue;
@@ -949,6 +995,109 @@ impl Store {
             "SELECT t.name, t.key, count(it.item) FROM tags t LEFT JOIN item_tags it ON it.tag = t.id GROUP BY t.id ORDER BY t.key",
         )?;
         stmt.query_map([], |r| Ok(TagCount { name: r.get(0)?, key: r.get(1)?, count: r.get(2)? }))?.collect()
+    }
+
+    pub fn folders(&self) -> Result<Vec<Folder>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT f.id, f.name, f.created_at, count(i.pk)
+             FROM folders f
+             LEFT JOIN items i ON i.folder_id = f.id
+             GROUP BY f.id
+             ORDER BY lower(f.name) ASC",
+        )?;
+        stmt.query_map([], |r| {
+            Ok(Folder {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                created_at: r.get(2)?,
+                count: r.get(3)?,
+            })
+        })?
+        .collect()
+    }
+
+    pub fn add_folder(&mut self, name: &str) -> Result<Folder> {
+        let clean = name.trim();
+        if clean.is_empty() {
+            return Err(rusqlite::Error::InvalidParameterName("klasör adı boş olamaz".into()));
+        }
+        let now = now();
+        self.conn.execute("INSERT INTO folders(name, created_at) VALUES (?1, ?2)", params![clean, now])?;
+        let id = self.conn.last_insert_rowid();
+        Ok(Folder {
+            id,
+            name: clean.to_string(),
+            created_at: now,
+            count: 0,
+        })
+    }
+
+    pub fn rename_folder(&mut self, id: i64, name: &str) -> Result<()> {
+        let clean = name.trim();
+        if clean.is_empty() {
+            return Err(rusqlite::Error::InvalidParameterName("klasör adı boş olamaz".into()));
+        }
+        self.conn.execute("UPDATE folders SET name = ?2 WHERE id = ?1", params![id, clean])?;
+        Ok(())
+    }
+
+    pub fn delete_folder(&mut self, id: i64) -> Result<()> {
+        let tx = self.write()?;
+        tx.execute("UPDATE items SET folder_id = NULL WHERE folder_id = ?1", [id])?;
+        tx.execute("DELETE FROM folders WHERE id = ?1", [id])?;
+        tx.commit()
+    }
+
+    pub fn move_to_folder(&mut self, id: &str, folder_id: Option<i64>) -> Result<()> {
+        let pk = pk_of(&self.conn, id)?;
+        self.conn.execute("UPDATE items SET folder_id = ?2, updated_at = ?3 WHERE pk = ?1", params![pk, folder_id, now()])?;
+        Ok(())
+    }
+
+    pub fn move_items_to_folder(&mut self, ids: &[String], folder_id: Option<i64>) -> Result<()> {
+        let tx = self.write()?;
+        let now = now();
+        for id in ids {
+            if let Ok(pk) = pk_of(&tx, id) {
+                tx.execute("UPDATE items SET folder_id = ?2, updated_at = ?3 WHERE pk = ?1", params![pk, folder_id, now])?;
+            }
+        }
+        tx.commit()
+    }
+
+    pub fn completed_video_downloads(&self, limit: i64) -> Result<Vec<Item>> {
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT {ITEM_COLS} FROM items i WHERE i.has_video = 1
+               AND EXISTS (SELECT 1 FROM json_each(i.media) m WHERE json_extract(m.value, '$.video_file') IS NOT NULL)
+             ORDER BY i.saved_at DESC LIMIT ?1"
+        ))?;
+        let rows = stmt.query_map([limit], read_item)?.collect::<Result<Vec<_>>>()?;
+        self.attach(rows)
+    }
+
+    pub fn failed_video_downloads(&self, limit: i64) -> Result<Vec<Item>> {
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT {ITEM_COLS} FROM items i WHERE i.has_video = 1 AND i.video_tries > 0
+               AND {NEEDS_EXTERNAL_VIDEO}
+             ORDER BY coalesce(i.video_tried_at, 0) DESC LIMIT ?1"
+        ))?;
+        let rows = stmt.query_map([limit], read_item)?.collect::<Result<Vec<_>>>()?;
+        self.attach(rows)
+    }
+
+    pub fn retry_video_download(&mut self, id: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE id = ?1",
+            [id],
+        )?;
+        Ok(())
+    }
+
+    pub fn retry_all_video_downloads(&mut self) -> Result<usize> {
+        self.conn.execute(
+            "UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE has_video = 1 AND video_tries > 0",
+            [],
+        )
     }
 
     pub fn set_note(&mut self, id: &str, note: Option<&str>) -> Result<()> {
@@ -1055,7 +1204,7 @@ impl Store {
     /// often or too recently; newest saved first.
     pub fn external_video_queue(&self, limit: i64) -> Result<Vec<Item>> {
         let mut stmt = self.conn.prepare_cached(&format!(
-            "SELECT {ITEM_COLS} FROM items i WHERE i.has_video = 1 AND {NEEDS_EXTERNAL_VIDEO}
+            "SELECT {ITEM_COLS} FROM items i WHERE i.has_video = 1 AND i.platform != 'youtube' AND {NEEDS_EXTERNAL_VIDEO}
                AND i.video_tries < ?2 AND coalesce(i.video_tried_at, 0) < ?3
              ORDER BY i.saved_at DESC LIMIT ?1"
         ))?;
@@ -1132,7 +1281,7 @@ impl Store {
             videos_missing: one(&format!("SELECT count(*) FROM items i WHERE i.has_video = 1 AND {NEEDS_EXTERNAL_VIDEO}"))?,
             videos_queued: self.conn.query_row(
                 &format!(
-                    "SELECT count(*) FROM items i WHERE i.has_video = 1 AND {NEEDS_EXTERNAL_VIDEO}
+                    "SELECT count(*) FROM items i WHERE i.has_video = 1 AND i.platform != 'youtube' AND {NEEDS_EXTERNAL_VIDEO}
                        AND i.video_tries < ?1 AND coalesce(i.video_tried_at, 0) < ?2"
                 ),
                 params![VIDEO_TRIES, now() - VIDEO_RETRY_SECS],
@@ -1431,6 +1580,7 @@ mod tests {
                     "ALTER TABLE items DROP COLUMN ocr; ALTER TABLE items DROP COLUMN reviewed_at;
                      ALTER TABLE items DROP COLUMN video_tries; ALTER TABLE items DROP COLUMN video_tried_at; DROP TABLE media_files;
                      ALTER TABLE links DROP COLUMN fetch_failures; ALTER TABLE links DROP COLUMN fetch_tried_at;
+                     DROP INDEX IF EXISTS items_folder; ALTER TABLE items DROP COLUMN folder_id; DROP TABLE IF EXISTS folders;
                      PRAGMA user_version = 3;",
                 )
                 .unwrap();
@@ -1446,5 +1596,35 @@ mod tests {
         for ext in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
         }
+    }
+
+    #[test]
+    fn folder_crud_and_search() {
+        let mut s = Store::open_in_memory().unwrap();
+        let f1 = s.add_folder("Yazılım").unwrap();
+        assert_eq!(f1.name, "Yazılım");
+        assert_eq!(f1.count, 0);
+
+        let item = post("1", "rust programlama");
+        s.upsert(&item).unwrap();
+        s.move_to_folder("x:1", Some(f1.id)).unwrap();
+
+        let folders = s.folders().unwrap();
+        assert_eq!(folders.len(), 1);
+        assert_eq!(folders[0].count, 1);
+
+        let res = s.search(&Query::parse("folder:Yazılım"), Sort::Default, 10, 0).unwrap();
+        assert_eq!(res.total, 1);
+
+        let res_id = s.search(&Query::parse(&format!("folder:{}", f1.id)), Sort::Default, 10, 0).unwrap();
+        assert_eq!(res_id.total, 1);
+
+        s.rename_folder(f1.id, "Geliştirme").unwrap();
+        assert_eq!(s.folders().unwrap()[0].name, "Geliştirme");
+
+        s.delete_folder(f1.id).unwrap();
+        assert_eq!(s.folders().unwrap().len(), 0);
+        let item_after = s.get("x:1").unwrap().unwrap();
+        assert_eq!(item_after.folder_id, None);
     }
 }

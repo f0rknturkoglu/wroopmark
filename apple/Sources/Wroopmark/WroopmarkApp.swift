@@ -5,18 +5,16 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
 
-    /// Deletions still undoable in the clean-up view are carried out first.
+    /// Deletions still undoable in the clean-up view are committed, and the database is cleanly checkpointed.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let model, model.hasPendingTriage else { return .terminateNow }
         Task {
-            await model.commitTriage()
+            if let model, model.hasPendingTriage {
+                await model.commitTriage()
+            }
+            await Core.shared.checkpointForQuit()
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        Core.shared.checkpointForQuit()
     }
 }
 
@@ -50,7 +48,7 @@ struct WroopmarkApp: App {
                 Button("Seçilenleri etiketle…") { model.showBulkTags = true }
                     .keyboardShortcut("t", modifiers: [.command, .shift])
                     .disabled(model.selection.isEmpty)
-                Button("Seçilenleri sil") { Task { await model.delete(Array(model.selection)) } }
+                Button("Seçilenleri sil") { model.requestDelete(Array(model.selection)) }
                     .keyboardShortcut(.delete, modifiers: .command)
                     .disabled(model.selection.isEmpty)
                 Divider()
@@ -65,14 +63,24 @@ struct WroopmarkApp: App {
                     .keyboardShortcut("f", modifiers: [.command, .option])
                 Button("Ayıkla") { model.scope = .triage }
                     .keyboardShortcut("k", modifiers: [.command, .shift])
+                Divider()
+                Button("İndirmeler") { model.showDownloads.toggle() }
+                    .keyboardShortcut("j", modifiers: .command)
+            }
+            CommandMenu("Görünüm") {
+                Picker("Tema", selection: $model.theme) {
+                    ForEach(AppTheme.allCases) { th in
+                        Label(th.label, systemImage: th.iconName).tag(th)
+                    }
+                }
             }
         }
 
         Settings {
             SettingsView()
                 .environment(model)
+                .preferredColorScheme(model.theme.colorScheme)
                 .tint(Theme.accent)
-                .frame(width: 520, height: 460)
         }
     }
 }

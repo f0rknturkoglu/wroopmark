@@ -45,8 +45,7 @@ struct GalleryView: View {
                                        systemImage: videos ? "play.rectangle" : "photo.on.rectangle")
             }
         }
-        .navigationTitle(videos ? "Videolar" : "Fotoğraflar")
-        .navigationSubtitle("\(entries.count.formatted()) \(videos ? "video" : "fotoğraf")")
+        .navigationTitle("")
     }
 
     private func tile(_ e: Entry) -> some View {

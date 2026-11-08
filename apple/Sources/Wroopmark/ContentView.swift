@@ -8,7 +8,7 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
-        } content: {
+        } detail: {
             Group {
                 switch model.scope {
                 case .links: LinkPoolView()
@@ -18,12 +18,12 @@ struct ContentView: View {
                 default: ItemGridView()
                 }
             }
-            .navigationSplitViewColumnWidth(min: 420, ideal: 620)
-        } detail: {
-            DetailColumn()
-                .navigationSplitViewColumnWidth(min: 340, ideal: 420)
+            .inspector(isPresented: $model.showDetailPane) {
+                DetailColumn()
+                    .inspectorColumnWidth(min: 320, ideal: 380, max: 550)
+            }
         }
-        .searchable(text: $model.query, placement: .toolbar, prompt: "Ara: kelime tag:dev from:@kişi has:image \"ifade\"")
+        .preferredColorScheme(model.theme.colorScheme)
         .onChange(of: model.query) { _, _ in model.queryChanged() }
         .onChange(of: model.filters) { _, _ in model.queryChanged() }
         .onChange(of: model.sort) { _, _ in Task { await model.reload() } }
@@ -32,9 +32,38 @@ struct ContentView: View {
             Task { await model.reload() }
         }
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 7) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    TextField("Ara: kelime, tag:dev, from:@yazar, has:image…", text: $model.query)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12.5))
+                    if !model.query.isEmpty {
+                        Button {
+                            model.query = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .frame(minWidth: 280, idealWidth: 380, maxWidth: 500)
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Theme.hairline, lineWidth: 1)
+                )
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 if model.isBusy { ProgressView().controlSize(.small) }
-                if model.scope != .links {
+                if !model.scope.isLinks {
                     SortMenu()
                     Button { model.showFilters.toggle() } label: {
                         Label("Filtreler", systemImage: model.filters.isEmpty
@@ -43,8 +72,37 @@ struct ContentView: View {
                     .help(model.filters.isEmpty ? "Gelişmiş filtreler" : "\(model.filters.activeCount) filtre açık")
                     .popover(isPresented: $model.showFilters, arrowEdge: .bottom) { FilterPanel().environment(model) }
                 }
+                Button {
+                    model.showDownloads.toggle()
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: model.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle")
+                            .foregroundStyle(model.isDownloading ? Theme.accent : .primary)
+                        if model.activeOrQueuedDownloadsCount > 0 {
+                            Text("\(model.activeOrQueuedDownloadsCount)")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(2.5)
+                                .background(Theme.accent, in: Circle())
+                                .offset(x: 7, y: -5)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                .help("İndirmeler (⌘J)")
                 Button { model.showAdd = true } label: { Label("Bağlantı ekle", systemImage: "plus") }
                     .help("URL kaydet (⌘N)")
+
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        model.showDetailPane.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.trailing")
+                        .foregroundStyle(model.showDetailPane ? Theme.accent : .primary)
+                }
+                .help(model.showDetailPane ? "Detay panelini gizle (⌘I)" : "Detay panelini göster (⌘I)")
+                .keyboardShortcut("i", modifiers: [.command])
             }
         }
         // A link dragged from the browser (or a .webloc) is saved like ⌘N.
@@ -57,12 +115,30 @@ struct ContentView: View {
             return true
         }
         .sheet(isPresented: $model.showAdd) { AddURLSheet() }
+        .sheet(isPresented: $model.showDownloads) { DownloadsView().environment(model) }
         .sheet(item: $model.viewer) { v in MediaViewer(viewer: v) }
         .sheet(isPresented: $model.showBulkTags) { BulkTagSheet(ids: Array(model.selection)) }
-        .alert("Hata", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+        .alert("Hata", isPresented: $model.hasError) {
             Button("Tamam", role: .cancel) {}
         } message: {
             Text(model.errorMessage ?? "")
+        }
+        .confirmationDialog(
+            (model.confirmDeleteIDs?.count ?? 0) > 1 ? "\(model.confirmDeleteIDs?.count ?? 0) kaydı silmek istediğine emin misin?" : "Bu kaydı silmek istediğine emin misin?",
+            isPresented: $model.hasConfirmDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Sil", role: .destructive) {
+                if let ids = model.confirmDeleteIDs {
+                    model.confirmDeleteIDs = nil
+                    Task { await model.delete(ids) }
+                }
+            }
+            Button("Vazgeç", role: .cancel) {
+                model.confirmDeleteIDs = nil
+            }
+        } message: {
+            Text("Bu işlem geri alınamaz.")
         }
     }
 }
@@ -72,10 +148,10 @@ struct DetailColumn: View {
 
     var body: some View {
         if let item = model.selectedItem {
-            ItemDetailView(item: item).id(item.id)
+            ItemDetailView(item: item).id("\(item.id)-\(item.folderId ?? 0)")
         } else if model.selection.count > 1 {
             MultiSelectionView(count: model.selection.count)
-        } else if model.scope == .links, let link = model.selectedLink {
+        } else if model.scope.isLinks, let link = model.selectedLink {
             LinkDetailView(link: link)
         } else {
             ContentUnavailableView("Bir kayıt seç", systemImage: "bookmark", description: Text("Metin, görseller, linkler, etiketler ve not burada görünür."))
@@ -90,10 +166,33 @@ struct MultiSelectionView: View {
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "square.stack.3d.up").font(.system(size: 34)).foregroundStyle(.secondary)
-            Text("\(count) kayıt seçili").font(.title3.weight(.semibold))
-            HStack {
+            Text("\(count) kayıt seçili")
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+            HStack(spacing: 10) {
                 Button("Etiketle…") { model.showBulkTags = true }
-                Button("Sil", role: .destructive) { Task { await model.delete(Array(model.selection)) } }
+
+                Menu("Klasöre taşı…") {
+                    if !model.folders.isEmpty {
+                        ForEach(model.folders) { f in
+                            Button {
+                                Task { await model.moveItemsToFolder(ids: Array(model.selection), folderID: f.id) }
+                            } label: {
+                                Label {
+                                    Text(f.name)
+                                } icon: {
+                                    Image(nsImage: FolderIcons.image(forFolder: f.name))
+                                }
+                            }
+                        }
+                        Divider()
+                    }
+                    Button("Klasörden çıkar") {
+                        Task { await model.moveItemsToFolder(ids: Array(model.selection), folderID: nil) }
+                    }
+                }
+
+                Button("Sil", role: .destructive) { model.requestDelete(Array(model.selection)) }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
