@@ -107,6 +107,13 @@ m["content_scripts"] = [c for c in m["content_scripts"] if c.get("world") != "MA
 m["web_accessible_resources"] = [{"resources": ["hook.js"], "matches": sites}]
 json.dump(m, open(sys.argv[2], "w"), ensure_ascii=False, indent=2)
 PY
+# The Chromium extension travels inside the app too; on launch the app copies
+# it to a fixed folder (~/Library/Application Support/wroopmark/chromium-extension)
+# that the browser loads, so it never depends on where this repo lives.
+CHROMIUM="$APP/Contents/Resources/ChromiumExtension"
+mkdir -p "$CHROMIUM"
+cp -R "$EXT_SRC"/*.js "$EXT_SRC"/*.html "$EXT_SRC"/manifest.json "$EXT_SRC/icons" "$CHROMIUM/"
+
 cat > "$APPEX/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

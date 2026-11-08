@@ -25,7 +25,7 @@ Hedef: Docker yok, sunucu yok, arka plan servisi yok, headless tarayıcı yok.
 | Yol | Ne |
 |---|---|
 | `core/` | Rust çekirdek. `staticlib` → Swift uygulamasına linklenir, `wroopmark` CLI → test + Chromium native host |
-| `extensions/chromium/` | MV3 eklenti (Chrome, Brave, Arc, Edge, Helium…) |
+| `extensions/chromium/` | MV3 eklenti (Chrome, Brave, Arc, Edge, Helium…); uygulamanın içine de kopyalanır, uygulama açılışta `~/Library/Application Support/wroopmark/chromium-extension`'a yazar (tarayıcı buradan yükler) |
 | `apple/Safari/` | Safari eklentisinin native handler'ı ve yetkileri; JS `extensions/chromium/`'dan kopyalanır |
 | `apple/` | SwiftUI macOS uygulaması (iOS sonra), forkjob'daki FFI kalıbıyla; `apple/OCR/` ayrı OCR yardımcısı |
 

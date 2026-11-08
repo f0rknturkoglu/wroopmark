@@ -12,3 +12,4 @@ apple/build/
 *.p12
 *.local
 media/
+dist/

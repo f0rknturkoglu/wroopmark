@@ -1,3 +1,4 @@
+import SafariServices
 import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
@@ -393,33 +394,56 @@ struct SettingsView: View {
     // MARK: - 7. Eklenti & Host
 
     private var extensionSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Tarayıcı Entegrasyonu:")
-                    .foregroundStyle(.secondary)
+                Text("Chromium (Chrome, Brave, Arc, Edge…)").font(.subheadline.weight(.semibold))
                 Spacer()
-                Text(HostInstaller.helperURL == nil ? "Host bulunamadı" : "Chromium & Safari Aktif")
+                Text(HostInstaller.helperURL == nil ? "Yardımcı bulunamadı" : "Bağlantı hazır")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(HostInstaller.helperURL == nil ? .orange : .green)
-                    .font(.subheadline.weight(.semibold))
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Eklenti Kimliği:")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(HostInstaller.extensionID)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
+            Text("1. Aşağıdan tarayıcını seç: eklentiler sayfası ve eklenti klasörü açılır (yolu panoda).\n2. Sağ üstte Geliştirici modu'nu aç.\n3. \"Paketlenmemiş öğe yükle\" → açılan klasörü seç.\nGüncellemelerden sonra eklentide ↻ yeniden yükle yeterli.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                let browsers = HostInstaller.installedBrowsers
+                ForEach(browsers, id: \.name) { b in
+                    Button(b.name) { HostInstaller.openExtensionSetup(browser: b.app, page: b.page) }
+                }
+                Button(browsers.isEmpty ? "Eklenti klasörünü göster" : "Yalnızca klasör") {
+                    HostInstaller.openExtensionSetup(browser: nil, page: nil)
+                }
+                .buttonStyle(.borderless)
             }
+            .buttonStyle(.bordered)
 
             Divider()
 
-            Text("Chrome, Brave, Edge veya Arc tarayıcınızda Wroopmark eklentisini açarak sayfaları, X yer imlerini ve linkleri arşivinize aktarabilirsiniz.")
-                .font(.caption).foregroundStyle(.secondary)
-
-            Button("Eklenti Bağlantısını Yeniden Kaydet") {
-                Task { await HostInstaller.registerIfNeeded() }
+            HStack {
+                Text("Safari").font(.subheadline.weight(.semibold))
+                Spacer()
+                Button("Safari'de aç") {
+                    SFSafariApplication.showPreferencesForExtension(withIdentifier: "com.f0rknturkoglu.wroopmark.safari") { _ in }
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
+            Text("Uygulamanın içinde gelir. İmzasız kurulumda önce Safari → Ayarlar → Geliştirici → \"İmzasız eklentilere izin ver\" gerekir (Safari her açılışta sıfırlar).")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            HStack {
+                Text("Eklenti kimliği: \(HostInstaller.extensionID)")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+                Spacer()
+                Button("Bağlantıyı yenile") { Task { await HostInstaller.registerIfNeeded() } }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .help("Tarayıcıların wroopmark'ı bulması için gereken kaydı yeniden yazar")
+            }
         }
     }
 }

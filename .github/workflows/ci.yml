@@ -44,3 +44,5 @@ jobs:
         run: xcrun swiftc -O -o "$RUNNER_TEMP/wroopmark-ocr" apple/OCR/main.swift
       - name: Extension scripts parse
         run: for f in extensions/chromium/*.js; do node --check "$f"; done
+      - name: Shell scripts parse
+        run: for f in install.sh apple/scripts/*.sh; do bash -n "$f"; done

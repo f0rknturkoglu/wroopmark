@@ -1,0 +1,28 @@
+name: release
+
+# Push a tag like v0.2.0 → a GitHub release with the .dmg and .zip attached.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: Build and package
+        run: apple/scripts/package.sh
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip \
+            --title "wroopmark $GITHUB_REF_NAME" \
+            --notes "Applications'a sürükle; ilk açılışta macOS engellerse Sistem Ayarları → Gizlilik ve Güvenlik → \"Yine de aç\". Kaynaktan kurmak için: ./install.sh"
