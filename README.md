@@ -1,4 +1,18 @@
-# wroopmark
+<p align="center">
+  <img src="docs/logo.png" width="128" height="128" alt="wroopmark logosu">
+</p>
+
+<h1 align="center">wroopmark</h1>
+
+<p align="center">
+  Kaydettiklerin, çevrimdışı ve aranabilir. macOS için.<br>
+  <a href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">İndir</a> ·
+  <a href="#kurulum-macos-14">Kurulum</a> ·
+  <a href="#kullanım">Kullanım</a> ·
+  <a href="ARCHITECTURE.md">Mimari</a>
+</p>
+
+---
 
 Sosyal medyada kaydettiklerin (X yer imleri, TikTok favorileri, Instagram ve
 Reddit kaydedilenleri, herhangi bir web sayfası) tek yerde, **çevrimdışı**
