@@ -8,7 +8,7 @@ struct ContentView: View {
         @Bindable var model = model
         NavigationSplitView {
             SidebarView()
-                .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
+                .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
         } detail: {
             Group {
                 switch model.scope {
@@ -19,6 +19,11 @@ struct ContentView: View {
                 default: ItemGridView()
                 }
             }
+            .searchable(
+                text: $model.query,
+                placement: .toolbar,
+                prompt: Text("Ara: kelime, tag:dev, from:@yazar, has:image…")
+            )
             .inspector(isPresented: $model.showDetailPane) {
                 DetailColumn()
                     .inspectorColumnWidth(min: 320, ideal: 380, max: 550)
@@ -33,7 +38,6 @@ struct ContentView: View {
             }
         }
         .animation(.easeOut(duration: 0.16), value: model.viewer?.id)
-        .preferredColorScheme(model.theme.colorScheme)
         .alert("Aramayı kaydet", isPresented: $model.showSaveSearch) {
             TextField("Ad", text: $saveSearchName)
             Button("Kaydet") {
@@ -55,73 +59,65 @@ struct ContentView: View {
             Task { await model.reload() }
         }
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 7) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    TextField("Ara: kelime, tag:dev, from:@yazar, has:image…", text: $model.query)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12.5))
-                    if !model.query.isEmpty {
-                        Button {
-                            model.query = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
+            ToolbarItemGroup(placement: .primaryAction) {
+                if model.isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("İşlem sürüyor")
+                }
+
+                ControlGroup {
+                    SortMenu()
+                    if !model.scope.isLinks {
+                        Button { model.showFilters.toggle() } label: {
+                            Label("Filtreler", systemImage: model.filters.isEmpty
+                                  ? "line.3.horizontal.decrease.circle"
+                                  : "line.3.horizontal.decrease.circle.fill")
+                                .labelStyle(.iconOnly)
                         }
-                        .buttonStyle(.plain)
+                        .help(model.filters.isEmpty ? "Gelişmiş filtreler" : "\(model.filters.activeCount) filtre açık")
+                        .popover(isPresented: $model.showFilters, arrowEdge: .bottom) { FilterPanel().environment(model) }
                     }
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .frame(minWidth: 280, idealWidth: 380, maxWidth: 500)
-                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Theme.hairline, lineWidth: 1)
-                )
             }
 
-            ToolbarItemGroup(placement: .primaryAction) {
-                if model.isBusy { ProgressView().controlSize(.small) }
-                if !model.scope.isLinks {
-                    SortMenu()
-                    Button { model.showFilters.toggle() } label: {
-                        Label("Filtreler", systemImage: model.filters.isEmpty
-                              ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
-                    }
-                    .help(model.filters.isEmpty ? "Gelişmiş filtreler" : "\(model.filters.activeCount) filtre açık")
-                    .popover(isPresented: $model.showFilters, arrowEdge: .bottom) { FilterPanel().environment(model) }
-                }
-                Button {
-                    model.showDownloads.toggle()
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: model.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle")
-                            .foregroundStyle(model.isDownloading ? Theme.accent : .primary)
-                        if model.activeOrQueuedDownloadsCount > 0 {
-                            Text("\(model.activeOrQueuedDownloadsCount)")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(2.5)
-                                .background(Theme.accent, in: Circle())
-                                .offset(x: 7, y: -5)
-                                .monospacedDigit()
-                        }
-                    }
-                }
-                .help("İndirmeler (⌘J)")
-                Button { model.showAdd = true } label: { Label("Bağlantı ekle", systemImage: "plus") }
-                    .help("URL kaydet (⌘N)")
+            ToolbarSpacer(.fixed)
 
+            ToolbarItem(placement: .primaryAction) {
+                Button { model.showAdd = true } label: {
+                    Label("Bağlantı ekle", systemImage: "plus")
+                        .labelStyle(.iconOnly)
+                }
+                .help("URL kaydet (⌘N)")
+            }
+
+            if !model.scope.isLinks {
+                ToolbarSpacer(.fixed)
+
+                ToolbarItem(placement: .primaryAction) {
+                    Picker("Görünüm", selection: $model.layout) {
+                        Label("Kart", systemImage: "square.grid.2x2").tag(LibraryLayout.grid)
+                        Label("Liste", systemImage: "list.bullet").tag(LibraryLayout.list)
+                        Label("Akış", systemImage: "rectangle.grid.1x2").tag(LibraryLayout.feed)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .labelStyle(.iconOnly)
+                    .fixedSize()
+                    .help("Kart / liste / akış görünümü")
+                }
+            }
+
+            ToolbarSpacer(.fixed)
+
+            ToolbarItem(placement: .primaryAction) {
                 Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                    withAnimation(.snappy(duration: 0.2)) {
                         model.showDetailPane.toggle()
                     }
                 } label: {
-                    Image(systemName: "sidebar.trailing")
+                    Label("Detay paneli", systemImage: "sidebar.trailing")
+                        .labelStyle(.iconOnly)
                         .foregroundStyle(model.showDetailPane ? Theme.accent : .primary)
                 }
                 .help(model.showDetailPane ? "Detay panelini gizle (⌘I)" : "Detay panelini göster (⌘I)")
@@ -133,7 +129,7 @@ struct ContentView: View {
             let web = urls.filter { ["http", "https"].contains($0.scheme?.lowercased() ?? "") }
             guard !web.isEmpty else { return false }
             Task {
-                for url in web { _ = await model.addURL(url.absoluteString, tags: [], note: "") }
+                await model.addURLs(web.map(\.absoluteString))
             }
             return true
         }
@@ -176,7 +172,12 @@ struct DetailColumn: View {
         } else if model.scope.isLinks, let link = model.selectedLink {
             LinkDetailView(link: link)
         } else {
-            ContentUnavailableView("Bir kayıt seç", systemImage: "bookmark", description: Text("Metin, görseller, linkler, etiketler ve not burada görünür."))
+            ContentUnavailableView(
+                "Bir kayıt seç",
+                systemImage: "bookmark",
+                description: Text("Metin, görseller, linkler, etiketler ve not burada görünür.")
+            )
+            .padding(Theme.Spacing.lg)
         }
     }
 }
@@ -186,15 +187,19 @@ struct MultiSelectionView: View {
     let count: Int
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "square.stack.3d.up").font(.system(size: 34)).foregroundStyle(.secondary)
-            Text("\(count) kayıt seçili")
+        ContentUnavailableView {
+            Label("\(count) kayıt seçili", systemImage: "square.stack.3d.up")
                 .font(.title3.weight(.semibold))
                 .monospacedDigit()
-            HStack(spacing: 10) {
-                Button("Etiketle…") { model.showBulkTags = true }
+        } description: {
+            Text("Seçilenlere etiket ekle, klasöre taşı ya da sil.")
+        } actions: {
+            ControlGroup {
+                Button { model.showBulkTags = true } label: {
+                    Label("Etiketle…", systemImage: "tag")
+                }
 
-                Menu("Klasöre taşı…") {
+                Menu {
                     if !model.folders.isEmpty {
                         ForEach(model.folders) { f in
                             Button {
@@ -209,14 +214,22 @@ struct MultiSelectionView: View {
                         }
                         Divider()
                     }
-                    Button("Klasörden çıkar") {
+                    Button {
                         Task { await model.moveItemsToFolder(ids: Array(model.selection), folderID: nil) }
+                    } label: {
+                        Label("Klasörden çıkar", systemImage: "tray")
                     }
+                } label: {
+                    Label("Klasöre taşı…", systemImage: "folder")
                 }
 
-                Button("Sil", role: .destructive) { model.requestDelete(Array(model.selection)) }
+                Button(role: .destructive) { model.requestDelete(Array(model.selection)) } label: {
+                    Label("Sil", systemImage: "trash")
+                }
             }
+            .buttonStyle(.glass)
+            .controlSize(.regular)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(Theme.Spacing.lg)
     }
 }

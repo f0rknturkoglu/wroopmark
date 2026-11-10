@@ -138,26 +138,46 @@ fn split(input: &str) -> Vec<String> {
 /// `2025`, `2025-06`, `2025-06-14` → unix seconds at the start (or, with
 /// `end`, the end) of that period.
 fn parse_date(s: &str, end: bool) -> Option<i64> {
-    let parts: Vec<&str> = s.split('-').collect();
-    let y: i32 = parts.first()?.parse().ok()?;
-    let m: Option<u32> = parts.get(1).and_then(|p| p.parse().ok());
-    let d: Option<u32> = parts.get(2).and_then(|p| p.parse().ok());
+    let mut parts = s.split('-');
+    let y: i32 = parts.next()?.parse().ok()?;
+    let m: Option<u32> = match parts.next() {
+        Some(p) => Some(p.parse().ok()?),
+        None => None,
+    };
+    let d: Option<u32> = match parts.next() {
+        Some(p) => Some(p.parse().ok()?),
+        None => None,
+    };
+    if parts.next().is_some() {
+        return None;
+    }
     let start = NaiveDate::from_ymd_opt(y, m.unwrap_or(1), d.unwrap_or(1))?;
     let date = if !end {
         start
     } else if d.is_some() {
         start.succ_opt()?
     } else if let Some(m) = m {
-        if m == 12 { NaiveDate::from_ymd_opt(y + 1, 1, 1)? } else { NaiveDate::from_ymd_opt(y, m + 1, 1)? }
+        if m == 12 { NaiveDate::from_ymd_opt(y.checked_add(1)?, 1, 1)? } else { NaiveDate::from_ymd_opt(y, m.checked_add(1)?, 1)? }
     } else {
-        NaiveDate::from_ymd_opt(y + 1, 1, 1)?
+        NaiveDate::from_ymd_opt(y.checked_add(1)?, 1, 1)?
     };
     Some(date.and_hms_opt(0, 0, 0)?.and_utc().timestamp())
 }
 
 pub fn tag_key(tag: &str) -> String {
     let t = tag.trim().trim_start_matches('#');
-    t.split('/').map(|p| fold(p.trim())).filter(|p| !p.is_empty()).collect::<Vec<_>>().join("/")
+    let mut out = String::with_capacity(t.len());
+    for part in t.split('/').map(str::trim).filter(|p| !p.is_empty()) {
+        if !out.is_empty() {
+            out.push('/');
+        }
+        out.push_str(&fold(part));
+    }
+    out
+}
+
+fn eq_any_ci(s: &str, opts: &[&str]) -> bool {
+    opts.iter().any(|o| s.eq_ignore_ascii_case(o))
 }
 
 impl Query {
@@ -168,92 +188,107 @@ impl Query {
                 Some(rest) if !rest.is_empty() => (true, rest),
                 _ => (false, raw.as_str()),
             };
-            let unquote = |s: &str| s.trim_matches('"').to_string();
+            fn unquote(s: &str) -> &str {
+                s.trim_matches('"')
+            }
             if let Some((key, val)) = tok.split_once(':').filter(|(k, v)| !k.is_empty() && !v.is_empty() && !k.starts_with('"')) {
                 let val = unquote(val);
-                let handled = match key.to_ascii_lowercase().as_str() {
-                    "tag" | "t" => {
-                        let t = tag_key(&val);
-                        if neg {
-                            q.not_tags.push(t)
-                        } else {
-                            q.tags.push(t)
-                        }
-                        true
+                let handled = if eq_any_ci(key, &["tag", "t"]) {
+                    let t = tag_key(val);
+                    if neg {
+                        q.not_tags.push(t);
+                    } else {
+                        q.tags.push(t);
                     }
-                    "id" if !neg => {
-                        q.ids.push(val.to_string());
-                        true
+                    true
+                } else if eq_any_ci(key, &["id"]) && !neg {
+                    q.ids.push(val.to_string());
+                    true
+                } else if eq_any_ci(key, &["folder", "klasor", "f"]) {
+                    let f = val.to_string();
+                    if neg {
+                        q.not_folder = Some(f);
+                    } else {
+                        q.folder = Some(f);
                     }
-                    "folder" | "klasor" | "f" => {
-                        if neg {
-                            q.not_folder = Some(val);
-                        } else {
-                            q.folder = Some(val);
-                        }
-                        true
+                    true
+                } else if eq_any_ci(key, &["from", "by", "@"]) {
+                    let a = val.trim_start_matches('@').to_ascii_lowercase();
+                    if neg {
+                        q.not_authors.push(a);
+                    } else {
+                        q.authors.push(a);
                     }
-                    "from" | "by" | "@" => {
-                        let a = val.trim_start_matches('@').to_ascii_lowercase();
-                        if neg {
-                            q.not_authors.push(a)
-                        } else {
-                            q.authors.push(a)
-                        }
-                        true
-                    }
-                    "platform" | "on" | "in" => match Platform::parse(&val) {
+                    true
+                } else if eq_any_ci(key, &["platform", "on", "in"]) {
+                    match Platform::parse(val) {
                         Some(p) => {
                             if neg {
-                                q.not_platforms.push(p)
+                                q.not_platforms.push(p);
                             } else {
-                                q.platforms.push(p)
+                                q.platforms.push(p);
                             }
                             true
                         }
                         None => false,
-                    },
-                    "has" => {
-                        let h = match val.to_ascii_lowercase().as_str() {
-                            "image" | "img" | "photo" | "gorsel" => Some(Has::Image),
-                            "video" => Some(Has::Video),
-                            "media" | "medya" => Some(Has::Media),
-                            "link" | "links" => Some(Has::Link),
-                            "note" | "not" => Some(Has::Note),
-                            "ocr" | "yazi" => Some(Has::Ocr),
-                            "quote" | "alinti" => Some(Has::Quote),
-                            _ => None,
-                        };
-                        h.map(|h| if neg { q.not_has.push(h) } else { q.has.push(h) }).is_some()
                     }
-                    "is" => match val.to_ascii_lowercase().as_str() {
-                        "untagged" => {
-                            q.tagged = Some(neg);
-                            true
+                } else if eq_any_ci(key, &["has"]) {
+                    let h = if eq_any_ci(val, &["image", "img", "photo", "gorsel"]) {
+                        Some(Has::Image)
+                    } else if eq_any_ci(val, &["video"]) {
+                        Some(Has::Video)
+                    } else if eq_any_ci(val, &["media", "medya"]) {
+                        Some(Has::Media)
+                    } else if eq_any_ci(val, &["link", "links"]) {
+                        Some(Has::Link)
+                    } else if eq_any_ci(val, &["note", "not"]) {
+                        Some(Has::Note)
+                    } else if eq_any_ci(val, &["ocr", "yazi"]) {
+                        Some(Has::Ocr)
+                    } else if eq_any_ci(val, &["quote", "alinti"]) {
+                        Some(Has::Quote)
+                    } else {
+                        None
+                    };
+                    if let Some(h) = h {
+                        if neg {
+                            q.not_has.push(h);
+                        } else {
+                            q.has.push(h);
                         }
-                        "tagged" => {
-                            q.tagged = Some(!neg);
-                            true
-                        }
-                        "reviewed" => {
-                            q.reviewed = Some(!neg);
-                            true
-                        }
-                        "infolder" | "in-folder" | "klasorlu" => {
-                            q.in_folder = Some(!neg);
-                            true
-                        }
-                        "unfiled" | "no-folder" | "klasorsuz" => {
-                            q.in_folder = Some(neg);
-                            true
-                        }
-                        _ => false,
-                    },
-                    "savedbefore" | "saved-before" => parse_date(&val, false).map(|t| q.saved_before = Some(t)).is_some(),
-                    "savedafter" | "saved-after" => parse_date(&val, true).map(|t| q.saved_after = Some(t)).is_some(),
-                    "before" | "until" => parse_date(&val, false).map(|t| q.before = Some(t)).is_some(),
-                    "after" | "since" => parse_date(&val, true).map(|t| q.after = Some(t)).is_some(),
-                    _ => false,
+                        true
+                    } else {
+                        false
+                    }
+                } else if eq_any_ci(key, &["is"]) {
+                    if eq_any_ci(val, &["untagged"]) {
+                        q.tagged = Some(neg);
+                        true
+                    } else if eq_any_ci(val, &["tagged"]) {
+                        q.tagged = Some(!neg);
+                        true
+                    } else if eq_any_ci(val, &["reviewed"]) {
+                        q.reviewed = Some(!neg);
+                        true
+                    } else if eq_any_ci(val, &["infolder", "in-folder", "klasorlu"]) {
+                        q.in_folder = Some(!neg);
+                        true
+                    } else if eq_any_ci(val, &["unfiled", "no-folder", "klasorsuz"]) {
+                        q.in_folder = Some(neg);
+                        true
+                    } else {
+                        false
+                    }
+                } else if eq_any_ci(key, &["savedbefore", "saved-before"]) {
+                    parse_date(val, false).map(|t| q.saved_before = Some(t)).is_some()
+                } else if eq_any_ci(key, &["savedafter", "saved-after"]) {
+                    parse_date(val, true).map(|t| q.saved_after = Some(t)).is_some()
+                } else if eq_any_ci(key, &["before", "until"]) {
+                    parse_date(val, false).map(|t| q.before = Some(t)).is_some()
+                } else if eq_any_ci(key, &["after", "since"]) {
+                    parse_date(val, true).map(|t| q.after = Some(t)).is_some()
+                } else {
+                    false
                 };
                 if handled {
                     continue;
@@ -263,13 +298,13 @@ impl Query {
             if let Some(h) = tok.strip_prefix('@').filter(|h| !h.is_empty()) {
                 let a = h.to_ascii_lowercase();
                 if neg {
-                    q.not_authors.push(a)
+                    q.not_authors.push(a);
                 } else {
-                    q.authors.push(a)
+                    q.authors.push(a);
                 }
                 continue;
             }
-            let folded = fold(&unquote(tok));
+            let folded = fold(unquote(tok));
             let toks = tokens(&folded);
             if toks.is_empty() {
                 continue;
@@ -293,15 +328,46 @@ impl Query {
     /// FTS5 MATCH expression for the positive terms. Every token is quoted,
     /// so user input can never inject FTS operators.
     pub fn fts_positive(&self) -> Option<String> {
-        let mut parts: Vec<String> = self.words.iter().map(|w| format!("\"{w}\"*")).collect();
-        parts.extend(self.phrases.iter().map(|p| format!("\"{p}\"")));
-        (!parts.is_empty()).then(|| parts.join(" "))
+        if self.words.is_empty() && self.phrases.is_empty() {
+            return None;
+        }
+        let cap = self.words.iter().map(|w| w.len() + 4).sum::<usize>() + self.phrases.iter().map(|p| p.len() + 3).sum::<usize>();
+        let mut out = String::with_capacity(cap);
+        for w in &self.words {
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push('"');
+            out.push_str(w);
+            out.push_str("\"*");
+        }
+        for p in &self.phrases {
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push('"');
+            out.push_str(p);
+            out.push('"');
+        }
+        Some(out)
     }
 
     /// MATCH expression for the negated words, OR-ed.
     pub fn fts_negative(&self) -> Option<String> {
-        let parts: Vec<String> = self.not_words.iter().map(|w| format!("\"{w}\"")).collect();
-        (!parts.is_empty()).then(|| parts.join(" OR "))
+        if self.not_words.is_empty() {
+            return None;
+        }
+        let cap = self.not_words.iter().map(|w| w.len() + 6).sum();
+        let mut out = String::with_capacity(cap);
+        for w in &self.not_words {
+            if !out.is_empty() {
+                out.push_str(" OR ");
+            }
+            out.push('"');
+            out.push_str(w);
+            out.push('"');
+        }
+        Some(out)
     }
 
     /// True when the query filters by what items are (tags, author, date…),
@@ -388,5 +454,8 @@ mod tests {
         assert_eq!(parse_date("2025-06", false), Some(1748736000));
         assert_eq!(parse_date("2025-12", true), Some(1767225600));
         assert_eq!(parse_date("2025-06-14", true), Some(1749945600));
+        assert_eq!(parse_date("2147483647", true), None);
+        assert_eq!(parse_date("2147483647-12", true), None);
+        assert_eq!(parse_date("2025-01-01-extra", false), None);
     }
 }

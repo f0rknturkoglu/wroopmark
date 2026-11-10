@@ -22,66 +22,74 @@ struct ItemDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 header
                 if model.scope == .all, let f = currentFolder {
-                    HStack(spacing: 7) {
+                    HStack(spacing: Theme.Spacing.sm) {
                         Image(nsImage: FolderIcons.image(forFolder: f.name))
                             .renderingMode(.template)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 14, height: 14)
+                            .frame(width: 16, height: 16)
                             .foregroundStyle(Theme.accent)
                         Text("Klasör:")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                         Text(f.name)
-                            .font(.system(size: 12.5, weight: .bold))
+                            .font(.callout.weight(.semibold))
                             .foregroundStyle(Theme.accent)
-                        Spacer()
-                        Button("Klasöre Git") {
+                        Spacer(minLength: Theme.Spacing.sm)
+                        Button {
                             model.scope = .folder(id: f.id, name: f.name)
+                        } label: {
+                            Label("Klasöre Git", systemImage: "arrow.forward")
                         }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.accent)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Theme.accent.opacity(0.18), lineWidth: 1)
-                    )
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .background(Theme.Stroke.subtleFill, in: .rect(cornerRadius: Theme.Radius.sm))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                    }
                 }
                 if let error = loadError {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                        Text("Detaylar yüklenemedi: \(error)").font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Tekrar Dene") {
-                            Task {
-                                do {
-                                    let full: Item = try await model.core.call(["cmd": "get", "id": item.id])
-                                    fullOCR = full.ocr
-                                    loadError = nil
-                                } catch {
-                                    loadError = error.localizedDescription
-                                }
-                            }
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Label("Detaylar yüklenemedi", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer(minLength: Theme.Spacing.sm)
+                        Button {
+                            detailReloadToken += 1
+                        } label: {
+                            Label("Tekrar Dene", systemImage: "arrow.clockwise")
                         }
                         .controlSize(.small)
                     }
-                    .padding(8)
-                    .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .padding(Theme.Spacing.md)
+                    .background(Color.orange.opacity(0.12), in: .rect(cornerRadius: Theme.Radius.sm))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .strokeBorder(Color.orange.opacity(0.28), lineWidth: Theme.Stroke.hairlineWidth)
+                    }
                 }
                 if let title = item.title, !title.isEmpty {
-                    Text(title).font(.system(size: 19, weight: .semibold)).textSelection(.enabled)
+                    Text(title)
+                        .font(.title3.weight(.semibold))
+                        .textSelection(.enabled)
                 }
                 if !item.text.isEmpty {
                     Text(linkified(item.text))
-                        .font(.system(size: 15))
-                        .lineSpacing(4.5)
+                        .font(.body)
+                        .lineSpacing(4)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -100,14 +108,14 @@ struct ItemDetailView: View {
                 if let ocr = fullOCR, !ocr.isEmpty {
                     DisclosureGroup {
                         Text(ocr)
-                            .font(.system(size: 12.5, design: .rounded))
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 6)
+                            .padding(.top, Theme.Spacing.sm)
                     } label: {
                         Label("Görseldeki yazı", systemImage: "text.viewfinder")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -115,13 +123,23 @@ struct ItemDetailView: View {
                 section("Klasör") {
                     HStack {
                         Menu {
+                            if model.folders.isEmpty && liveItem.folderId == nil && currentFolder == nil {
+                                Button {} label: {
+                                    Label("Henüz klasör yok", systemImage: "folder")
+                                }
+                                .disabled(true)
+                            }
                             if !model.folders.isEmpty {
                                 ForEach(model.folders) { f in
                                     Button {
                                         Task { await model.moveToFolder(id: liveItem.id, folderID: f.id) }
                                     } label: {
                                         HStack {
-                                            Text(f.name)
+                                            Label {
+                                                Text(f.name)
+                                            } icon: {
+                                                Image(nsImage: FolderIcons.image(forFolder: f.name))
+                                            }
                                             if (liveItem.folderId ?? currentFolder?.id) == f.id { Image(systemName: "checkmark") }
                                         }
                                     }
@@ -129,34 +147,43 @@ struct ItemDetailView: View {
                                 Divider()
                             }
                             if liveItem.folderId != nil || currentFolder != nil {
-                                Button("Klasörden çıkar") {
+                                Button {
                                     Task { await model.moveToFolder(id: liveItem.id, folderID: nil) }
+                                } label: {
+                                    Label("Klasörden çıkar", systemImage: "tray")
                                 }
                             }
                         } label: {
-                            HStack(spacing: 6) {
+                            HStack(spacing: Theme.Spacing.sm) {
                                 if let f = currentFolder {
                                     Image(nsImage: FolderIcons.image(forFolder: f.name))
                                         .renderingMode(.template)
                                         .resizable()
                                         .scaledToFit()
-                                        .frame(width: 13, height: 13)
+                                        .frame(width: 16, height: 16)
                                         .foregroundStyle(Theme.accent)
                                 } else {
                                     Image(systemName: "folder")
+                                        .frame(width: 16, height: 16)
                                         .foregroundStyle(.secondary)
                                 }
                                 Text(currentFolder?.name ?? "Klasör seçilmedi")
                                     .foregroundStyle(currentFolder != nil ? .primary : .secondary)
                                 Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 9))
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            .font(.system(size: 12.5, weight: .medium))
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(Theme.hairline, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .font(.callout.weight(.medium))
+                            .padding(.horizontal, Theme.Spacing.md)
+                            .padding(.vertical, Theme.Spacing.sm)
+                            .background(Theme.Stroke.subtleFill, in: .rect(cornerRadius: Theme.Radius.sm))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                                    .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                            }
                         }
                         .menuStyle(.borderlessButton)
+                        .controlSize(.regular)
                         Spacer()
                     }
                 }
@@ -166,44 +193,75 @@ struct ItemDetailView: View {
                     }
                 }
                 section("Not") {
-                    TextEditor(text: $note)
-                        .font(.system(size: 13.5))
-                        .frame(minHeight: 64)
-                        .scrollContentBackground(.hidden)
-                        .padding(6)
-                        .background(Theme.hairline, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .focused($noteFocused)
-                        .onChange(of: noteFocused) { _, focused in if !focused { saveNote() } }
+                    ZStack(alignment: .topLeading) {
+                        if note.isEmpty {
+                            Text("Kayıtla ilgili not ekle…")
+                                .font(.body)
+                                .foregroundStyle(.tertiary)
+                                .padding(.horizontal, Theme.Spacing.sm)
+                                .padding(.vertical, Theme.Spacing.sm)
+                                .allowsHitTesting(false)
+                        }
+                        TextEditor(text: $note)
+                            .font(.body)
+                            .frame(minHeight: 72)
+                            .scrollContentBackground(.hidden)
+                            .padding(Theme.Spacing.xs)
+                    }
+                    .padding(Theme.Spacing.xs)
+                    .background(Theme.Stroke.subtleFill, in: .rect(cornerRadius: Theme.Radius.sm))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .strokeBorder(
+                                noteFocused ? Theme.accent.opacity(0.65) : Theme.Stroke.surfaceBorder,
+                                lineWidth: noteFocused ? 1 : Theme.Stroke.hairlineWidth
+                            )
+                    }
+                    .focused($noteFocused)
+                    .onChange(of: noteFocused) { _, focused in if !focused { saveNote() } }
                 }
                 if !item.links.isEmpty {
                     section("Linkler") {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                             ForEach(item.links, id: \.self) { link in
                                 if let url = URL(string: link) {
                                     Link(destination: url) {
                                         Label(link.replacingOccurrences(of: "https://", with: ""), systemImage: "link")
-                                            .lineLimit(1).truncationMode(.middle)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
                                     }
-                                    .font(.system(size: 13))
+                                    .font(.callout)
                                 }
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                actions
                 footer
             }
-            .padding(24)
+            .padding(Theme.Spacing.xl)
             .frame(maxWidth: 660, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            actions
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.vertical, Theme.Spacing.md)
+                .frame(maxWidth: .infinity)
+                .background(.background)
+                .overlay(alignment: .top) { Divider() }
+        }
         .onAppear { note = item.note ?? "" }
-        .task(id: item.id) {
+        .task(id: "\(item.id)#\(detailReloadToken)") {
+            fullOCR = liveItem.ocr
+            loadError = nil
             do {
-                let full: Item = try await model.core.call(["cmd": "get", "id": item.id])
+                let full: Item = try await model.core.call(.get(id: item.id))
                 fullOCR = full.ocr
                 loadError = nil
+            } catch is CancellationError {
+                return
             } catch {
                 loadError = error.localizedDescription
             }
@@ -214,24 +272,26 @@ struct ItemDetailView: View {
     /// The list rows carry no OCR text; the detail loads it with the item.
     @State private var fullOCR: String?
     @State private var loadError: String?
+    @State private var detailReloadToken = 0
 
     private var header: some View {
         let platform = Platform(rawValue: item.platform) ?? .web
-        return HStack(spacing: 10) {
-            Avatar(name: item.author ?? platform.label, size: 38)
-            VStack(alignment: .leading, spacing: 1) {
+        return HStack(alignment: .center, spacing: Theme.Spacing.md) {
+            Avatar(name: item.author ?? platform.label, size: 40)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(item.authorName ?? item.author ?? URL(string: item.url)?.host() ?? platform.label)
-                    .font(.system(size: 14, weight: .semibold))
-                HStack(spacing: 6) {
+                    .font(.headline)
+                HStack(spacing: Theme.Spacing.sm) {
                     if let h = item.authorHandle { Text("@\(h)") }
                     Label(platform.label, systemImage: platform.symbol)
                 }
-                .font(.system(size: 12)).foregroundStyle(.secondary)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
-            Spacer()
+            Spacer(minLength: Theme.Spacing.sm)
             if let created = item.created {
                 Text(created.formatted(.dateTime.day().month(.abbreviated).year().hour().minute().locale(Theme.locale)))
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
@@ -239,48 +299,91 @@ struct ItemDetailView: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 8) {
-            Button {
-                if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
-            } label: { Label("Kaynağında aç", systemImage: "arrow.up.right.square") }
-                .buttonStyle(.borderedProminent)
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(item.url, forType: .string)
-            } label: { Label("Kopyala", systemImage: "doc.on.doc") }
-            if item.needsDownload {
-                Button {
-                    Task { await model.downloadMedia(item.id) }
-                } label: {
-                    Label(item.platform == "youtube" ? "Videoyu lokale indir" : "Medyayı indir", systemImage: "arrow.down.circle")
-                }
-                .disabled(model.isBusy)
-            }
-            Spacer()
-            Button(role: .destructive) {
-                model.requestDelete([item.id])
-            } label: {
-                Image(systemName: "trash")
-            }
-            .accessibilityLabel("Kaydı sil")
-            .help("Sil")
+        ViewThatFits(in: .horizontal) {
+            actionRow(compact: false)
+            actionRow(compact: true)
         }
         .controlSize(.regular)
     }
 
+    @ViewBuilder
+    private func actionRow(compact: Bool) -> some View {
+        let downloadTitle = item.platform == "youtube" ? "Videoyu lokale indir" : "Medyayı indir"
+        HStack(spacing: Theme.Spacing.sm) {
+            Button {
+                if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+            } label: {
+                Label("Kaynağında aç", systemImage: "arrow.up.right.square")
+            }
+            .buttonStyle(.borderedProminent)
+            .fixedSize()
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.url, forType: .string)
+            } label: {
+                if compact {
+                    Label("Bağlantıyı kopyala", systemImage: "doc.on.doc")
+                        .labelStyle(.iconOnly)
+                } else {
+                    Label("Kopyala", systemImage: "doc.on.doc")
+                }
+            }
+            .buttonStyle(.bordered)
+            .fixedSize()
+            .accessibilityLabel("Bağlantıyı kopyala")
+            .help("Bağlantıyı kopyala")
+
+            if item.needsDownload {
+                Button {
+                    Task { await model.downloadMedia(item.id) }
+                } label: {
+                    if compact {
+                        Label(downloadTitle, systemImage: "arrow.down.circle")
+                            .labelStyle(.iconOnly)
+                    } else {
+                        Label(downloadTitle, systemImage: "arrow.down.circle")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(compact ? .small : .regular)
+                .fixedSize()
+                .disabled(model.isBusy)
+                .accessibilityLabel(downloadTitle)
+                .help(downloadTitle)
+            }
+
+            Spacer(minLength: Theme.Spacing.sm)
+
+            Button(role: .destructive) {
+                model.requestDelete([item.id])
+            } label: {
+                Label("Kaydı sil", systemImage: "trash")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.bordered)
+            .fixedSize()
+            .accessibilityLabel("Kaydı sil")
+            .help("Sil")
+        }
+    }
+
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             Text("Kaydedildi \(item.saved.formatted(.dateTime.day().month(.wide).year().hour().minute().locale(Theme.locale)))")
                 .monospacedDigit()
-            Text(item.id).textSelection(.enabled)
+            Text(item.id)
+                .textSelection(.enabled)
         }
-        .font(.system(size: 11)).foregroundStyle(.tertiary)
+        .font(.caption)
+        .foregroundStyle(.tertiary)
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased(with: Locale(identifier: "tr")))
-                .font(.system(size: 10.5, weight: .semibold)).tracking(0.6).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
             content()
         }
     }
@@ -292,32 +395,31 @@ struct ItemDetailView: View {
     }
 
     /// Makes URLs in post text clickable. The detail redraws whenever the
-    /// library refreshes; the detector and its result are kept per text.
+    /// library refreshes; the detector and its result are kept per text on `@MainActor`.
     private func linkified(_ text: String) -> AttributedString {
-        if let hit = Self.linkCache.object(forKey: text as NSString) { return hit.value }
+        if let hit = Self.linkCache[text] { return hit }
         var s = AttributedString(text)
         if let detector = Self.detector {
             for m in detector.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
                 guard let r = Range(m.range, in: text), let ar = Range(r, in: s), let url = m.url else { continue }
-                s[ar].link = url
-                s[ar].foregroundColor = Theme.accent
+                var attrs = AttributeContainer()
+                attrs.link = url
+                attrs.foregroundColor = Theme.accent
+                s[ar].mergeAttributes(attrs)
             }
         }
-        Self.linkCache.setObject(Linked(s), forKey: text as NSString)
+        if Self.linkCache.count >= 64, let oldest = Self.linkCacheOrder.first {
+            Self.linkCache.removeValue(forKey: oldest)
+            Self.linkCacheOrder.removeFirst()
+        }
+        Self.linkCache[text] = s
+        Self.linkCacheOrder.append(text)
         return s
     }
 
-    private final class Linked {
-        let value: AttributedString
-        init(_ value: AttributedString) { self.value = value }
-    }
-
     private static let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-    private static let linkCache: NSCache<NSString, Linked> = {
-        let c = NSCache<NSString, Linked>()
-        c.countLimit = 64
-        return c
-    }()
+    private static var linkCache: [String: AttributedString] = [:]
+    private static var linkCacheOrder: [String] = []
 }
 
 /// Chips with remove buttons, an inline field with completion, and the
@@ -329,30 +431,23 @@ struct TagEditor: View {
     @State private var draft = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            FlowLayout(spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            FlowLayout(spacing: Theme.Spacing.sm) {
                 ForEach(tags, id: \.self) { tag in
                     TagChip(name: tag, removable: true, remove: { onChange(tags.filter { $0 != tag }) })
                 }
                 TextField(tags.isEmpty ? "Etiket ekle (Enter)" : "ekle…", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12.5))
-                    .frame(width: 130)
-                    .padding(.vertical, 3)
+                    .font(.callout)
+                    .frame(width: 132)
+                    .padding(.vertical, Theme.Spacing.xs)
                     .onSubmit { add(draft) }
             }
             let options = suggestions
             if !options.isEmpty {
-                FlowLayout(spacing: 5) {
+                FlowLayout(spacing: Theme.Spacing.xs) {
                     ForEach(options, id: \.key) { tag in
-                        Button { add(tag.name) } label: {
-                            Text("+ \(tag.name)")
-                                .font(.system(size: 11.5))
-                                .padding(.horizontal, 7).padding(.vertical, 3)
-                                .background(Theme.hairline, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
+                        TagSuggestionButton(name: tag.name) { add(tag.name) }
                     }
                 }
             }
@@ -383,17 +478,42 @@ struct TagSuggestions: View {
     var body: some View {
         let lower = Set(current.map { $0.lowercased() })
         let options = all.filter { !lower.contains($0.name.lowercased()) }.sorted { $0.count > $1.count }.prefix(12)
-        FlowLayout(spacing: 5) {
+        FlowLayout(spacing: Theme.Spacing.xs) {
             ForEach(Array(options), id: \.key) { tag in
-                Button { pick(tag.name) } label: {
-                    Text("+ \(tag.name)")
-                        .font(.system(size: 11.5))
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(Theme.hairline, in: Capsule())
-                }
-                .buttonStyle(.plain)
+                TagSuggestionButton(name: tag.name) { pick(tag.name) }
             }
         }
+    }
+}
+
+private struct TagSuggestionButton: View {
+    let name: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text("+ \(name)")
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, Theme.Spacing.sm)
+                .padding(.vertical, Theme.Spacing.xs)
+                .background(
+                    hovering ? Theme.Stroke.subtleHoverFill : Theme.Stroke.subtleFill,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            hovering ? Theme.Stroke.surfaceHoverBorder : Theme.Stroke.surfaceBorder,
+                            lineWidth: Theme.Stroke.hairlineWidth
+                        )
+                }
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .foregroundStyle(.secondary)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }
 
@@ -412,9 +532,15 @@ struct MediaGallery: View {
         } else if stacked {
             PhotoStack(media: media) { open(0) }
         } else {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: Theme.Spacing.sm),
+                    GridItem(.flexible(), spacing: Theme.Spacing.sm),
+                ],
+                spacing: Theme.Spacing.sm
+            ) {
                 ForEach(Array(media.enumerated()), id: \.element.url) { i, m in
-                    tile(m, index: i).frame(height: 170)
+                    tile(m, index: i).frame(height: 176)
                 }
             }
         }
@@ -425,19 +551,25 @@ struct MediaGallery: View {
             if let file = m.file {
                 Color.clear.overlay { LocalImage(file: file, maxPixel: 1200) }.clipped()
             } else {
-                Rectangle().fill(Theme.hairline)
-                    .overlay(Image(systemName: "photo").font(.title2).foregroundStyle(.tertiary))
+                Rectangle()
+                    .fill(.quaternary)
+                    .overlay { Image(systemName: "photo").font(.title2).foregroundStyle(.tertiary) }
             }
             if m.isVideo {
                 Image(systemName: m.videoFile != nil ? "play.circle.fill" : "arrow.down.circle.fill")
-                    .font(.system(size: 40))
+                    .font(.title)
                     .foregroundStyle(.white, .black.opacity(0.45))
                     .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .contentShape(Rectangle())
+        .clipShape(.rect(cornerRadius: Theme.Radius.sm))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                .strokeBorder(Theme.Stroke.mediaOutline, lineWidth: Theme.Stroke.hairlineWidth)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .accessibilityAddTraits(.isButton)
         // High priority: inside a feed post or card the post's own click
         // (select / open) would otherwise swallow it.
         .highPriorityGesture(TapGesture().onEnded { open(index) })
@@ -453,34 +585,42 @@ struct PhotoStack: View {
     @State private var hovering = false
 
     var body: some View {
-        let top = media[0]
-        let aspect = min(max(top.aspect ?? 0.75, 0.6), 1.6)
-        ZStack {
-            ForEach(Array(media.prefix(3).enumerated().reversed()), id: \.element.url) { i, m in
-                card(m)
-                    .rotationEffect(.degrees(i == 0 ? 0 : (i == 1 ? 3.5 : -4) * (hovering ? 1.6 : 1)))
-                    .offset(x: CGFloat(i) * (hovering ? 14 : 8), y: CGFloat(i) * -4)
-                    .scaleEffect(1 - CGFloat(i) * 0.04)
-                    .shadow(color: .black.opacity(i == 0 ? 0.25 : 0.12), radius: i == 0 ? 8 : 4, y: 2)
+        if let top = media.first {
+            let aspect = min(max(top.aspect ?? 0.75, 0.6), 1.6)
+            ZStack {
+                ForEach(Array(media.prefix(3).enumerated().reversed()), id: \.element.url) { i, m in
+                    card(m)
+                        .rotationEffect(.degrees(i == 0 ? 0 : (i == 1 ? 3.5 : -4) * (hovering ? 1.6 : 1)))
+                        .offset(x: CGFloat(i) * (hovering ? 16 : 8), y: CGFloat(i) * -4)
+                        .scaleEffect(1 - CGFloat(i) * 0.04)
+                        .shadow(color: .black.opacity(i == 0 ? 0.25 : 0.12), radius: i == 0 ? 8 : 4, y: 2)
+                }
             }
+            .aspectRatio(aspect, contentMode: .fit)
+            .padding(.trailing, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.sm)
+            .overlay(alignment: .bottomLeading) {
+                Label("\(media.count)", systemImage: "square.stack.fill")
+                    .font(.caption.bold())
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .background(.black.opacity(0.62), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Theme.Stroke.darkOverlayBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                    }
+                    .padding(Theme.Spacing.md)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .accessibilityAddTraits(.isButton)
+            .highPriorityGesture(TapGesture().onEnded(open))
+            .onHover { hovering = $0 }
+            .animation(.spring(duration: 0.25), value: hovering)
+            .help("\(media.count) fotoğraf — tıkla, ← → ile gez")
         }
-        .aspectRatio(aspect, contentMode: .fit)
-        .padding(.trailing, 18).padding(.top, 8)
-        .overlay(alignment: .bottomLeading) {
-            Label("\(media.count)", systemImage: "square.stack.fill")
-                .font(.system(size: 12, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(.black.opacity(0.6), in: Capsule())
-                .padding(10)
-        }
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-        .highPriorityGesture(TapGesture().onEnded(open))
-        .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25), value: hovering)
-        .help("\(media.count) fotoğraf — tıkla, ← → ile gez")
     }
 
     private func card(_ m: Media) -> some View {
@@ -489,11 +629,14 @@ struct PhotoStack: View {
                 if let file = m.file {
                     LocalImage(file: file, maxPixel: 1200)
                 } else {
-                    Rectangle().fill(Theme.hairline)
+                    Rectangle().fill(.quaternary)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.15)))
+            .clipShape(.rect(cornerRadius: Theme.Radius.sm))
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .strokeBorder(Theme.Stroke.darkOverlayBorder, lineWidth: Theme.Stroke.hairlineWidth)
+            }
     }
 }
 
@@ -502,15 +645,22 @@ struct QuoteCard: View {
     let open: (Int) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             AuthorLine(item: item)
             if !item.text.isEmpty {
-                Text(item.text).font(.system(size: 13.5)).lineSpacing(3).textSelection(.enabled)
+                Text(item.text)
+                    .font(.callout)
+                    .lineSpacing(3)
+                    .textSelection(.enabled)
             }
             if !item.media.isEmpty { MediaGallery(media: item.media, open: open) }
         }
-        .padding(12)
-        .background(Theme.hairline.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+        .padding(Theme.Spacing.lg)
+        .background(Theme.Stroke.subtleFill, in: .rect(cornerRadius: Theme.Radius.lg))
+        .containerShape(.rect(cornerRadius: Theme.Radius.lg))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+        }
     }
 }

@@ -5,6 +5,9 @@
 //! releases, so every lookup tolerates the old and new shapes, and the
 //! timeline walker finds tweets by structure instead of fixed paths.
 
+use std::borrow::Cow;
+use std::collections::HashSet;
+
 use serde_json::Value;
 
 use crate::model::{Item, Media, MediaKind, Platform};
@@ -98,10 +101,14 @@ fn parse_tweet_depth(result: &Value, depth: u8) -> Option<Item> {
         .flatten()
         .chain(note.and_then(|n| n.pointer("/entity_set/urls")).and_then(Value::as_array).into_iter().flatten());
     for e in url_entities {
-        let (Some(short), Some(long)) = (s(e, &["url"]), s(e, &["expanded_url"])) else { continue };
-        text = text.replace(&short, &long);
-        if !links.contains(&long) {
-            links.push(long);
+        let (Some(short), Some(long)) = (e.get("url").and_then(Value::as_str), e.get("expanded_url").and_then(Value::as_str)) else {
+            continue;
+        };
+        if text.contains(short) {
+            text = text.replace(short, long);
+        }
+        if !links.iter().any(|l| l == long) {
+            links.push(long.to_string());
         }
     }
 
@@ -109,11 +116,13 @@ fn parse_tweet_depth(result: &Value, depth: u8) -> Option<Item> {
         .pointer("/extended_entities/media")
         .or_else(|| legacy.pointer("/entities/media"))
         .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    for e in &media_entries {
-        if let Some(short) = s(e, &["url"]) {
-            text = text.replace(&short, "");
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    for e in media_entries {
+        if let Some(short) = e.get("url").and_then(Value::as_str)
+            && text.contains(short)
+        {
+            text = text.replace(short, "");
         }
     }
     let media: Vec<Media> = media_entries.iter().filter_map(parse_media).collect();
@@ -122,22 +131,25 @@ fn parse_tweet_depth(result: &Value, depth: u8) -> Option<Item> {
     // as the quote instead.
     let quote = if depth == 0 { t.pointer("/quoted_status_result/result").and_then(|q| parse_tweet_depth(q, 1)).map(Box::new) } else { None };
     if let Some(q) = &quote {
-        links.retain(|l| !l.contains(&format!("/status/{}", q.id.trim_start_matches("x:"))));
+        let needle = format!("/status/{}", q.id.trim_start_matches("x:"));
+        links.retain(|l| !l.contains(&needle));
     }
 
-    let handle_for_url = handle.clone().unwrap_or_else(|| "i".into());
+    let url = format!("https://x.com/{}/status/{id}", handle.as_deref().unwrap_or("i"));
+    let unescaped: Cow<'_, str> =
+        if text.contains('&') { Cow::Owned(text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")) } else { Cow::Borrowed(&text) };
     Some(Item {
         id: format!("x:{id}"),
         platform: Platform::X,
-        url: format!("https://x.com/{handle_for_url}/status/{id}"),
+        url,
         author_handle: handle,
         author_name: name,
         author_avatar: avatar,
         title: None,
-        text: tidy(&text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")),
+        text: tidy(&unescaped),
         extra: None,
         ocr: None,
-        created_at: s(legacy, &["created_at"]).as_deref().and_then(parse_created),
+        created_at: legacy.get("created_at").and_then(Value::as_str).and_then(parse_created),
         saved_at: 0,
         media,
         links,
@@ -170,8 +182,17 @@ fn bookmark_time_at(sort: &str, item: &Item, now: i64) -> Option<i64> {
     }
     let n: u64 = sort.parse().ok()?;
     let secs = i64::try_from(((n >> 22) + BOOKMARK_EPOCH_MS) / 1000).ok()?;
-    let after_post = item.created_at.is_none_or(|c| secs >= c - 60);
-    (after_post && secs <= now + 3600).then_some(secs)
+    let after_post = item.created_at.is_none_or(|c| secs >= c.saturating_sub(60));
+    (after_post && secs <= now.saturating_add(3600)).then_some(secs)
+}
+
+fn canonical_tweet_id(result: &Value) -> Option<&str> {
+    let t = unwrap_tweet(result)?;
+    let legacy = t.get("legacy")?;
+    if let Some(rt) = legacy.pointer("/retweeted_status_result/result") {
+        return canonical_tweet_id(rt);
+    }
+    t.get("rest_id").and_then(Value::as_str).or_else(|| legacy.get("id_str").and_then(Value::as_str))
 }
 
 /// Every top-level tweet in a GraphQL timeline response, in timeline order.
@@ -179,16 +200,19 @@ fn bookmark_time_at(sort: &str, item: &Item, now: i64) -> Option<i64> {
 /// plain entries, conversation modules and the bookmark timeline alike;
 /// quoted tweets live elsewhere and stay nested in their parent.
 pub fn parse_timeline(v: &Value) -> Vec<Item> {
-    fn walk(v: &Value, sort: Option<&str>, out: &mut Vec<Item>) {
+    fn walk<'a>(v: &'a Value, sort: Option<&str>, out: &mut Vec<Item>, seen: &mut HashSet<&'a str>) {
         match v {
             Value::Object(map) => {
                 // Seen as a string so far; accept a number too.
-                let own = map.get("sortIndex").and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_u64().map(|n| n.to_string())));
+                let own: Option<Cow<'_, str>> =
+                    map.get("sortIndex").and_then(|v| v.as_str().map(Cow::Borrowed).or_else(|| v.as_u64().map(|n| Cow::Owned(n.to_string()))));
                 let sort = own.as_deref().or(sort);
                 if let Some(result) = map.get("itemContent").and_then(|c| c.pointer("/tweet_results/result")) {
-                    if let Some(mut item) = parse_tweet(result)
-                        && !out.iter().any(|o| o.id == item.id)
+                    if let Some(tid) = canonical_tweet_id(result)
+                        && !seen.contains(tid)
+                        && let Some(mut item) = parse_tweet(result)
                     {
+                        seen.insert(tid);
                         item.saved_at = sort.and_then(|s| bookmark_time(s, &item)).unwrap_or(0);
                         // Kept with the raw tweet so the ordering rule can be
                         // checked against what X really sends.
@@ -199,14 +223,15 @@ pub fn parse_timeline(v: &Value) -> Vec<Item> {
                     }
                     return;
                 }
-                map.values().for_each(|c| walk(c, sort, out));
+                map.values().for_each(|c| walk(c, sort, out, seen));
             }
-            Value::Array(arr) => arr.iter().for_each(|c| walk(c, sort, out)),
+            Value::Array(arr) => arr.iter().for_each(|c| walk(c, sort, out, seen)),
             _ => {}
         }
     }
     let mut out = vec![];
-    walk(v, None, &mut out);
+    let mut seen = HashSet::new();
+    walk(v, None, &mut out, &mut seen);
     // A bare tweet result (e.g. `TweetResultByRestId`).
     if out.is_empty() {
         if let Some(r) = v.pointer("/data/tweetResult/result").or_else(|| v.pointer("/data/tweet_result/result")) {

@@ -55,14 +55,14 @@ pub unsafe extern "C" fn wm_call(handle: *mut WmHandle, request: *const c_char) 
         // SAFETY: handle is checked for non-null and comes from wm_open.
         let h = unsafe { &*handle };
         // SAFETY: request is non-null and caller guarantees NUL-terminated UTF-8.
-        let req = unsafe { CStr::from_ptr(request) }.to_string_lossy().into_owned();
-        match catch_unwind(AssertUnwindSafe(|| crate::api::handle(&h.lib, &req))) {
-            Ok(v) => v.to_string(),
+        let req = unsafe { CStr::from_ptr(request) }.to_string_lossy();
+        match catch_unwind(AssertUnwindSafe(|| crate::api::handle_json(&h.lib, &req))) {
+            Ok(s) => s,
             Err(_) => r#"{"ok":false,"error":"çekirdek hata verdi (panic)"}"#.to_string(),
         }
     };
     // Sanitize any interior null bytes in response so CString::new never fails silently.
-    let sanitized = if response.contains('\0') { response.replace('\0', " ") } else { response };
+    let sanitized = if response.as_bytes().contains(&0) { response.replace('\0', " ") } else { response };
     CString::new(sanitized).map(CString::into_raw).unwrap_or(std::ptr::null_mut())
 }
 
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn wm_close(handle: *mut WmHandle) {
         let _ = catch_unwind(AssertUnwindSafe(|| {
             // SAFETY: handle is non-null and came from Box::into_raw in wm_open.
             let h = unsafe { Box::from_raw(handle) };
-            h.lib.store().checkpoint();
+            h.lib.shutdown();
         }));
     }
 }

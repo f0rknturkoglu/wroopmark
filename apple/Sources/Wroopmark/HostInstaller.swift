@@ -1,10 +1,24 @@
 import AppKit
 import Foundation
 
+struct ExtensionStatus: Equatable, Sendable {
+    struct Browser: Identifiable, Hashable, Sendable {
+        let id: String
+        let name: String
+        let app: URL
+        let page: String
+    }
+
+    let helperAvailable: Bool
+    let installedBrowsers: [Browser]
+
+    static let empty = ExtensionStatus(helperAvailable: false, installedBrowsers: [])
+}
+
 /// Registers the `wroopmark` helper inside the app bundle as the native
 /// messaging host of every Chromium browser on the machine, so installing
-/// the app is all the browser extension needs. Runs on every launch and only
-/// writes when a manifest is missing or points elsewhere.
+/// the app is all the browser extension needs. Disk and LaunchServices checks
+/// run off `@MainActor`.
 enum HostInstaller {
     static let hostName = "com.wroopmark.host"
     /// Fixed by the "key" in extensions/chromium/manifest.json.
@@ -29,14 +43,42 @@ enum HostInstaller {
         }.value
     }
 
+    /// Resolves helper availability and installed Chromium browsers off the main thread.
+    static func status() async -> ExtensionStatus {
+        await Task.detached(priority: .utility) {
+            let helperAvailable = helperURL != nil
+            let known: [(String, String, String)] = [
+                ("com.google.Chrome", "Chrome", "chrome://extensions"),
+                ("com.brave.Browser", "Brave", "brave://extensions"),
+                ("company.thebrowser.Browser", "Arc", "arc://extensions"),
+                ("com.microsoft.edgemac", "Edge", "edge://extensions"),
+                ("com.vivaldi.Vivaldi", "Vivaldi", "vivaldi://extensions"),
+                ("org.chromium.Chromium", "Chromium", "chrome://extensions"),
+                ("net.imput.helium", "Helium", "chrome://extensions"),
+            ]
+            let browsers = known.compactMap { id, name, page in
+                NSWorkspace.shared.urlForApplication(withBundleIdentifier: id).map {
+                    ExtensionStatus.Browser(id: id, name: name, app: $0, page: page)
+                }
+            }
+            return ExtensionStatus(helperAvailable: helperAvailable, installedBrowsers: browsers)
+        }.value
+    }
+
+    static func fileExists(atPath path: String) async -> Bool {
+        await Task.detached(priority: .utility) {
+            FileManager.default.fileExists(atPath: path)
+        }.value
+    }
+
     // MARK: Chromium extension folder
 
     /// Where the browser loads the unpacked extension from. Fixed, so moving
     /// or deleting the source checkout never breaks it; refreshed from the
-    /// copy inside the app at every launch (an app update → "reload" in the
+    /// copy inside the app at every launch (an app update -> "reload" in the
     /// browser picks up the new extension).
     static var extensionFolder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        AppPaths.applicationSupportDirectory
             .appendingPathComponent("wroopmark/chromium-extension", isDirectory: true)
     }
 
@@ -61,32 +103,24 @@ enum HostInstaller {
         }
     }
 
-    /// Chromium browsers on this Mac: (name, app URL, extensions page).
-    static var installedBrowsers: [(name: String, app: URL, page: String)] {
-        let known: [(String, String, String)] = [
-            ("com.google.Chrome", "Chrome", "chrome://extensions"),
-            ("com.brave.Browser", "Brave", "brave://extensions"),
-            ("company.thebrowser.Browser", "Arc", "arc://extensions"),
-            ("com.microsoft.edgemac", "Edge", "edge://extensions"),
-            ("com.vivaldi.Vivaldi", "Vivaldi", "vivaldi://extensions"),
-            ("org.chromium.Chromium", "Chromium", "chrome://extensions"),
-            ("net.imput.helium", "Helium", "chrome://extensions"),
-        ]
-        return known.compactMap { id, name, page in
-            NSWorkspace.shared.urlForApplication(withBundleIdentifier: id).map { (name, $0, page) }
-        }
-    }
-
-    /// Shows the folder to pick in "Load unpacked", with its path on the
-    /// clipboard, and the browser's extensions page next to it.
-    static func openExtensionSetup(browser: URL?, page: String?) {
-        syncExtension()
+    /// Syncs the extension off `@MainActor`, then reveals it and opens the browser.
+    @MainActor
+    static func openExtensionSetup(browser: URL?, page: String?) async -> String? {
+        await Task.detached(priority: .utility) {
+            syncExtension()
+        }.value
+        let folder = extensionFolder
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(extensionFolder.path, forType: .string)
-        NSWorkspace.shared.activateFileViewerSelecting([extensionFolder])
+        NSPasteboard.general.setString(folder.path, forType: .string)
+        NSWorkspace.shared.activateFileViewerSelecting([folder])
         if let browser, let page, let url = URL(string: page) {
-            NSWorkspace.shared.open([url], withApplicationAt: browser, configuration: NSWorkspace.OpenConfiguration())
+            do {
+                _ = try await NSWorkspace.shared.open([url], withApplicationAt: browser, configuration: NSWorkspace.OpenConfiguration())
+            } catch {
+                return error.localizedDescription
+            }
         }
+        return nil
     }
 
     private static func registerSync() {
@@ -100,7 +134,7 @@ enum HostInstaller {
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]) else { return }
         let fm = FileManager.default
-        let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let support = AppPaths.applicationSupportDirectory
         for dir in browserDirs {
             let base = support.appendingPathComponent(dir, isDirectory: true)
             guard fm.fileExists(atPath: base.path) else { continue }

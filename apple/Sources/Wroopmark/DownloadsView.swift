@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct DownloadsView: View {
     @Environment(AppModel.self) private var model
@@ -57,20 +57,21 @@ struct DownloadsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: Theme.Spacing.md) {
                 Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 26))
+                    .font(.title2)
                     .foregroundStyle(Theme.accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    HStack(spacing: Theme.Spacing.sm) {
                         Text("İndirmeler")
                             .font(.title3.bold())
                         if model.activeOrQueuedDownloadsCount > 0 {
                             Text("\(model.activeOrQueuedDownloadsCount)")
                                 .font(.caption.bold())
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .padding(.horizontal, Theme.Spacing.sm)
+                                .padding(.vertical, Theme.Spacing.xs)
                                 .background(Theme.accent, in: Capsule())
                                 .monospacedDigit()
                         }
@@ -80,7 +81,7 @@ struct DownloadsView: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                Spacer()
+                Spacer(minLength: Theme.Spacing.md)
 
                 if !failedDownloads.isEmpty || (model.stats?.videosMissing ?? 0) > 0 {
                     Button {
@@ -89,22 +90,22 @@ struct DownloadsView: View {
                         Label("Tümünü Yeniden Dene", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.bordered)
-                    .controlSize(.regular)
                 }
 
-                Button("Kapat") {
-                    dismiss()
+                Button { dismiss() } label: {
+                    Label("Kapat", systemImage: "xmark")
                 }
+                .buttonStyle(.bordered)
                 .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(.bar)
+            .controlSize(.regular)
+            .padding(.horizontal, Theme.Spacing.xl)
+            .padding(.vertical, Theme.Spacing.lg)
+            .background(.background)
 
             Divider()
 
-            // Filters & Search bar
-            HStack(spacing: 12) {
+            VStack(spacing: Theme.Spacing.md) {
                 Picker("Filtre", selection: $selectedTab) {
                     Text("Tümü (\(allCount))").tag(FilterTab.all)
                     Text("İnenler (\(activeDownloads.count))").tag(FilterTab.active)
@@ -112,56 +113,84 @@ struct DownloadsView: View {
                     Text("Başarısız (\(failedDownloads.count))").tag(FilterTab.failed)
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 380)
+                .labelsHidden()
+                .monospacedDigit()
+                .frame(maxWidth: .infinity)
 
-                Spacer()
-
-                HStack(spacing: 6) {
+                HStack(spacing: Theme.Spacing.sm) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
                     TextField("İndirmelerde ara…", text: $searchText)
                         .textFieldStyle(.plain)
                     if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                        Button { searchText = "" } label: {
+                            Label("Aramayı temizle", systemImage: "xmark.circle.fill")
+                                .labelStyle(.iconOnly)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .frame(maxWidth: 220)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.vertical, Theme.Spacing.sm)
+                .background(Theme.Stroke.subtleFill, in: .rect(cornerRadius: Theme.Radius.sm))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(Color.primary.opacity(0.02))
+            .padding(.horizontal, Theme.Spacing.xl)
+            .padding(.vertical, Theme.Spacing.md)
 
             Divider()
 
-            // List of download cards
+            if let err = model.downloadsError {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                    Spacer(minLength: Theme.Spacing.sm)
+                    Button {
+                        Task { await model.refreshDownloads() }
+                    } label: {
+                        Label("Tekrar Dene", systemImage: "arrow.clockwise")
+                    }
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.vertical, Theme.Spacing.sm)
+                .background(Color.orange.opacity(0.12))
+                Divider()
+            }
+
             if filteredItems.isEmpty {
                 emptyStateView
+                    .padding(Theme.Spacing.xl)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 10) {
+                    LazyVStack(spacing: Theme.Spacing.md) {
                         ForEach(filteredItems) { item in
                             DownloadRow(item: item)
                         }
                     }
-                    .padding(20)
+                    .padding(Theme.Spacing.xl)
                 }
             }
         }
-        .frame(minWidth: 600, idealWidth: 680, minHeight: 460, idealHeight: 580)
+        .frame(minWidth: 620, idealWidth: 700, minHeight: 480, idealHeight: 580)
         .task {
             await model.refreshDownloads()
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(800))
+                let busy = model.activeOrQueuedDownloadsCount > 0 || model.isFetchingVideos
+                do {
+                    try await Task.sleep(for: busy ? .milliseconds(800) : .seconds(5))
+                } catch {
+                    break
+                }
+                guard !Task.isCancelled else { break }
                 await model.refreshDownloads()
             }
         }
@@ -197,10 +226,12 @@ struct DownloadsView: View {
             Text("Kaydettiğiniz TikTok veya web videolarının indirme ilerlemeleri burada görünür.")
         } actions: {
             if (model.stats?.videosMissing ?? 0) > 0 {
-                Button("Eksik videoları şimdi indir") {
+                Button {
                     Task { await model.retryAllDownloads() }
+                } label: {
+                    Label("Eksik videoları şimdi indir", systemImage: "arrow.down.circle")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
             }
         }
     }
@@ -209,67 +240,80 @@ struct DownloadsView: View {
 private struct DownloadRow: View {
     @Environment(AppModel.self) private var model
     let item: DownloadItem
+    @State private var hovering = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            // Platform & Status indicator
+        HStack(alignment: .top, spacing: Theme.Spacing.md) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary.opacity(0.06))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: iconName)
-                    .font(.system(size: 20))
-                    .foregroundStyle(iconColor)
-            }
-
-            // Info & Progress
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    if let author = item.author {
-                        Text(author)
-                            .font(.system(size: 13, weight: .semibold))
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .fill(Theme.Stroke.subtleFill)
+                    .frame(width: 48, height: 48)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
                     }
 
-                    Text(item.platform.uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(platformColor)
-                        .padding(.horizontal, 5).padding(.vertical, 1.5)
-                        .background(platformColor.opacity(0.12), in: Capsule())
+                Image(systemName: iconName)
+                    .font(.title3)
+                    .foregroundStyle(iconColor)
+            }
+            .accessibilityHidden(true)
 
-                    Spacer()
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                    if let author = item.author {
+                        Text(author)
+                            .font(.callout.weight(.semibold))
+                            .lineLimit(1)
+                    }
+
+                    Label(item.platform.uppercased(), systemImage: Platform(rawValue: item.platform.lowercased())?.symbol ?? "globe")
+                        .font(.caption.bold())
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, Theme.Spacing.sm)
+                        .padding(.vertical, Theme.Spacing.xs)
+                        .background(Theme.accent.opacity(0.12), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(Theme.accent.opacity(0.18), lineWidth: Theme.Stroke.hairlineWidth)
+                        }
+
+                    Spacer(minLength: Theme.Spacing.sm)
 
                     if let bytes = item.fileSize, bytes > 0 {
                         Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
+                            .frame(minWidth: 64, alignment: .trailing)
                     }
                 }
 
                 Text(item.headline)
-                    .font(.system(size: 13))
+                    .font(.callout)
                     .lineLimit(2)
-                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Progress Bar or State Label
                 if item.isDownloading {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                         let pct = item.progress ?? 0
                         ProgressView(value: pct > 0 ? pct : 0, total: 100)
                             .tint(Theme.accent)
 
-                        HStack(spacing: 8) {
-                            if pct > 0 {
-                                Text("%\(Int(pct))")
-                                    .font(.caption.bold())
-                                    .foregroundStyle(Theme.accent)
-                                    .monospacedDigit()
-                            } else {
-                                Text("İndiriliyor…")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                            Group {
+                                if pct > 0 {
+                                    Text("%\(Int(pct))")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(Theme.accent)
+                                } else {
+                                    Text("İndiriliyor…")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            .monospacedDigit()
+                            .frame(minWidth: 44, alignment: .leading)
 
                             if let spd = item.speed {
                                 Text("· \(spd)")
@@ -287,76 +331,96 @@ private struct DownloadRow: View {
                         }
                     }
                 } else if item.isQueued {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock")
-                            .font(.caption)
-                        Text("Sırada bekliyor")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.secondary)
+                    Label("Sırada bekliyor", systemImage: "clock")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 } else if item.isCompleted {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                        Text("Tamamlandı")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Label("Tamamlandı", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
                 } else if item.isFailed {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                        let tries = item.tries ?? 1
-                        Text("İndirilemedi (\(tries)/3 deneme yapıldı)")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
+                    Label(
+                        "İndirilemedi (\(item.tries ?? 1)/3 deneme yapıldı)",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .monospacedDigit()
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Action buttons
-            VStack(alignment: .trailing, spacing: 6) {
+            HStack(spacing: Theme.Spacing.sm) {
                 if item.isCompleted, let file = item.videoFile {
-                    HStack(spacing: 6) {
+                    Button {
+                        model.openInFinder(fileName: file)
+                    } label: {
+                        Label("Finder", systemImage: "folder")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Finder'da göster")
+
+                    if let rawURL = URL(string: item.url) {
                         Button {
-                            model.openInFinder(fileName: file)
+                            NSWorkspace.shared.open(rawURL)
                         } label: {
-                            Label("Finder", systemImage: "folder")
-                                .font(.system(size: 11))
+                            Label("Kaynağında aç", systemImage: "arrow.up.right.square")
+                                .labelStyle(.iconOnly)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .help("Finder'da göster")
-
-                        if let rawURL = URL(string: item.url) {
-                            Button {
-                                NSWorkspace.shared.open(rawURL)
-                            } label: {
-                                Image(systemName: "arrow.up.right.square")
-                                    .font(.system(size: 11))
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .help("Kaynağında aç")
-                        }
+                        .help("Kaynağında aç")
                     }
                 } else if item.isFailed || item.isQueued {
                     Button {
                         Task { await model.retryDownload(id: item.id) }
                     } label: {
                         Label("Şimdi indir", systemImage: "arrow.clockwise")
-                            .font(.system(size: 11))
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                 }
             }
+            .frame(minWidth: 136, alignment: .trailing)
         }
-        .padding(14)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+        .padding(Theme.Spacing.lg)
+        .background(.background.secondary, in: .rect(cornerRadius: Theme.Radius.lg))
+        .containerShape(.rect(cornerRadius: Theme.Radius.lg))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(
+                    hovering ? Theme.Stroke.surfaceHoverBorder : Theme.Stroke.surfaceBorder,
+                    lineWidth: Theme.Stroke.hairlineWidth
+                )
+        }
+        .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .contextMenu {
+            if let file = item.videoFile {
+                Button { model.openInFinder(fileName: file) } label: {
+                    Label("Finder'da göster", systemImage: "folder")
+                }
+            }
+            if let rawURL = URL(string: item.url) {
+                Button { NSWorkspace.shared.open(rawURL) } label: {
+                    Label("Kaynağında aç", systemImage: "arrow.up.right.square")
+                }
+            }
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.url, forType: .string)
+            } label: {
+                Label("Bağlantıyı kopyala", systemImage: "doc.on.doc")
+            }
+            if item.isFailed || item.isQueued {
+                Divider()
+                Button { Task { await model.retryDownload(id: item.id) } } label: {
+                    Label("Yeniden dene", systemImage: "arrow.clockwise")
+                }
+            }
+        }
     }
 
     private var iconName: String {
@@ -371,15 +435,5 @@ private struct DownloadRow: View {
         if item.isQueued { return .orange }
         if item.isCompleted { return .green }
         return .red
-    }
-
-    private var platformColor: Color {
-        switch item.platform.lowercased() {
-        case "tiktok": return .pink
-        case "x": return .primary
-        case "pinterest": return .red
-        case "facebook": return .blue
-        default: return .teal
-        }
     }
 }

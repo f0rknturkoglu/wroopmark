@@ -1420,6 +1420,7 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
+ "thiserror",
  "unicode-normalization",
  "ureq",
  "url",

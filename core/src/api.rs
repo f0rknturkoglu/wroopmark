@@ -4,21 +4,86 @@
 //! Request:  `{"cmd": "search", "q": "tag:dev rust"}`
 //! Response: `{"ok": true, "data": ...}` or `{"ok": false, "error": "..."}`
 
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
-use crate::db::{Saved, Store};
-use crate::fetch::Fetcher;
+use crate::db::{Saved, Store, StoreError};
+use crate::external::ExternalError;
+use crate::fetch::{FetchError, Fetcher};
 use crate::media::MediaStore;
 use crate::model::{Item, Media, MediaKind};
 use crate::query::{Query, Sort};
-use crate::text::{item_id_for_url, now};
+use crate::text::{hash_hex, item_id_for_url, now};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub type Result<T> = std::result::Result<T, CoreError>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum CoreError {
+    #[error("{path}: {source}")]
+    IoPath {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
+    #[error("{0}")]
+    Store(#[from] StoreError),
+    #[error("{0}")]
+    Fetch(#[from] FetchError),
+    #[error("video indirilemedi: {0}")]
+    External(#[from] ExternalError),
+    #[error("{0}")]
+    Json(#[from] serde_json::Error),
+    #[error("geçersiz parça: {0}")]
+    Base64(#[from] base64::DecodeError),
+    #[error("kütüphane kilidi bozuldu")]
+    LockPoisoned,
+    #[error("cmd eksik")]
+    MissingCmd,
+    #[error("geçersiz JSON: {0}")]
+    InvalidJson(serde_json::Error),
+    #[error("geçersiz istek: {0}")]
+    InvalidRequest(serde_json::Error),
+    #[error("payload JSON değil: {0}")]
+    InvalidPayloadJson(serde_json::Error),
+    #[error("bilinmeyen komut: {0}")]
+    UnknownCmd(String),
+    #[error("kayıt yok")]
+    ItemNotFound,
+    #[error("kaydedilemedi")]
+    SaveFailed,
+    #[error("geçersiz URL")]
+    InvalidUrl,
+    #[error("geçersiz anahtar")]
+    InvalidKey,
+    #[error("value eksik")]
+    MissingValue,
+    #[error("geçersiz dosya adı: {0}")]
+    InvalidFileName(String),
+    #[error("yedek klasörü kütüphanenin içinde olamaz")]
+    BackupInsideLibrary,
+    #[error("bu kaydın beklenen bir videosu yok")]
+    VideoNotExpected,
+    #[error("video çok büyük")]
+    VideoTooLarge,
+    #[error("parça sırası bozuk: {have} bayt var, {expected} bekleniyordu")]
+    ChunkOrder { have: u64, expected: u64 },
+    #[error("video eksik geldi: {got} / {expected} bayt")]
+    ChunkSize { got: u64, expected: u64 },
+    #[error("sayı sınırı aşıldı")]
+    NumericOverflow,
+}
 
 /// Appends a line to `<library>/host.log`, which shows what the browser
 /// extensions saw and did (Chromium's host and Safari's handler alike).
@@ -41,6 +106,7 @@ pub struct Library {
     pub media: MediaStore,
     fetcher: Fetcher,
     worker: Mutex<Option<JoinHandle<()>>>,
+    stopping: AtomicBool,
     pub download_tracker: Arc<Mutex<Option<ActiveDownloadInfo>>>,
 }
 
@@ -82,6 +148,42 @@ pub struct ImportReport {
     pub ids: Vec<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct LookupHit {
+    pub id: String,
+    pub title: Option<String>,
+    pub tags: Vec<String>,
+    pub folder_id: Option<i64>,
+    pub folder: Option<String>,
+    pub saved_at: i64,
+}
+
+struct TrackerGuard<'a>(&'a Mutex<Option<ActiveDownloadInfo>>);
+
+impl Drop for TrackerGuard<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut dt) = self.0.lock() {
+            *dt = None;
+        }
+    }
+}
+
+struct WorkDirGuard<'a>(&'a Path);
+
+impl Drop for WorkDirGuard<'_> {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(self.0);
+    }
+}
+
+struct TempFileGuard<'a>(&'a Path);
+
+impl Drop for TempFileGuard<'_> {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(self.0);
+    }
+}
+
 impl Library {
     /// `$WROOPMARK_HOME`, else `~/Library/Application Support/wroopmark`.
     pub fn default_root() -> PathBuf {
@@ -92,15 +194,16 @@ impl Library {
         home.join("Library/Application Support/wroopmark")
     }
 
-    pub fn open(root: &Path) -> Result<Arc<Self>, String> {
-        std::fs::create_dir_all(root).map_err(|e| format!("{}: {e}", root.display()))?;
-        let store = Store::open(&root.join("library.sqlite")).map_err(|e| e.to_string())?;
+    pub fn open(root: &Path) -> Result<Arc<Self>> {
+        std::fs::create_dir_all(root).map_err(|source| CoreError::IoPath { path: root.display().to_string(), source })?;
+        let store = Store::open(&root.join("library.sqlite"))?;
         Ok(Arc::new(Self {
             root: root.to_path_buf(),
             store: Mutex::new(store),
             media: MediaStore::new(root.join("media")),
             fetcher: Fetcher::new(),
             worker: Mutex::new(None),
+            stopping: AtomicBool::new(false),
             download_tracker: Arc::new(Mutex::new(None)),
         }))
     }
@@ -109,39 +212,47 @@ impl Library {
         &self.root
     }
 
-    /// The store lock. A panic while holding it does not brick the library.
-    pub fn store(&self) -> MutexGuard<'_, Store> {
-        self.store.lock().unwrap_or_else(|e| e.into_inner())
+    fn lock_store(&self) -> Result<MutexGuard<'_, Store>> {
+        self.store.lock().map_err(|_| CoreError::LockPoisoned)
+    }
+
+    pub fn checkpoint(&self) {
+        if let Ok(store) = self.store.lock() {
+            store.checkpoint();
+        }
+    }
+
+    /// Signals background media work to stop, waits for it to join, and checkpoints SQLite.
+    pub fn shutdown(&self) {
+        self.stopping.store(true, Ordering::Release);
+        self.wait_media();
+        self.checkpoint();
     }
 
     /// Saves a batch in one transaction: all of it or nothing.
-    fn save_all(&self, items: Vec<Item>, tags: &[String]) -> Result<ImportReport, String> {
-        self.save_into(items, tags, None)
+    fn save_all(&self, mut items: Vec<Item>, tags: &[String]) -> Result<ImportReport> {
+        self.save_into(&mut items, tags, None)
     }
 
     /// Like `save_all`, filing every item in `folder` when one is given.
-    fn save_into(&self, items: Vec<Item>, tags: &[String], folder: Option<i64>) -> Result<ImportReport, String> {
-        let items: Vec<Item> = items
-            .into_iter()
-            .map(|mut item| {
-                if item.id.is_empty() {
-                    let (platform, id) = item_id_for_url(&item.url);
-                    item.platform = platform;
-                    item.id = id;
-                }
-                item.tags.extend(tags.iter().cloned());
-                if folder.is_some() {
-                    item.folder_id = folder;
-                }
-                item
-            })
-            .collect();
+    fn save_into(&self, items: &mut [Item], tags: &[String], folder: Option<i64>) -> Result<ImportReport> {
+        for item in items.iter_mut() {
+            if item.id.is_empty() {
+                let (platform, id) = item_id_for_url(&item.url);
+                item.platform = platform;
+                item.id = id;
+            }
+            item.tags.extend(tags.iter().cloned());
+            if folder.is_some() {
+                item.folder_id = folder;
+            }
+        }
         let mut report = ImportReport::default();
-        for Saved { id, created } in self.store().upsert_all(&items).map_err(|e| e.to_string())? {
+        for Saved { id, created } in self.lock_store()?.upsert_all(items)? {
             if created {
-                report.new += 1
+                report.new += 1;
             } else {
-                report.updated += 1
+                report.updated += 1;
             }
             report.ids.push(id);
         }
@@ -149,18 +260,19 @@ impl Library {
     }
 
     /// Captures a URL from the network and saves it with its media.
-    pub fn add_url(&self, url: &str, tags: &[String], note: Option<&str>, folder: Option<i64>) -> Result<Item, String> {
+    pub fn add_url(&self, url: &str, tags: &[String], note: Option<&str>, folder: Option<i64>) -> Result<Item> {
         let mut item = self.fetcher.capture(url)?;
         item.note = note.map(str::to_string);
         self.fetcher.fill_media(&self.media, &mut item.media, self.videos_enabled());
-        let report = self.save_into(vec![item.clone()], tags, folder)?;
-        let id = &report.ids[0];
-        self.store().set_media(id, &item.media, None).map_err(|e| e.to_string())?;
-        self.store().get(id).map_err(|e| e.to_string())?.ok_or_else(|| "kaydedilemedi".into())
+        let report = self.save_into(std::slice::from_mut(&mut item), tags, folder)?;
+        let id = report.ids.first().ok_or(CoreError::SaveFailed)?;
+        let mut store = self.lock_store()?;
+        store.set_media(id, &item.media, None)?;
+        store.get(id)?.ok_or(CoreError::SaveFailed)
     }
 
     /// Saves every tweet in an x.com GraphQL response.
-    pub fn import_x(&self, payload: &Value, tags: &[String]) -> Result<ImportReport, String> {
+    pub fn import_x(&self, payload: &Value, tags: &[String]) -> Result<ImportReport> {
         // Timelines list newest first; saving oldest first keeps that order
         // among items that end up with the same save time.
         let mut items = crate::x::parse_timeline(payload);
@@ -171,148 +283,171 @@ impl Library {
     }
 
     /// Saves every TikTok item in a TikTok web API response (favorites, …).
-    pub fn import_tiktok(&self, payload: &Value, tags: &[String]) -> Result<ImportReport, String> {
+    pub fn import_tiktok(&self, payload: &Value, tags: &[String]) -> Result<ImportReport> {
         self.save_all(crate::tiktok::parse_api(payload), tags)
     }
 
     /// Saves items already shaped by a capturer (extensions, share sheet).
-    pub fn import_items(&self, items: Vec<Item>, tags: &[String], folder: Option<i64>) -> Result<ImportReport, String> {
-        self.save_into(items, tags, folder)
+    pub fn import_items(&self, items: Vec<Item>, tags: &[String], folder: Option<i64>) -> Result<ImportReport> {
+        let mut items = items;
+        self.save_into(&mut items, tags, folder)
     }
 
     /// Saves every post in a Reddit listing (saved posts and comments).
-    pub fn import_reddit(&self, payload: &Value, tags: &[String]) -> Result<ImportReport, String> {
+    pub fn import_reddit(&self, payload: &Value, tags: &[String]) -> Result<ImportReport> {
         self.save_all(crate::reddit::parse_listing(payload), tags)
     }
 
     /// Saves every post in an Instagram web API response (the Saved page).
-    pub fn import_instagram(&self, payload: &Value, tags: &[String]) -> Result<ImportReport, String> {
+    pub fn import_instagram(&self, payload: &Value, tags: &[String]) -> Result<ImportReport> {
         self.save_all(crate::instagram::parse_api(payload), tags)
     }
 
     /// Checks up to `limit` links not checked for a week; returns how many.
-    pub fn check_links(&self, limit: i64) -> Result<usize, String> {
+    pub fn check_links(&self, limit: i64) -> Result<usize> {
         const WEEK: i64 = 7 * 24 * 3600;
-        let todo = self.store().links_to_check(limit, WEEK).map_err(|e| e.to_string())?;
+        let todo = self.lock_store()?.links_to_check(limit, WEEK)?;
         for (id, url) in &todo {
             let (status, dead) = self.fetcher.check(url);
-            self.store().set_link_status(*id, status, dead).map_err(|e| e.to_string())?;
+            self.lock_store()?.set_link_status(*id, status, dead)?;
         }
         Ok(todo.len())
     }
 
     /// The saved item for a page the browser is on, if any.
-    pub fn lookup_url(&self, url: &str) -> Result<Option<Value>, String> {
+    pub fn lookup_url(&self, url: &str) -> Result<Option<LookupHit>> {
         let (_, id) = item_id_for_url(url);
         let norm = crate::text::normalize_url(url).unwrap_or_else(|| url.to_string());
-        let store = self.store();
-        let Some(item) = store.lookup(&id, &norm).map_err(|e| e.to_string())? else { return Ok(None) };
+        let store = self.lock_store()?;
+        let Some(item) = store.lookup(&id, &norm)? else { return Ok(None) };
         let folder = match item.folder_id {
-            Some(f) => store.folders().map_err(|e| e.to_string())?.into_iter().find(|x| x.id == f).map(|x| x.name),
+            Some(f) => store.folders()?.into_iter().find(|x| x.id == f).map(|x| x.name),
             None => None,
         };
-        Ok(Some(
-            json!({ "id": item.id, "title": item.title, "tags": item.tags, "folder_id": item.folder_id, "folder": folder, "saved_at": item.saved_at }),
-        ))
+        Ok(Some(LookupHit { id: item.id, title: item.title, tags: item.tags, folder_id: item.folder_id, folder, saved_at: item.saved_at }))
     }
 
     /// Mirrors the library into `dest`: a consistent copy of the database,
     /// the media files the copy lacks (names are content hashes, so a file
     /// already there is the same file), and `items.jsonl`, a plain export
     /// any other program can read. Nothing in `dest` is ever deleted.
-    pub fn backup(&self, dest: &Path) -> Result<BackupReport, String> {
-        let err = |e: std::io::Error| format!("{}: {e}", dest.display());
+    pub fn backup(&self, dest: &Path) -> Result<BackupReport> {
+        let io_err = |source: std::io::Error| CoreError::IoPath { path: dest.display().to_string(), source };
         let root = self.root.canonicalize().unwrap_or_else(|_| self.root.clone());
-        std::fs::create_dir_all(dest).map_err(err)?;
-        let dest_abs = dest.canonicalize().map_err(err)?;
+        let existed = dest.exists();
+        std::fs::create_dir_all(dest).map_err(io_err)?;
+        let dest_abs = dest.canonicalize().map_err(io_err)?;
         if dest_abs.starts_with(&root) {
-            return Err("yedek klasörü kütüphanenin içinde olamaz".into());
+            if !existed {
+                let _ = std::fs::remove_dir(dest);
+            }
+            return Err(CoreError::BackupInsideLibrary);
         }
         let mut report = BackupReport { path: dest_abs.display().to_string(), ..Default::default() };
 
         let tmp = dest.join("library.sqlite.tmp");
         let _ = std::fs::remove_file(&tmp);
-        self.store().backup_to(&tmp).map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, dest.join("library.sqlite")).map_err(err)?;
+        {
+            let _db_guard = TempFileGuard(&tmp);
+            self.lock_store()?.backup_to(&tmp)?;
+            std::fs::rename(&tmp, dest.join("library.sqlite")).map_err(io_err)?;
+        }
         report.db_bytes = std::fs::metadata(dest.join("library.sqlite")).map(|m| m.len()).unwrap_or(0);
 
         let src_media = self.media.root();
         if let Ok(shards) = std::fs::read_dir(src_media) {
-            for shard in shards.flatten().filter(|e| e.path().is_dir()) {
+            for shard in shards.flatten() {
+                if !shard.file_type().is_ok_and(|t| t.is_dir()) {
+                    continue;
+                }
                 let out_dir = dest.join("media").join(shard.file_name());
-                for f in std::fs::read_dir(shard.path()).map_err(err)?.flatten() {
-                    let name = f.file_name();
-                    if !crate::media::is_name(&name.to_string_lossy()) {
+                for f in std::fs::read_dir(shard.path()).map_err(io_err)?.flatten() {
+                    if !f.file_type().is_ok_and(|t| t.is_file()) {
+                        continue;
+                    }
+                    let name_os = f.file_name();
+                    let Some(name) = name_os.to_str() else {
+                        continue;
+                    };
+                    if !crate::media::is_name(name) {
                         continue;
                     }
                     report.files_total += 1;
                     let len = f.metadata().map(|m| m.len()).unwrap_or(0);
-                    let target = out_dir.join(&name);
+                    let target = out_dir.join(name);
                     if std::fs::metadata(&target).is_ok_and(|m| m.len() == len) {
                         continue;
                     }
-                    std::fs::create_dir_all(&out_dir).map_err(err)?;
-                    let part = out_dir.join(format!(".{}.part", name.to_string_lossy()));
-                    std::fs::copy(f.path(), &part).map_err(err)?;
-                    std::fs::rename(&part, &target).map_err(err)?;
+                    std::fs::create_dir_all(&out_dir).map_err(io_err)?;
+                    let part = out_dir.join(format!(".{name}.part"));
+                    let _part_guard = TempFileGuard(&part);
+                    std::fs::copy(f.path(), &part).map_err(io_err)?;
+                    std::fs::rename(&part, &target).map_err(io_err)?;
                     report.files_copied += 1;
                     report.bytes_copied += len;
                 }
             }
         }
 
-        report.items = self.export_jsonl(&dest.join("items.jsonl")).map_err(err)?;
+        report.items = self.export_jsonl(&dest.join("items.jsonl")).map_err(io_err)?;
         let readme = "wroopmark yedeği\n\n\
             library.sqlite + media/ birlikte tam kütüphanedir. Geri yüklemek için uygulamayı kapat,\n\
             ikisini ~/Library/Application Support/wroopmark/ içine kopyala (eskisinin yerine), sonra aç.\n\n\
             items.jsonl: her satır bir kayıt (metin, yazar, etiketler, klasör, not, medya dosya adları);\n\
             başka programlarla okumak için.\n";
-        std::fs::write(dest.join("OKUBENI.txt"), readme).map_err(err)?;
+        std::fs::write(dest.join("OKUBENI.txt"), readme).map_err(io_err)?;
         Ok(report)
     }
 
     fn export_jsonl(&self, path: &Path) -> std::io::Result<usize> {
         use std::io::Write;
+        #[derive(Serialize)]
+        struct ExportRow<'a> {
+            #[serde(flatten)]
+            item: &'a Item,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            folder: Option<&'a str>,
+        }
         let tmp = path.with_extension("jsonl.tmp");
+        let _tmp_guard = TempFileGuard(&tmp);
         let mut out = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
         let folders: std::collections::HashMap<i64, String> =
-            self.store().folders().unwrap_or_default().into_iter().map(|f| (f.id, f.name)).collect();
+            self.lock_store().ok().and_then(|s| s.folders().ok()).unwrap_or_default().into_iter().map(|f| (f.id, f.name)).collect();
         let q = Query::parse("");
-        let mut offset = 0;
+        let sort = Sort::parse("saved_asc");
+        let mut offset: i64 = 0;
         let mut n = 0;
         loop {
-            let page = self.store().search(&q, Sort::parse("saved_asc"), 500, offset).map_err(std::io::Error::other)?;
+            let page = self.lock_store().map_err(std::io::Error::other)?.search(&q, sort, 500, offset).map_err(std::io::Error::other)?;
             if page.items.is_empty() {
                 break;
             }
-            offset += page.items.len() as i64;
+            let page_len = i64::try_from(page.items.len()).map_err(std::io::Error::other)?;
+            offset = offset.checked_add(page_len).ok_or_else(|| std::io::Error::other("offset overflow"))?;
             for mut item in page.items {
                 item.raw = None;
-                let mut v = serde_json::to_value(&item).map_err(std::io::Error::other)?;
-                if let Some(name) = item.folder_id.and_then(|f| folders.get(&f)) {
-                    v["folder"] = json!(name);
-                }
-                serde_json::to_writer(&mut out, &v).map_err(std::io::Error::other)?;
+                let folder = item.folder_id.and_then(|f| folders.get(&f)).map(String::as_str);
+                serde_json::to_writer(&mut out, &ExportRow { item: &item, folder }).map_err(std::io::Error::other)?;
                 out.write_all(b"\n")?;
                 n += 1;
             }
         }
         out.flush()?;
         drop(out);
-        std::fs::rename(tmp, path)?;
+        std::fs::rename(&tmp, path)?;
         Ok(n)
     }
 
     /// Videos are downloaded unless turned off in the settings.
     pub fn videos_enabled(&self) -> bool {
-        self.store().setting("download_videos").ok().flatten().is_none_or(|v| v != "0")
+        self.lock_store().ok().and_then(|s| s.setting("download_videos").ok().flatten()).is_none_or(|v| v != "0")
     }
 
-    pub fn set_videos_enabled(self: &Arc<Self>, on: bool) -> Result<(), String> {
-        let mut store = self.store();
-        store.set_setting("download_videos", if on { "1" } else { "0" }).map_err(|e| e.to_string())?;
+    pub fn set_videos_enabled(self: &Arc<Self>, on: bool) -> Result<()> {
+        let mut store = self.lock_store()?;
+        store.set_setting("download_videos", if on { "1" } else { "0" })?;
         if on {
-            store.queue_videos().map_err(|e| e.to_string())?;
+            store.queue_videos()?;
             drop(store);
             self.kick_media();
         }
@@ -322,11 +457,11 @@ impl Library {
     /// Points media at files already on disk for the same URL (the same
     /// picture in another post), so only new things hit the network.
     fn reuse_known_files(&self, media: &mut [Media]) {
-        let store = self.store();
+        let Ok(store) = self.lock_store() else { return };
         for m in media.iter_mut() {
             if m.file.is_none() {
-                let src = m.local_source().to_string();
-                m.file = store.known_file(&src).ok().flatten().filter(|f| self.media.contains(f));
+                let src = m.local_source();
+                m.file = store.known_file(src).ok().flatten().filter(|f| self.media.contains(f));
             }
             if m.video_file.is_none() && m.kind != MediaKind::Image {
                 m.video_file = store.known_file(&m.url).ok().flatten().filter(|f| self.media.contains(f));
@@ -348,26 +483,30 @@ impl Library {
 
     /// Downloads media for up to `limit` pending items and returns how many
     /// items were processed. The store lock is released during downloads.
-    pub fn fetch_pending_media(&self, limit: i64) -> Result<usize, String> {
-        let pending = self.store().pending_media(limit).map_err(|e| e.to_string())?;
-        let count = pending.len();
+    pub fn fetch_pending_media(&self, limit: i64) -> Result<usize> {
+        let pending = self.lock_store()?.pending_media(limit)?;
         let videos = self.videos_enabled();
+        let mut done = 0;
         for mut item in pending {
+            if self.stopping.load(Ordering::Acquire) {
+                break;
+            }
             self.fill_item(&mut item, videos);
-            self.store().set_media(&item.id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
+            self.lock_store()?.set_media(&item.id, &item.media, item.quote.as_deref())?;
+            done += 1;
         }
-        Ok(count)
+        Ok(done)
     }
 
     /// Which of these items still lack their video file.
-    pub fn videos_needed(&self, ids: &[String]) -> Result<Vec<String>, String> {
+    pub fn videos_needed(&self, ids: &[String]) -> Result<Vec<String>> {
         if !self.videos_enabled() {
             return Ok(vec![]);
         }
-        let store = self.store();
+        let store = self.lock_store()?;
         let mut out = vec![];
         for id in ids {
-            if let Some(item) = store.get(id).map_err(|e| e.to_string())?.filter(Self::needs_video) {
+            if let Some(item) = store.get(id)?.filter(Self::needs_video) {
                 out.push(item.id);
             }
         }
@@ -384,74 +523,88 @@ impl Library {
     /// next one (Safari may start a fresh extension process per message).
     /// `offset` (bytes sent before this chunk) and, on the last one, `size`
     /// catch a lost or repeated chunk; the file is then dropped, not saved.
-    pub fn upload_chunk(&self, c: &Chunk) -> Result<Option<Item>, String> {
+    pub fn upload_chunk(&self, c: &Chunk) -> Result<Option<Item>> {
         use base64::Engine;
         use std::io::Write;
         const MAX: u64 = 600 << 20;
         let dir = self.root.join(".uploads");
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let safe: String = c.id.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
-        let part = dir.join(format!("{safe}.part"));
-        let fail = |e: String| {
+        std::fs::create_dir_all(&dir)?;
+        let part = dir.join(format!("{}.part", hash_hex(c.id.as_bytes())));
+        let fail = |e: CoreError| -> Result<Option<Item>> {
             let _ = std::fs::remove_file(&part);
             Err(e)
         };
-        if c.seq == 0 && !self.store().get(&c.id).map_err(|e| e.to_string())?.is_some_and(|i| Self::needs_video(&i)) {
-            return Err("bu kaydın beklenen bir videosu yok".into());
+        if c.seq == 0 && !self.lock_store()?.get(&c.id)?.is_some_and(|i| Self::needs_video(&i)) {
+            return Err(CoreError::VideoNotExpected);
         }
         let have = if c.seq == 0 { 0 } else { std::fs::metadata(&part).map(|m| m.len()).unwrap_or(0) };
         if c.offset.is_some_and(|o| o != have) || (c.seq > 0 && have == 0) {
-            return fail(format!("parça sırası bozuk: {} bayt var, {} bekleniyordu", have, c.offset.unwrap_or(0)));
+            return fail(CoreError::ChunkOrder { have, expected: c.offset.unwrap_or(0) });
         }
-        let bytes = base64::engine::general_purpose::STANDARD.decode(&c.data).map_err(|e| format!("geçersiz parça: {e}"))?;
+        let bytes = match base64::engine::general_purpose::STANDARD.decode(&c.data) {
+            Ok(b) => b,
+            Err(e) => return fail(CoreError::Base64(e)),
+        };
         let (seq, last) = (c.seq, c.last);
-        let mut f = std::fs::OpenOptions::new().create(true).write(true).append(seq > 0).truncate(seq == 0).open(&part).map_err(|e| e.to_string())?;
-        f.write_all(&bytes).map_err(|e| e.to_string())?;
-        let len = f.metadata().map(|m| m.len()).unwrap_or(0);
+        let len = {
+            let res = (|| -> std::io::Result<u64> {
+                let mut f = std::fs::OpenOptions::new().create(seq == 0).write(true).append(seq > 0).truncate(seq == 0).open(&part)?;
+                f.write_all(&bytes)?;
+                Ok(f.metadata()?.len())
+            })();
+            match res {
+                Ok(l) => l,
+                Err(e) => return fail(CoreError::Io(e)),
+            }
+        };
         if len > MAX {
-            return fail("video çok büyük".into());
+            return fail(CoreError::VideoTooLarge);
         }
         if !last {
             return Ok(None);
         }
-        drop(f);
         if c.size.is_some_and(|s| s != len) {
-            return fail(format!("video eksik geldi: {len} / {} bayt", c.size.unwrap_or(0)));
+            return fail(CoreError::ChunkSize { got: len, expected: c.size.unwrap_or(0) });
         }
         // Checked again: another process may have saved it meanwhile.
-        let item = self.store().get(&c.id).map_err(|e| e.to_string())?.filter(Self::needs_video);
-        let Some(mut item) = item else { return fail("bu kaydın beklenen bir videosu yok".into()) };
-        let reader = std::fs::File::open(&part).map_err(|e| e.to_string())?;
-        let name = self.media.put_reader(reader, &c.content_type).map_err(|e| e.to_string());
-        let _ = std::fs::remove_file(&part);
-        let name = name?;
+        let item = match self.lock_store()?.get(&c.id) {
+            Ok(it) => it.filter(Self::needs_video),
+            Err(e) => return fail(CoreError::Store(e)),
+        };
+        let Some(mut item) = item else { return fail(CoreError::VideoNotExpected) };
+        let name = {
+            let _part_guard = TempFileGuard(&part);
+            let reader = std::fs::File::open(&part)?;
+            self.media.put_reader(reader, &c.content_type)?
+        };
         if let Some(m) = item.media.iter_mut().find(|m| m.kind != MediaKind::Image && m.video_file.is_none()) {
             m.video_file = Some(name);
         }
-        let mut store = self.store();
-        store.set_media(&c.id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
-        store.get(&c.id).map_err(|e| e.to_string())
+        let mut store = self.lock_store()?;
+        store.set_media(&c.id, &item.media, item.quote.as_deref())?;
+        Ok(store.get(&c.id)?)
     }
 
     /// Downloads everything one item has, videos included, right now.
     /// Pictures and direct video files first, then videos that need an
     /// outside tool (whatever their earlier tries).
-    pub fn download_item(&self, id: &str) -> Result<Item, String> {
-        let mut item = self.store().get(id).map_err(|e| e.to_string())?.ok_or("kayıt yok")?;
+    pub fn download_item(&self, id: &str) -> Result<Item> {
+        let mut item = self.lock_store()?.get(id)?.ok_or(CoreError::ItemNotFound)?;
         self.fill_item(&mut item, true);
-        self.store().set_media(id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
+        self.lock_store()?.set_media(id, &item.media, item.quote.as_deref())?;
         if needs_external_video(&item) {
-            self.fetch_external_video(&mut item).map_err(|e| format!("video indirilemedi: {e}"))?;
+            self.fetch_external_video(&mut item)?;
         }
-        self.store().get(id).map_err(|e| e.to_string())?.ok_or_else(|| "kayıt yok".into())
+        self.lock_store()?.get(id)?.ok_or(CoreError::ItemNotFound)
     }
 
     /// Fetches the item's post-page videos with yt-dlp / gallery-dl and
     /// stores them. On failure the item waits before it is tried again.
-    fn fetch_external_video(&self, item: &mut Item) -> Result<(), String> {
-        let work = self.root.join(".downloads").join(format!("{}-{}", std::process::id(), item.id.replace(':', "_")));
+    fn fetch_external_video(&self, item: &mut Item) -> Result<()> {
+        let work = self.root.join(".downloads").join(format!("{}-{}", std::process::id(), hash_hex(item.id.as_bytes())));
+        let _work_guard = WorkDirGuard(&work);
         {
-            let mut dt = self.download_tracker.lock().unwrap_or_else(|e| e.into_inner());
+            let mut dt = self.download_tracker.lock().map_err(|_| CoreError::LockPoisoned)?;
             *dt = Some(ActiveDownloadInfo {
                 id: item.id.clone(),
                 platform: item.platform.as_str().to_string(),
@@ -467,94 +620,119 @@ impl Library {
                 started_at: now(),
             });
         }
+        let _tracker_guard = TrackerGuard(&self.download_tracker);
         let tracker = self.download_tracker.clone();
         let on_progress: Option<crate::external::ProgressCallback> = Some(Arc::new(move |pct, speed, eta| {
-            let mut dt = tracker.lock().unwrap_or_else(|e| e.into_inner());
-            if let Some(active) = dt.as_mut() {
+            if let Ok(mut dt) = tracker.lock()
+                && let Some(active) = dt.as_mut()
+            {
                 active.progress = pct;
                 active.speed = speed.map(str::to_string);
                 active.eta = eta.map(str::to_string);
             }
         }));
-        let mut result = Ok(());
+        let mut result: Result<()> = Ok(());
         for m in item.media.iter_mut().filter(|m| m.kind != MediaKind::Image && m.video_file.is_none() && m.downloadable_video().is_none()) {
-            let got = crate::external::download_with_progress(&m.url, &work, on_progress.as_ref()).and_then(|file| {
-                let f = std::fs::File::open(&file).map_err(|e| e.to_string())?;
-                self.media.put_reader(f, "").map_err(|e| e.to_string())
-            });
+            let got = (|| -> Result<String> {
+                let file = crate::external::download_with_progress(&m.url, &work, on_progress.as_ref(), &self.stopping)?;
+                let f = std::fs::File::open(&file)?;
+                Ok(self.media.put_reader(f, "")?)
+            })();
             match got {
                 Ok(name) => m.video_file = Some(name),
                 Err(e) => result = Err(e),
             }
         }
-        let _ = std::fs::remove_dir_all(&work);
-        {
-            let mut dt = self.download_tracker.lock().unwrap_or_else(|e| e.into_inner());
-            *dt = None;
-        }
-        let mut store = self.store();
-        store.set_media(&item.id, &item.media, item.quote.as_deref()).map_err(|e| e.to_string())?;
+        drop(_tracker_guard);
+        let mut store = self.lock_store()?;
+        store.set_media(&item.id, &item.media, item.quote.as_deref())?;
         if result.is_err() {
-            store.video_failed(&item.id).map_err(|e| e.to_string())?;
+            store.video_failed(&item.id)?;
         }
         result
     }
 
     /// Works through up to `limit` queued outside-tool videos. Returns how
     /// many items were tried; errors are logged, not returned.
-    pub fn download_external_videos(&self, limit: i64) -> Result<usize, String> {
-        if !self.videos_enabled() || crate::external::available().is_empty() {
+    pub fn download_external_videos(&self, limit: i64) -> Result<usize> {
+        if self.stopping.load(Ordering::Acquire) || !self.videos_enabled() || crate::external::available().is_empty() {
             return Ok(0);
         }
-        let queue = self.store().external_video_queue(limit).map_err(|e| e.to_string())?;
-        for (i, mut item) in queue.iter().cloned().enumerate() {
+        let queue = self.lock_store()?.external_video_queue(limit)?;
+        let count = queue.len();
+        for (i, mut item) in queue.into_iter().enumerate() {
             if i > 0 {
                 // One at a time, unhurried: this is a personal archive, not a crawler.
-                std::thread::sleep(std::time::Duration::from_secs(2));
+                for _ in 0..10 {
+                    if self.stopping.load(Ordering::Acquire) {
+                        return Ok(i);
+                    }
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+            }
+            if self.stopping.load(Ordering::Acquire) {
+                return Ok(i);
             }
             if let Err(e) = self.fetch_external_video(&mut item) {
                 append_log(&self.root, &format!("video {}: {e}", item.id));
             }
         }
-        Ok(queue.len())
+        Ok(count)
     }
 
     /// Starts a background media download pass unless one is running.
     pub fn kick_media(self: &Arc<Self>) {
-        let mut slot = self.worker.lock().unwrap_or_else(|e| e.into_inner());
+        if self.stopping.load(Ordering::Acquire) {
+            return;
+        }
+        let Ok(mut slot) = self.worker.lock() else { return };
         if slot.as_ref().is_some_and(|h| !h.is_finished()) {
             return;
         }
         let lib = Arc::clone(self);
-        *slot = Some(std::thread::spawn(move || while matches!(lib.fetch_pending_media(10), Ok(n) if n > 0) {}));
+        *slot = Some(std::thread::spawn(move || {
+            loop {
+                if lib.stopping.load(Ordering::Acquire) {
+                    break;
+                }
+                match lib.fetch_pending_media(10) {
+                    Ok(n) if n > 0 => {}
+                    _ => break,
+                }
+            }
+        }));
     }
 
     /// Blocks until the background media pass (if any) is done.
     pub fn wait_media(&self) {
-        let handle = self.worker.lock().unwrap_or_else(|e| e.into_inner()).take();
-        if let Some(h) = handle {
+        let Ok(mut slot) = self.worker.lock() else { return };
+        if let Some(h) = slot.take() {
             let _ = h.join();
         }
     }
 
     /// Fetches titles/descriptions for links that have none yet. A page that
     /// cannot be fetched is not marked done; it is tried again later.
-    pub fn enrich_links(&self, limit: i64) -> Result<usize, String> {
-        let todo = self.store().links_to_enrich(limit).map_err(|e| e.to_string())?;
+    pub fn enrich_links(&self, limit: i64) -> Result<usize> {
+        let todo = self.lock_store()?.links_to_enrich(limit)?;
         let n = todo.len();
         for (id, url) in todo {
-            let saved = match self.fetcher.page(&url) {
-                Ok(meta) => self.store().set_link_meta(id, meta.title.as_deref(), meta.description.as_deref(), meta.image.as_deref()),
-                Err(_) => self.store().link_fetch_failed(id),
-            };
-            saved.map_err(|e| e.to_string())?;
+            if self.stopping.load(Ordering::Acquire) {
+                break;
+            }
+            match self.fetcher.page(&url) {
+                Ok(meta) => self.lock_store()?.set_link_meta(id, meta.title.as_deref(), meta.description.as_deref(), meta.image.as_deref())?,
+                Err(_) => self.lock_store()?.link_fetch_failed(id)?,
+            }
         }
         Ok(n)
     }
 
-    pub fn delete(&self, id: &str) -> Result<usize, String> {
-        let orphans = self.store().delete(id).map_err(|e| e.to_string())?;
-        orphans.iter().for_each(|f| self.media.remove(f));
+    pub fn delete(&self, id: &str) -> Result<usize> {
+        let orphans = self.lock_store()?.delete(id)?;
+        for f in &orphans {
+            self.media.remove(f);
+        }
         Ok(orphans.len())
     }
 }
@@ -571,6 +749,19 @@ struct Id {
 #[derive(Deserialize)]
 struct LinkId {
     id: i64,
+}
+
+#[derive(Deserialize)]
+struct LinkItemsPage {
+    id: i64,
+    #[serde(default = "default_link_items_limit")]
+    limit: i64,
+    #[serde(default)]
+    offset: i64,
+}
+
+fn default_link_items_limit() -> i64 {
+    60
 }
 
 #[derive(Deserialize)]
@@ -708,105 +899,232 @@ pub struct Chunk {
     pub size: Option<u64>,
 }
 
+#[derive(Serialize)]
+struct ApiOk<T: Serialize> {
+    ok: bool,
+    data: T,
+}
+
+#[derive(Serialize)]
+struct ApiErr<'a> {
+    ok: bool,
+    error: &'a str,
+}
+
+trait Sink {
+    type Out;
+    fn ok<T: Serialize>(v: T) -> Result<Self::Out>;
+}
+
+struct StringSink;
+
+impl Sink for StringSink {
+    type Out = String;
+    fn ok<T: Serialize>(v: T) -> Result<String> {
+        Ok(serde_json::to_string(&ApiOk { ok: true, data: v })?)
+    }
+}
+
+struct ValueSink;
+
+impl Sink for ValueSink {
+    type Out = Value;
+    fn ok<T: Serialize>(v: T) -> Result<Value> {
+        Ok(serde_json::json!({ "ok": true, "data": serde_json::to_value(v)? }))
+    }
+}
+
+enum Req<'a> {
+    Json(&'a str),
+    Val(Value),
+}
+
+impl Req<'_> {
+    fn parse<T: DeserializeOwned>(self) -> Result<T> {
+        match self {
+            Self::Json(raw) => serde_json::from_str(raw).map_err(CoreError::InvalidRequest),
+            Self::Val(val) => serde_json::from_value(val).map_err(CoreError::InvalidRequest),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct CmdPeek<'a> {
+    #[serde(borrow)]
+    cmd: Option<Cow<'a, str>>,
+}
+
+fn err_json(msg: &str) -> String {
+    serde_json::to_string(&ApiErr { ok: false, error: msg }).unwrap_or_else(|_| r#"{"ok":false,"error":"hata"}"#.into())
+}
+
+fn err_val(msg: &str) -> Value {
+    serde_json::json!({ "ok": false, "error": msg })
+}
+
+pub fn handle_json(lib: &Arc<Library>, raw: &str) -> String {
+    let peek: CmdPeek<'_> = match serde_json::from_str(raw) {
+        Ok(p) => p,
+        Err(e) if e.is_syntax() || e.is_eof() => return err_json(&CoreError::InvalidJson(e).to_string()),
+        Err(_) => return err_json(&CoreError::MissingCmd.to_string()),
+    };
+    let Some(cmd) = peek.cmd.as_deref() else {
+        return err_json(&CoreError::MissingCmd.to_string());
+    };
+    match dispatch_with::<StringSink>(lib, cmd, Req::Json(raw)) {
+        Ok(s) => s,
+        Err(e) => err_json(&e.to_string()),
+    }
+}
+
 pub fn handle(lib: &Arc<Library>, raw: &str) -> Value {
-    match serde_json::from_str::<Value>(raw) {
-        Ok(req) => handle_value(lib, req),
-        Err(e) => json!({ "ok": false, "error": format!("geçersiz JSON: {e}") }),
+    let peek: CmdPeek<'_> = match serde_json::from_str(raw) {
+        Ok(p) => p,
+        Err(e) if e.is_syntax() || e.is_eof() => return err_val(&CoreError::InvalidJson(e).to_string()),
+        Err(_) => return err_val(&CoreError::MissingCmd.to_string()),
+    };
+    let Some(cmd) = peek.cmd.as_deref() else {
+        return err_val(&CoreError::MissingCmd.to_string());
+    };
+    match dispatch_with::<ValueSink>(lib, cmd, Req::Json(raw)) {
+        Ok(v) => v,
+        Err(e) => err_val(&e.to_string()),
     }
 }
 
 pub fn handle_value(lib: &Arc<Library>, req: Value) -> Value {
-    match dispatch(lib, req) {
-        Ok(data) => json!({ "ok": true, "data": data }),
-        Err(e) => json!({ "ok": false, "error": e }),
+    let Some(cmd) = req.get("cmd").and_then(Value::as_str).map(str::to_string) else {
+        return err_val(&CoreError::MissingCmd.to_string());
+    };
+    match dispatch_with::<ValueSink>(lib, &cmd, Req::Val(req)) {
+        Ok(v) => v,
+        Err(e) => err_val(&e.to_string()),
     }
 }
 
-fn arg<T: for<'de> Deserialize<'de>>(req: Value) -> Result<T, String> {
-    serde_json::from_value(req).map_err(|e| format!("geçersiz istek: {e}"))
-}
-
-fn to_value<T: serde::Serialize>(v: T) -> Result<Value, String> {
-    serde_json::to_value(v).map_err(|e| e.to_string())
-}
-
-fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
-    let cmd = req.get("cmd").and_then(Value::as_str).ok_or("cmd eksik")?.to_string();
-    let db = |e: rusqlite::Error| e.to_string();
-
-    match cmd.as_str() {
-        "ping" => Ok(json!({ "version": VERSION, "library": lib.root() })),
+fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result<S::Out> {
+    match cmd {
+        "ping" => {
+            #[derive(Serialize)]
+            struct Ping<'a> {
+                version: &'static str,
+                library: &'a Path,
+            }
+            S::ok(Ping { version: VERSION, library: lib.root() })
+        }
         "log" => {
+            #[derive(Deserialize)]
+            struct LogReq {
+                #[serde(default)]
+                line: Option<Value>,
+            }
+            let r: LogReq = req.parse()?;
+            let raw_line = r.line.as_ref().and_then(Value::as_str).unwrap_or("");
             // One line per entry: control characters cannot forge others.
-            let line: String =
-                req.get("line").and_then(Value::as_str).unwrap_or("").chars().take(500).map(|c| if c.is_control() { ' ' } else { c }).collect();
+            let line: String = raw_line.chars().take(500).map(|c| if c.is_control() { ' ' } else { c }).collect();
             append_log(lib.root(), &format!("eklenti: {line}"));
-            Ok(json!(true))
+            S::ok(true)
         }
         "stats" => {
-            let mut v = to_value(lib.store().stats().map_err(db)?)?;
-            v["media_bytes"] = json!(lib.media.bytes());
-            Ok(v)
+            #[derive(Serialize)]
+            struct StatsResp {
+                #[serde(flatten)]
+                stats: crate::db::Stats,
+                media_bytes: u64,
+            }
+            let stats = lib.lock_store()?.stats()?;
+            S::ok(StatsResp { stats, media_bytes: lib.media.bytes() })
         }
-        "settings" => Ok(json!({ "download_videos": lib.videos_enabled() })),
+        "settings" => {
+            #[derive(Serialize)]
+            struct SettingsResp {
+                download_videos: bool,
+            }
+            S::ok(SettingsResp { download_videos: lib.videos_enabled() })
+        }
         "set_settings" => {
-            if let Some(on) = req.get("download_videos").and_then(Value::as_bool) {
+            #[derive(Deserialize)]
+            struct SetSettingsReq {
+                #[serde(default)]
+                download_videos: Option<Value>,
+            }
+            #[derive(Serialize)]
+            struct SettingsResp {
+                download_videos: bool,
+            }
+            let r: SetSettingsReq = req.parse()?;
+            if let Some(on) = r.download_videos.as_ref().and_then(Value::as_bool) {
                 lib.set_videos_enabled(on)?;
             }
-            Ok(json!({ "download_videos": lib.videos_enabled() }))
+            S::ok(SettingsResp { download_videos: lib.videos_enabled() })
         }
         "videos_needed" => {
             #[derive(Deserialize)]
             struct Ids {
                 ids: Vec<String>,
             }
-            to_value(lib.videos_needed(&arg::<Ids>(req)?.ids)?)
+            S::ok(lib.videos_needed(&req.parse::<Ids>()?.ids)?)
         }
-        "upload_chunk" => to_value(lib.upload_chunk(&arg::<Chunk>(req)?)?),
-        "download_media" => to_value(lib.download_item(&arg::<Id>(req)?.id)?),
+        "upload_chunk" => S::ok(lib.upload_chunk(&req.parse::<Chunk>()?)?),
+        "download_media" => S::ok(lib.download_item(&req.parse::<Id>()?.id)?),
         // Run by the app (the browser extensions' processes may not start
         // other programs).
-        "download_videos" => to_value(lib.download_external_videos(arg::<Limit>(req)?.limit)?),
+        "download_videos" => S::ok(lib.download_external_videos(req.parse::<Limit>()?.limit)?),
         "video_tools" => {
-            let tools: Vec<Value> = crate::external::available().into_iter().map(|(t, p)| json!({ "name": t.name(), "path": p })).collect();
-            Ok(json!(tools))
+            #[derive(Serialize)]
+            struct ToolInfo {
+                name: &'static str,
+                path: PathBuf,
+            }
+            let tools: Vec<ToolInfo> = crate::external::available().into_iter().map(|(t, path)| ToolInfo { name: t.name(), path }).collect();
+            S::ok(tools)
         }
-        "data_version" => to_value(lib.store().data_version().map_err(db)?),
+        "data_version" => S::ok(lib.lock_store()?.data_version()?),
         // Folds the WAL into the main file; the app sends it when quitting.
         "checkpoint" => {
-            lib.store().checkpoint();
-            Ok(json!(true))
+            lib.checkpoint();
+            S::ok(true)
         }
 
         "add_url" => {
-            let a: AddUrl = arg(req)?;
-            to_value(lib.add_url(&a.url, &a.tags, a.note.as_deref(), a.folder_id)?)
+            let a: AddUrl = req.parse()?;
+            S::ok(lib.add_url(&a.url, &a.tags, a.note.as_deref(), a.folder_id)?)
         }
         "import_x" | "import_tiktok" | "import_reddit" | "import_instagram" => {
-            let a: ImportPayload = arg(req)?;
-            let payload = match a.payload {
-                Value::String(s) => serde_json::from_str(&s).map_err(|e| format!("payload JSON değil: {e}"))?,
-                v => v,
+            let a: ImportPayload = req.parse()?;
+            let mut items = {
+                let payload = match a.payload {
+                    Value::String(s) => serde_json::from_str(&s).map_err(CoreError::InvalidPayloadJson)?,
+                    v => v,
+                };
+                match cmd {
+                    "import_x" => {
+                        let mut parsed = crate::x::parse_timeline(&payload);
+                        parsed.reverse();
+                        parsed
+                    }
+                    "import_reddit" => crate::reddit::parse_listing(&payload),
+                    "import_instagram" => crate::instagram::parse_api(&payload),
+                    _ => crate::tiktok::parse_api(&payload),
+                }
             };
-            let report = match cmd.as_str() {
-                "import_x" => lib.import_x(&payload, &a.tags)?,
-                "import_reddit" => lib.import_reddit(&payload, &a.tags)?,
-                "import_instagram" => lib.import_instagram(&payload, &a.tags)?,
-                _ => lib.import_tiktok(&payload, &a.tags)?,
-            };
+            let mut report = lib.save_into(&mut items, &a.tags, None)?;
+            if cmd == "import_x" {
+                report.ids.reverse();
+            }
             lib.kick_media();
-            to_value(report)
+            S::ok(report)
         }
         "import_items" => {
-            let a: ImportItems = arg(req)?;
+            let a: ImportItems = req.parse()?;
             let report = lib.import_items(a.items, &a.tags, a.folder_id)?;
             lib.kick_media();
-            to_value(report)
+            S::ok(report)
         }
 
         "search" => {
-            let p: Page = arg(req)?;
-            to_value(lib.store().search(&Query::parse(&p.q), Sort::parse(&p.sort), p.limit.clamp(1, 500), p.offset.max(0)).map_err(db)?)
+            let p: Page = req.parse()?;
+            S::ok(lib.lock_store()?.search(&Query::parse(&p.q), Sort::parse(&p.sort), p.limit.clamp(1, 500), p.offset.max(0))?)
         }
         "set_reviewed" => {
             #[derive(Deserialize)]
@@ -814,186 +1132,249 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
                 ids: Vec<String>,
                 reviewed: bool,
             }
-            let a: Reviewed = arg(req)?;
-            to_value(lib.store().set_reviewed(&a.ids, a.reviewed).map_err(db)?)
+            let a: Reviewed = req.parse()?;
+            S::ok(lib.lock_store()?.set_reviewed(&a.ids, a.reviewed)?)
         }
-        "reset_reviewed" => to_value(lib.store().reset_reviewed().map_err(db)?),
-        "get" => to_value(lib.store().get(&arg::<Id>(req)?.id).map_err(db)?),
-        "raw" => to_value(lib.store().raw(&arg::<Id>(req)?.id).map_err(db)?),
-        "delete" => to_value(lib.delete(&arg::<Id>(req)?.id)?),
+        "reset_reviewed" => S::ok(lib.lock_store()?.reset_reviewed()?),
+        "get" => S::ok(lib.lock_store()?.get(&req.parse::<Id>()?.id)?),
+        "raw" => S::ok(lib.lock_store()?.raw(&req.parse::<Id>()?.id)?),
+        "delete" => S::ok(lib.delete(&req.parse::<Id>()?.id)?),
 
-        "tags" => to_value(lib.store().tags().map_err(db)?),
+        "tags" => S::ok(lib.lock_store()?.tags()?),
         "set_tags" => {
-            let a: SetTags = arg(req)?;
-            lib.store().set_tags(&a.id, &a.tags).map_err(db)?;
-            Ok(json!(true))
+            let a: SetTags = req.parse()?;
+            lib.lock_store()?.set_tags(&a.id, &a.tags)?;
+            S::ok(true)
         }
         "edit_tags" => {
-            let a: EditTags = arg(req)?;
-            lib.store().edit_tags(&a.ids, &a.add, &a.remove).map_err(db)?;
-            Ok(json!(true))
+            let a: EditTags = req.parse()?;
+            lib.lock_store()?.edit_tags(&a.ids, &a.add, &a.remove)?;
+            S::ok(true)
         }
         "rename_tag" => {
-            let a: RenameTag = arg(req)?;
-            to_value(lib.store().rename_tag(&a.from, &a.to).map_err(db)?)
+            let a: RenameTag = req.parse()?;
+            S::ok(lib.lock_store()?.rename_tag(&a.from, &a.to)?)
         }
 
-        "folders" => to_value(lib.store().folders().map_err(db)?),
+        "folders" => S::ok(lib.lock_store()?.folders()?),
         "add_folder" => {
-            let a: AddFolder = arg(req)?;
-            to_value(lib.store().add_folder(&a.name).map_err(db)?)
+            let a: AddFolder = req.parse()?;
+            S::ok(lib.lock_store()?.add_folder(&a.name)?)
         }
         "rename_folder" => {
-            let a: RenameFolder = arg(req)?;
-            lib.store().rename_folder(a.id, &a.name).map_err(db)?;
-            Ok(json!(true))
+            let a: RenameFolder = req.parse()?;
+            lib.lock_store()?.rename_folder(a.id, &a.name)?;
+            S::ok(true)
         }
         "delete_folder" => {
-            let a: FolderId = arg(req)?;
-            lib.store().delete_folder(a.id).map_err(db)?;
-            Ok(json!(true))
+            let a: FolderId = req.parse()?;
+            lib.lock_store()?.delete_folder(a.id)?;
+            S::ok(true)
         }
         "move_to_folder" => {
-            let a: MoveToFolder = arg(req)?;
-            lib.store().move_to_folder(&a.id, a.folder_id).map_err(db)?;
-            Ok(json!(true))
+            let a: MoveToFolder = req.parse()?;
+            lib.lock_store()?.move_to_folder(&a.id, a.folder_id)?;
+            S::ok(true)
         }
         "move_items_to_folder" => {
-            let a: MoveItemsToFolder = arg(req)?;
-            lib.store().move_items_to_folder(&a.ids, a.folder_id).map_err(db)?;
-            Ok(json!(true))
+            let a: MoveItemsToFolder = req.parse()?;
+            lib.lock_store()?.move_items_to_folder(&a.ids, a.folder_id)?;
+            S::ok(true)
         }
 
         "downloads" => {
+            #[derive(Serialize)]
+            struct QueuedRow {
+                id: String,
+                platform: &'static str,
+                url: String,
+                author_handle: Option<String>,
+                author_name: Option<String>,
+                title: Option<String>,
+                text: String,
+                status: &'static str,
+                saved_at: i64,
+            }
+            #[derive(Serialize)]
+            struct CompletedRow {
+                id: String,
+                platform: &'static str,
+                url: String,
+                author_handle: Option<String>,
+                author_name: Option<String>,
+                title: Option<String>,
+                text: String,
+                status: &'static str,
+                video_file: Option<String>,
+                file_size: Option<i64>,
+                saved_at: i64,
+            }
+            #[derive(Serialize)]
+            struct FailedRow {
+                id: String,
+                platform: &'static str,
+                url: String,
+                author_handle: Option<String>,
+                author_name: Option<String>,
+                title: Option<String>,
+                text: String,
+                status: &'static str,
+                tries: i64,
+                saved_at: i64,
+            }
+            #[derive(Serialize)]
+            struct DownloadsResp<'a> {
+                active: &'a [ActiveDownloadInfo],
+                queued: Vec<QueuedRow>,
+                completed: Vec<CompletedRow>,
+                failed: Vec<FailedRow>,
+            }
             let active = {
-                let dt = lib.download_tracker.lock().unwrap_or_else(|e| e.into_inner());
-                dt.clone().map(|a| vec![a]).unwrap_or_default()
+                let dt = lib.download_tracker.lock().map_err(|_| CoreError::LockPoisoned)?;
+                dt.clone()
             };
-            let store = lib.store();
-            let active_ids: std::collections::HashSet<String> = active.iter().map(|a| a.id.clone()).collect();
-            let queued_items = store.external_video_queue(25).map_err(db)?;
-            let queued: Vec<Value> = queued_items
+            let (queued_items, completed_items, failed_items) = {
+                let store = lib.lock_store()?;
+                (store.external_video_queue(25)?, store.completed_video_downloads(30)?, store.failed_video_downloads(20)?)
+            };
+            let queued = queued_items
                 .into_iter()
-                .filter(|i| !active_ids.contains(&i.id))
-                .map(|i| {
-                    json!({
-                        "id": i.id,
-                        "platform": i.platform.as_str(),
-                        "url": i.url,
-                        "author_handle": i.author_handle,
-                        "author_name": i.author_name,
-                        "title": i.title,
-                        "text": i.text,
-                        "status": "queued",
-                        "saved_at": i.saved_at
-                    })
+                .filter(|i| active.as_ref().is_none_or(|a| a.id != i.id))
+                .map(|i| QueuedRow {
+                    id: i.id,
+                    platform: i.platform.as_str(),
+                    url: i.url,
+                    author_handle: i.author_handle,
+                    author_name: i.author_name,
+                    title: i.title,
+                    text: i.text,
+                    status: "queued",
+                    saved_at: i.saved_at,
                 })
                 .collect();
-            let completed_items = store.completed_video_downloads(30).map_err(db)?;
-            let completed: Vec<Value> = completed_items
+            let completed = completed_items
                 .into_iter()
                 .map(|i| {
-                    let (file, size) =
-                        i.media.iter().find_map(|m| m.video_file.as_ref()).map(|f| (Some(f.clone()), lib.media.file_size(f))).unwrap_or((None, None));
-                    json!({
-                        "id": i.id,
-                        "platform": i.platform.as_str(),
-                        "url": i.url,
-                        "author_handle": i.author_handle,
-                        "author_name": i.author_name,
-                        "title": i.title,
-                        "text": i.text,
-                        "status": "completed",
-                        "video_file": file,
-                        "file_size": size,
-                        "saved_at": i.saved_at
-                    })
+                    let file = i.media.into_iter().find_map(|m| m.video_file);
+                    let size = file.as_deref().and_then(|f| lib.media.file_size(f));
+                    CompletedRow {
+                        id: i.id,
+                        platform: i.platform.as_str(),
+                        url: i.url,
+                        author_handle: i.author_handle,
+                        author_name: i.author_name,
+                        title: i.title,
+                        text: i.text,
+                        status: "completed",
+                        video_file: file,
+                        file_size: size,
+                        saved_at: i.saved_at,
+                    }
                 })
                 .collect();
-            let failed_items = store.failed_video_downloads(20).map_err(db)?;
-            let failed: Vec<Value> = failed_items
+            let failed = failed_items
                 .into_iter()
-                .map(|i| {
-                    json!({
-                        "id": i.id,
-                        "platform": i.platform.as_str(),
-                        "url": i.url,
-                        "author_handle": i.author_handle,
-                        "author_name": i.author_name,
-                        "title": i.title,
-                        "text": i.text,
-                        "status": "failed",
-                        "tries": i.video_tries,
-                        "saved_at": i.saved_at
-                    })
+                .map(|i| FailedRow {
+                    id: i.id,
+                    platform: i.platform.as_str(),
+                    url: i.url,
+                    author_handle: i.author_handle,
+                    author_name: i.author_name,
+                    title: i.title,
+                    text: i.text,
+                    status: "failed",
+                    tries: i.video_tries,
+                    saved_at: i.saved_at,
                 })
                 .collect();
-            Ok(json!({
-                "active": active,
-                "queued": queued,
-                "completed": completed,
-                "failed": failed,
-            }))
+            S::ok(DownloadsResp { active: active.as_slice(), queued, completed, failed })
         }
         "retry_download" => {
-            let id = arg::<Id>(req)?.id;
-            let mut store = lib.store();
-            store.retry_video_download(&id).map_err(db)?;
-            let item = store.get(&id).ok().flatten();
-            drop(store);
+            let id = req.parse::<Id>()?.id;
+            let item = {
+                let mut store = lib.lock_store()?;
+                store.retry_video_download(&id)?;
+                store.get(&id).ok().flatten()
+            };
             if let Some(mut it) = item
                 && it.media.iter().any(|m| m.kind != MediaKind::Image && m.video_file.is_none())
             {
                 let _ = lib.fetch_external_video(&mut it);
             }
             lib.kick_media();
-            Ok(json!(true))
+            S::ok(true)
         }
         "retry_all_downloads" => {
-            let mut store = lib.store();
-            let n = store.retry_all_video_downloads().map_err(db)?;
-            drop(store);
+            let n = lib.lock_store()?.retry_all_video_downloads()?;
             lib.kick_media();
-            Ok(json!(n))
+            S::ok(n)
         }
         "set_note" => {
-            let a: SetNote = arg(req)?;
-            lib.store().set_note(&a.id, a.note.as_deref()).map_err(db)?;
-            Ok(json!(true))
+            let a: SetNote = req.parse()?;
+            lib.lock_store()?.set_note(&a.id, a.note.as_deref())?;
+            S::ok(true)
         }
         "ocr_pending" => {
-            let limit = arg::<Limit>(req)?.limit;
-            let rows = lib.store().ocr_pending(limit).map_err(db)?;
-            let paths: Vec<Value> = rows
-                .into_iter()
-                .map(|(id, files)| json!({ "id": id, "files": files.iter().map(|f| lib.media.path(f)).collect::<Vec<_>>() }))
-                .collect();
-            Ok(json!(paths))
+            #[derive(Serialize)]
+            struct OcrRow {
+                id: String,
+                files: Vec<PathBuf>,
+            }
+            let limit = req.parse::<Limit>()?.limit;
+            let rows = lib.lock_store()?.ocr_pending(limit)?;
+            let paths: Vec<OcrRow> =
+                rows.into_iter().map(|(id, files)| OcrRow { id, files: files.iter().map(|f| lib.media.path(f)).collect() }).collect();
+            S::ok(paths)
         }
         "set_ocr" => {
-            let a: SetExtra = arg(req)?;
-            lib.store().set_ocr(&a.id, &a.text).map_err(db)?;
-            Ok(json!(true))
+            let a: SetExtra = req.parse()?;
+            lib.lock_store()?.set_ocr(&a.id, &a.text)?;
+            S::ok(true)
         }
         "set_extra" => {
-            let a: SetExtra = arg(req)?;
-            lib.store().set_extra(&a.id, &a.text).map_err(db)?;
-            Ok(json!(true))
+            let a: SetExtra = req.parse()?;
+            lib.lock_store()?.set_extra(&a.id, &a.text)?;
+            S::ok(true)
         }
 
         "links" => {
-            let p: Page = arg(req)?;
-            to_value(lib.store().links(&p.q, p.limit.clamp(1, 500), p.offset.max(0)).map_err(db)?)
+            let p: Page = req.parse()?;
+            S::ok(lib.lock_store()?.links(&p.q, p.limit.clamp(1, 500), p.offset.max(0))?)
         }
-        "link_items" => to_value(lib.store().link_items(arg::<LinkId>(req)?.id).map_err(db)?),
-        "add_link" => to_value(lib.store().add_link(&arg::<Url>(req)?.url).map_err(db)?.ok_or("geçersiz URL")?),
+        "link_counts" => S::ok(lib.lock_store()?.link_counts()?),
+        "links_page" => {
+            #[derive(Deserialize)]
+            struct LinksPageReq {
+                #[serde(default)]
+                q: String,
+                #[serde(default)]
+                category: Option<String>,
+                #[serde(default)]
+                only_dead: bool,
+                #[serde(default = "default_links_page_limit")]
+                limit: i64,
+                #[serde(default)]
+                offset: i64,
+            }
+            fn default_links_page_limit() -> i64 {
+                100
+            }
+            let p: LinksPageReq = req.parse()?;
+            let cat = p.category.as_deref().and_then(crate::db::LinkCategory::parse);
+            S::ok(lib.lock_store()?.links_page(&p.q, cat, p.only_dead, p.limit.clamp(1, 200), p.offset.max(0))?)
+        }
+        "link_items" => {
+            let p = req.parse::<LinkItemsPage>()?;
+            S::ok(lib.lock_store()?.link_items(p.id, p.limit, p.offset)?)
+        }
+        "add_link" => S::ok(lib.lock_store()?.add_link(&req.parse::<Url>()?.url)?.ok_or(CoreError::InvalidUrl)?),
         "delete_link" => {
-            lib.store().delete_link(arg::<LinkId>(req)?.id).map_err(db)?;
-            Ok(json!(true))
+            lib.lock_store()?.delete_link(req.parse::<LinkId>()?.id)?;
+            S::ok(true)
         }
-        "enrich_links" => to_value(lib.enrich_links(arg::<Limit>(req)?.limit)?),
-        "check_links" => to_value(lib.check_links(arg::<Limit>(req)?.limit)?),
-        "lookup_url" => to_value(lib.lookup_url(&arg::<Url>(req)?.url)?),
+        "enrich_links" => S::ok(lib.enrich_links(req.parse::<Limit>()?.limit)?),
+        "check_links" => S::ok(lib.check_links(req.parse::<Limit>()?.limit)?),
+        "lookup_url" => S::ok(lib.lookup_url(&req.parse::<Url>()?.url)?),
         "suggest_folders" => {
             #[derive(Deserialize)]
             struct Suggest {
@@ -1004,56 +1385,71 @@ fn dispatch(lib: &Arc<Library>, req: Value) -> Result<Value, String> {
             fn three() -> i64 {
                 3
             }
-            let a: Suggest = arg(req)?;
-            to_value(lib.store().suggest_folders(&a.id, a.limit.clamp(1, 20)).map_err(db)?)
+            let a: Suggest = req.parse()?;
+            S::ok(lib.lock_store()?.suggest_folders(&a.id, a.limit.clamp(1, 20))?)
         }
         "backup" => {
             #[derive(Deserialize)]
             struct Dest {
                 dest: String,
             }
-            to_value(lib.backup(Path::new(&arg::<Dest>(req)?.dest))?)
+            S::ok(lib.backup(Path::new(&req.parse::<Dest>()?.dest))?)
         }
         // Small UI state kept in the library (and so in its backups):
         // saved searches and the like. Only `ui.` keys.
         "ui_get" => {
-            let key = req.get("key").and_then(Value::as_str).filter(|k| k.starts_with("ui.")).ok_or("geçersiz anahtar")?;
-            to_value(lib.store().setting(key).map_err(db)?)
+            #[derive(Deserialize)]
+            struct UiGetReq {
+                #[serde(default)]
+                key: Option<Value>,
+            }
+            let r: UiGetReq = req.parse()?;
+            let key = r.key.as_ref().and_then(Value::as_str).filter(|k| k.starts_with("ui.")).ok_or(CoreError::InvalidKey)?;
+            S::ok(lib.lock_store()?.setting(key)?)
         }
         "ui_set" => {
-            let key = req.get("key").and_then(Value::as_str).filter(|k| k.starts_with("ui.")).ok_or("geçersiz anahtar")?;
-            let value = req.get("value").and_then(Value::as_str).ok_or("value eksik")?;
-            lib.store().set_setting(key, value).map_err(db)?;
-            Ok(json!(true))
+            #[derive(Deserialize)]
+            struct UiSetReq {
+                #[serde(default)]
+                key: Option<Value>,
+                #[serde(default)]
+                value: Option<Value>,
+            }
+            let r: UiSetReq = req.parse()?;
+            let key = r.key.as_ref().and_then(Value::as_str).filter(|k| k.starts_with("ui.")).ok_or(CoreError::InvalidKey)?;
+            let value = r.value.as_ref().and_then(Value::as_str).ok_or(CoreError::MissingValue)?;
+            lib.lock_store()?.set_setting(key, value)?;
+            S::ok(true)
         }
 
         // Short-lived capturers (the Safari extension process) may die before
         // their downloads finish; the app picks the queue up with this.
         "kick_media" => {
             lib.kick_media();
-            Ok(json!(true))
+            S::ok(true)
         }
-        "fetch_media" => to_value(lib.fetch_pending_media(arg::<Limit>(req)?.limit)?),
+        "fetch_media" => S::ok(lib.fetch_pending_media(req.parse::<Limit>()?.limit)?),
         "retry_media" => {
-            let n = lib.store().retry_media().map_err(db)?;
+            let n = lib.lock_store()?.retry_media()?;
             lib.kick_media();
-            to_value(n)
+            S::ok(n)
         }
         "media_path" => {
-            let file = arg::<File>(req)?.file;
+            let file = req.parse::<File>()?.file;
             if !crate::media::is_name(&file) {
-                return Err(format!("geçersiz dosya adı: {file}"));
+                return Err(CoreError::InvalidFileName(file));
             }
-            Ok(json!(lib.media.path(&file)))
+            S::ok(lib.media.path(&file))
         }
 
-        other => Err(format!("bilinmeyen komut: {other}")),
+        other => Err(CoreError::UnknownCmd(other.to_string())),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn json_surface() {
@@ -1165,5 +1561,53 @@ mod tests {
         let back = &s.links("", 10, 0).unwrap()[0];
         assert!(back.dead);
         assert_eq!(back.status, Some(404));
+    }
+
+    #[test]
+    fn handle_json_direct_and_upload_path_safety() {
+        let dir = std::env::temp_dir().join(format!("wm-api-sec-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let lib = Library::open(&dir.join("lib")).unwrap();
+
+        let unset: Value = serde_json::from_str(&handle_json(&lib, r#"{"cmd":"ui_get","key":"ui.missing"}"#)).unwrap();
+        assert_eq!(unset, json!({ "ok": true, "data": null }));
+
+        let bad_syntax: Value = serde_json::from_str(&handle_json(&lib, r#"{"cmd":bad"#)).unwrap();
+        assert_eq!(bad_syntax["ok"], false);
+
+        let arr: Value = serde_json::from_str(&handle_json(&lib, r#"[1, 2, 3]"#)).unwrap();
+        assert_eq!(arr, json!({ "ok": false, "error": "cmd eksik" }));
+
+        let dl_json: Value = serde_json::from_str(&handle_json(&lib, r#"{"cmd":"downloads"}"#)).unwrap();
+        assert_eq!(dl_json, handle(&lib, r#"{"cmd":"downloads"}"#));
+
+        // Path traversal in chunk ID stays contained inside `.uploads` via hashing.
+        let evil_id = "../../outside-escape";
+        lib.import_items(
+            vec![Item {
+                id: evil_id.into(),
+                url: "https://www.tiktok.com/@u/video/99".into(),
+                media: vec![Media { kind: MediaKind::Video, ..Media::image("https://www.tiktok.com/@u/video/99") }],
+                ..Default::default()
+            }],
+            &[],
+            None,
+        )
+        .unwrap();
+        let req = json!({
+            "cmd": "upload_chunk",
+            "id": evil_id,
+            "seq": 0,
+            "data": "AAAAGGZ0eXBtcDQy"
+        })
+        .to_string();
+        let r: Value = serde_json::from_str(&handle_json(&lib, &req)).unwrap();
+        assert_eq!(r["ok"], true, "{r}");
+        assert!(!dir.join("outside-escape.part").exists());
+        assert!(dir.join("lib/.uploads").join(format!("{}.part", hash_hex(evil_id.as_bytes()))).exists());
+
+        // Shutdown cleanly waits and checkpoints.
+        lib.shutdown();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

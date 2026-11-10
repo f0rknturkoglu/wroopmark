@@ -8,45 +8,39 @@ struct FilterPanel: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Filtreler").font(.headline)
+            HStack(spacing: Theme.Spacing.md) {
+                Label("Filtreler", systemImage: "line.3.horizontal.decrease.circle")
+                    .font(.headline)
                 Spacer()
-                Button("Sıfırla") { model.filters = AdvancedFilters() }
-                    .disabled(model.filters.isEmpty)
+                Button { model.filters = AdvancedFilters() } label: {
+                    Label("Sıfırla", systemImage: "arrow.counterclockwise")
+                }
+                .controlSize(.small)
+                .disabled(model.filters.isEmpty)
             }
-            .padding([.horizontal, .top], 16).padding(.bottom, 8)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.md)
+
+            Divider()
 
             Form {
-                Section("Platform") {
-                    FlowLayout(spacing: 6) {
+                Section {
+                    FlowLayout(spacing: Theme.Spacing.sm) {
                         ForEach(Platform.allCases) { p in
                             let on = model.filters.platforms.contains(p)
-                            Button {
+                            PlatformFilterChip(platform: p, selected: on) {
                                 if on { model.filters.platforms.remove(p) } else { model.filters.platforms.insert(p) }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    if on {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                    }
-                                    Label(p.label, systemImage: p.symbol)
-                                }
-                                .font(.system(size: 12, weight: .medium))
-                                .fixedSize()
-                                .padding(.horizontal, 9).padding(.vertical, 5)
-                                .foregroundStyle(on ? Color.white : Color.primary)
-                                .background(on ? Theme.accent : Theme.hairline, in: Capsule())
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(on ? [.isSelected] : [])
-                            .accessibilityLabel(p.label)
                         }
                     }
                     Text(model.filters.platforms.isEmpty ? "Hepsi" : "Seçilenlerden herhangi biri")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Label("Platform", systemImage: "square.grid.2x2")
                 }
 
-                Section("İçerik") {
+                Section {
                     Picker("Medya", selection: $model.filters.media) {
                         ForEach(AdvancedFilters.MediaFilter.allCases) { Text($0.label).tag($0) }
                     }
@@ -55,48 +49,69 @@ struct FilterPanel: View {
                     tri("Not", $model.filters.note)
                     tri("Görselde yazı (OCR)", $model.filters.ocr)
                     tri("Alıntı", $model.filters.quote)
+                } header: {
+                    Label("İçerik", systemImage: "doc.text")
                 }
 
-                Section("Klasör") {
+                Section {
                     FolderFilterPicker()
                     if case .folder(_, let name) = model.scope {
                         Text("Kenar çubuğunda \"\(name)\" klasörü açık")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Label("Klasör", systemImage: "folder")
                 }
                 .disabled(model.scope.isFolder)
 
-                Section("Etiketler") {
+                Section {
                     TagPick(title: "İçersin", picked: $model.filters.includeTags, all: model.tags)
                     TagPick(title: "İçermesin", picked: $model.filters.excludeTags, all: model.tags)
+                } header: {
+                    Label("Etiketler", systemImage: "tag")
                 }
 
-                Section("Kişi") {
+                Section {
                     TextField("Şu kişiler", text: $model.filters.authors, prompt: Text("@kisi, @diger"))
                     TextField("Şunlar hariç", text: $model.filters.excludeAuthors, prompt: Text("@kisi"))
+                } header: {
+                    Label("Kişi", systemImage: "person")
                 }
 
-                Section("Tarih") {
+                Section {
                     Picker("Alan", selection: $model.filters.dateField) {
                         ForEach(AdvancedFilters.DateField.allCases) { Text($0.label).tag($0) }
                     }
                     DateBound(title: "Başlangıç", date: $model.filters.from)
                     DateBound(title: "Bitiş", date: $model.filters.to)
+                } header: {
+                    Label("Tarih", systemImage: "calendar")
                 }
             }
             .formStyle(.grouped)
-
-            if !model.filters.terms.isEmpty {
-                Text(model.filters.terms)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .lineLimit(3)
-                    .padding(.horizontal, 16).padding(.bottom, 12)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !model.filters.terms.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Arama ifadesi")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(model.filters.terms)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(.background)
+                    .overlay(alignment: .top) { Divider() }
                     .help("Aynı sonucu arama kutusuna bunu yazarak da alırsın")
+                }
             }
         }
-        .frame(minWidth: 420, idealWidth: 480, minHeight: 480, idealHeight: 640)
+        .frame(minWidth: 440, idealWidth: 480, minHeight: 500, idealHeight: 640)
     }
 
     private func tri(_ title: String, _ value: Binding<AdvancedFilters.Tri>, yes: String = "Var", no: String = "Yok") -> some View {
@@ -106,6 +121,51 @@ struct FilterPanel: View {
             Text(no).tag(AdvancedFilters.Tri.no)
         }
         .pickerStyle(.segmented)
+    }
+}
+
+private struct PlatformFilterChip: View {
+    let platform: Platform
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Theme.Spacing.xs) {
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.bold())
+                }
+                Label(platform.label, systemImage: platform.symbol)
+            }
+            .font(.caption.weight(.medium))
+            .fixedSize()
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.xs)
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .background(
+                selected
+                    ? (hovering ? Theme.accent.opacity(0.92) : Theme.accent)
+                    : (hovering ? Theme.Stroke.subtleHoverFill : Theme.Stroke.subtleFill),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        selected
+                            ? Color.white.opacity(0.16)
+                            : (hovering ? Theme.Stroke.surfaceHoverBorder : Theme.Stroke.surfaceBorder),
+                        lineWidth: Theme.Stroke.hairlineWidth
+                    )
+            }
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .accessibilityLabel(platform.label)
     }
 }
 
@@ -139,23 +199,31 @@ private struct TagPick: View {
 
     var body: some View {
         LabeledContent(title) {
-            HStack(spacing: 6) {
+            FlowLayout(spacing: Theme.Spacing.sm) {
                 ForEach(picked, id: \.self) { key in
                     TagChip(name: key, selected: true, removable: true, remove: { picked.removeAll { $0 == key } })
                 }
                 Menu {
                     let rest = all.filter { !picked.contains($0.key) }
-                    if rest.isEmpty { Text("Etiket yok") }
+                    if rest.isEmpty {
+                        Button {} label: {
+                            Label("Etiket yok", systemImage: "tag.slash")
+                        }
+                        .disabled(true)
+                    }
                     ForEach(rest, id: \.key) { tag in
                         Button("\(tag.name) (\(tag.count))") { picked.append(tag.key) }
                     }
                 } label: {
-                    Image(systemName: "plus")
+                    Label("Etiket ekle", systemImage: "plus")
+                        .labelStyle(.iconOnly)
                 }
                 .accessibilityLabel("Etiket ekle")
                 .menuStyle(.borderlessButton)
+                .controlSize(.small)
                 .fixedSize()
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 }
@@ -187,7 +255,9 @@ private struct DateBound: View {
 
     var body: some View {
         HStack {
-            Toggle(title, isOn: isEnabled)
+            Toggle(isOn: isEnabled) {
+                Label(title, systemImage: "calendar")
+            }
             Spacer()
             if date != nil {
                 DatePicker("", selection: selectedDate, displayedComponents: .date)
@@ -211,10 +281,13 @@ struct SortMenu: View {
             .pickerStyle(.inline)
             if model.sort == .random {
                 Divider()
-                Button("Yeniden karıştır") { model.reshuffle() }
+                Button { model.reshuffle() } label: {
+                    Label("Yeniden karıştır", systemImage: "shuffle")
+                }
             }
         } label: {
             Label("Sırala", systemImage: "arrow.up.arrow.down")
+                .labelStyle(.iconOnly)
         }
         .help("Sıralama: \(model.sort.help)")
     }

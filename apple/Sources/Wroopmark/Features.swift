@@ -10,16 +10,28 @@ extension AppModel {
     private static let savedSearchesKey = "ui.saved_searches"
 
     func loadSavedSearches() async {
-        // Nothing saved yet comes back as null, which `call` reports as an error.
-        guard let raw: String = try? await core.call(["cmd": "ui_get", "key": Self.savedSearchesKey]),
-              let data = raw.data(using: .utf8),
-              let list = try? JSONDecoder().decode([SavedSearch].self, from: data) else { return }
-        if list != savedSearches { savedSearches = list }
+        do {
+            guard let raw: String = try await core.callOptional(.uiGet(key: Self.savedSearchesKey), as: String.self),
+                  let data = raw.data(using: .utf8) else { return }
+            let list = try JSONDecoder().decode([SavedSearch].self, from: data)
+            if list != savedSearches { savedSearches = list }
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func storeSavedSearches() async {
-        guard let data = try? JSONEncoder().encode(savedSearches), let text = String(data: data, encoding: .utf8) else { return }
-        _ = await perform(["cmd": "ui_set", "key": Self.savedSearchesKey, "value": text])
+        do {
+            let data = try JSONEncoder().encode(savedSearches)
+            guard let text = String(data: data, encoding: .utf8) else { return }
+            _ = try await core.run(.uiSet(key: Self.savedSearchesKey, value: text))
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     /// What "save this search" would keep: the view, the filters and the
@@ -97,32 +109,68 @@ extension AppModel {
     // MARK: - Clean-up: folder suggestions
 
     func loadTriageSuggestions() async {
+        triageSuggestionsTask?.cancel()
         guard scope == .triage, let item = items.first, !folders.isEmpty else {
             if !triageSuggestions.isEmpty { triageSuggestions = [] }
             return
         }
         let id = item.id
-        let found: [FolderSuggestion] = (try? await core.call(["cmd": "suggest_folders", "id": id, "limit": 3])) ?? []
-        guard items.first?.id == id else { return }
-        if found != triageSuggestions { triageSuggestions = found }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let found: [FolderSuggestion] = try await self.core.call(.suggestFolders(id: id, limit: 3))
+                guard !Task.isCancelled, self.items.first?.id == id else { return }
+                if found != self.triageSuggestions { self.triageSuggestions = found }
+            } catch is CancellationError {
+                return
+            } catch {
+                self.metaError = error.localizedDescription
+            }
+        }
+        triageSuggestionsTask = task
+        await task.value
     }
 
     // MARK: - Link checks
 
     /// Checks every link not checked this week, ten at a time.
     func checkLinks() async {
-        guard !isCheckingLinks else { return }
+        guard linkCheckTask == nil else { return }
         isCheckingLinks = true
         linksChecked = 0
-        defer { isCheckingLinks = false }
-        while isCheckingLinks, let n: Int = try? await core.call(["cmd": "check_links", "limit": 10], network: true), n > 0 {
-            linksChecked += n
-            await loadLinks()
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.isCheckingLinks = false
+                self.linkCheckTask = nil
+            }
+            do {
+                while !Task.isCancelled {
+                    let n: Int = try await self.core.call(.checkLinks(limit: 10), network: true)
+                    guard n > 0, !Task.isCancelled else { break }
+                    self.linksChecked += n
+                    await self.loadLinks(reset: false)
+                }
+                if !Task.isCancelled {
+                    await self.loadLinks(reset: false)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                if !Task.isCancelled {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
         }
-        await loadLinks()
+        linkCheckTask = task
+        await task.value
     }
 
-    func stopCheckingLinks() { isCheckingLinks = false }
+    func stopCheckingLinks() {
+        linkCheckTask?.cancel()
+        linkCheckTask = nil
+        isCheckingLinks = false
+    }
 
     // MARK: - Backups
 
@@ -146,18 +194,20 @@ extension AppModel {
 
     func runBackup() async {
         guard !isBackingUp, let folder = backupFolder, let target = backupTarget else { return }
-        // An unplugged disk: skip quietly until it is back.
-        guard FileManager.default.fileExists(atPath: folder) else {
+        // Check off the main thread so slow/unmounted disks don't hang UI.
+        guard await HostInstaller.fileExists(atPath: folder) else {
             backupError = "Yedek klasörü şu an yok (disk takılı mı?): \(folder)"
             return
         }
         isBackingUp = true
         defer { isBackingUp = false }
         do {
-            let report: BackupReport = try await core.call(["cmd": "backup", "dest": target.path], network: true)
+            let report: BackupReport = try await core.call(.backup(dest: target.path), network: true)
             lastBackupReport = report
             lastBackupAt = .now
             backupError = nil
+        } catch is CancellationError {
+            return
         } catch {
             backupError = error.localizedDescription
         }
@@ -165,24 +215,36 @@ extension AppModel {
 
     /// Once a day while the app runs, when automatic backups are on.
     func startBackupSchedule() {
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(30))
-            while !Task.isCancelled {
-                guard let self else { return }
-                if self.autoBackup, self.backupFolder != nil, (self.lastBackupAt.map { Date.now.timeIntervalSince($0) > 86_400 } ?? true) {
-                    await self.runBackup()
+        backupScheduleTask?.cancel()
+        backupScheduleTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(30))
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    if self.autoBackup, self.backupFolder != nil, (self.lastBackupAt.map { Date.now.timeIntervalSince($0) > 86_400 } ?? true) {
+                        await self.runBackup()
+                    }
+                    try await Task.sleep(for: .seconds(3600))
                 }
-                try? await Task.sleep(for: .seconds(3600))
-            }
+            } catch is CancellationError {
+                return
+            } catch {}
         }
     }
 
     // MARK: - Menu bar
 
     func loadRecent() async {
-        struct R: Decodable { let items: [Item] }
-        if let r: R = try? await core.call(["cmd": "search", "q": "", "sort": "saved", "limit": 6]), r.items != recentItems {
-            recentItems = r.items
+        struct R: Decodable, Sendable { let items: [Item] }
+        do {
+            let r: R = try await core.call(.search(q: "", sort: "saved", limit: 6, offset: 0))
+            if r.items != recentItems {
+                recentItems = r.items
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            metaError = error.localizedDescription
         }
     }
 }

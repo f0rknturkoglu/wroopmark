@@ -55,32 +55,42 @@ impl Platform {
 
     /// Accepts the canonical names plus the aliases people actually type.
     pub fn parse(s: &str) -> Option<Self> {
-        Some(match s.to_ascii_lowercase().as_str() {
-            "x" | "twitter" | "tw" | "tweet" => Self::X,
-            "facebook" | "fb" => Self::Facebook,
-            "tiktok" | "tt" => Self::Tiktok,
-            "pinterest" | "pin" => Self::Pinterest,
-            "reddit" | "rd" => Self::Reddit,
-            "youtube" | "yt" => Self::Youtube,
-            "instagram" | "ig" | "insta" => Self::Instagram,
-            "github" | "gh" => Self::Github,
-            "hackernews" | "hn" | "ycombinator" => Self::Hackernews,
-            "arxiv" => Self::Arxiv,
-            "web" | "custom" | "link" => Self::Web,
+        let bytes = s.as_bytes();
+        if bytes.len() > 11 {
+            return None;
+        }
+        let mut buf = [0u8; 11];
+        for (dst, &src) in buf.iter_mut().zip(bytes) {
+            *dst = src.to_ascii_lowercase();
+        }
+        Some(match buf.get(..bytes.len())? {
+            b"x" | b"twitter" | b"tw" | b"tweet" => Self::X,
+            b"facebook" | b"fb" => Self::Facebook,
+            b"tiktok" | b"tt" => Self::Tiktok,
+            b"pinterest" | b"pin" => Self::Pinterest,
+            b"reddit" | b"rd" => Self::Reddit,
+            b"youtube" | b"yt" => Self::Youtube,
+            b"instagram" | b"ig" | b"insta" => Self::Instagram,
+            b"github" | b"gh" => Self::Github,
+            b"hackernews" | b"hn" | b"ycombinator" => Self::Hackernews,
+            b"arxiv" => Self::Arxiv,
+            b"web" | b"custom" | b"link" => Self::Web,
             _ => return None,
         })
     }
 
     pub fn from_host(host: &str) -> Self {
-        let h = host.trim_start_matches("www.").trim_start_matches("m.").trim_start_matches("mobile.");
-        let is = |d: &str| h == d || h.ends_with(&format!(".{d}"));
+        let mut h = strip_prefix_repeated(host, "www.");
+        h = strip_prefix_repeated(h, "m.");
+        h = strip_prefix_repeated(h, "mobile.");
+        let is = |d: &str| host_matches(h, d);
         if is("x.com") || is("twitter.com") {
             Self::X
         } else if is("facebook.com") || is("fb.com") || is("fb.watch") {
             Self::Facebook
         } else if is("tiktok.com") {
             Self::Tiktok
-        } else if is("pin.it") || h.split('.').any(|p| p == "pinterest") {
+        } else if is("pin.it") || h.split('.').any(|p| p.eq_ignore_ascii_case("pinterest")) {
             Self::Pinterest
         } else if is("reddit.com") || is("redd.it") {
             Self::Reddit
@@ -98,6 +108,28 @@ impl Platform {
             Self::Web
         }
     }
+}
+
+fn strip_prefix_repeated<'a>(mut s: &'a str, prefix: &str) -> &'a str {
+    while let Some(head) = s.get(..prefix.len())
+        && head.eq_ignore_ascii_case(prefix)
+    {
+        match s.get(prefix.len()..) {
+            Some(rest) => s = rest,
+            None => break,
+        }
+    }
+    s
+}
+
+fn host_matches(host: &str, domain: &str) -> bool {
+    if host.eq_ignore_ascii_case(domain) {
+        return true;
+    }
+    let Some(prefix_len) = host.len().checked_sub(domain.len() + 1) else {
+        return false;
+    };
+    host.get(prefix_len..prefix_len + 1) == Some(".") && host.get(prefix_len + 1..).is_some_and(|tail| tail.eq_ignore_ascii_case(domain))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,7 +175,8 @@ impl Media {
             return None;
         }
         let path = self.url.split(['?', '#']).next().unwrap_or("");
-        path.ends_with(".mp4").then_some(self.url.as_str())
+        let is_mp4 = path.len().checked_sub(4).and_then(|start| path.get(start..)).is_some_and(|ext| ext.eq_ignore_ascii_case(".mp4"));
+        is_mp4.then_some(self.url.as_str())
     }
 
     /// The URL whose bytes end up in `file`.

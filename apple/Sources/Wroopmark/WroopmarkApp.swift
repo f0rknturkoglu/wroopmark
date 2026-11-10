@@ -8,9 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Deletions still undoable in the clean-up view are committed, and the database is cleanly checkpointed.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        Task {
-            if let model, model.hasPendingTriage {
-                await model.commitTriage()
+        Task { @MainActor in
+            if let model {
+                model.stopBackgroundWork()
+                if model.hasPendingTriage {
+                    await model.commitTriage()
+                } else {
+                    await model.waitForPendingTriage()
+                }
             }
             await Core.shared.checkpointForQuit()
             sender.reply(toApplicationShouldTerminate: true)
@@ -48,47 +53,64 @@ struct WroopmarkApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Bağlantı ekle…") { model.showAdd = true }
-                    .keyboardShortcut("n", modifiers: .command)
+                Button { model.showAdd = true } label: {
+                    Label("Bağlantı ekle…", systemImage: "plus")
+                }
+                .keyboardShortcut("n", modifiers: .command)
             }
             CommandMenu("Kütüphane") {
-                Button("Yenile") { Task { await model.reload() } }
-                    .keyboardShortcut("r", modifiers: .command)
-                Divider()
-                Button("Seçilenleri etiketle…") { model.showBulkTags = true }
-                    .keyboardShortcut("t", modifiers: [.command, .shift])
-                    .disabled(model.selection.isEmpty)
-                Button("Seçilenleri sil") { model.requestDelete(Array(model.selection)) }
-                    .keyboardShortcut(.delete, modifiers: .command)
-                    .disabled(model.selection.isEmpty)
-                Divider()
-                Button("Kart görünümü") { model.layout = .grid }
-                    .keyboardShortcut("1", modifiers: .command)
-                Button("Liste görünümü") { model.layout = .list }
-                    .keyboardShortcut("2", modifiers: .command)
-                Button("Akış görünümü") { model.layout = .feed }
-                    .keyboardShortcut("3", modifiers: .command)
-                Divider()
-                Button("Filtreler…") { model.showFilters = true }
-                    .keyboardShortcut("f", modifiers: [.command, .option])
-                Button("Aramayı kaydet…") { model.showSaveSearch = true }
-                    .keyboardShortcut("s", modifiers: [.command, .shift])
-                    .disabled(model.searchToSave.isEmpty)
-                Button("Ayıkla") { model.scope = .triage }
-                    .keyboardShortcut("k", modifiers: [.command, .shift])
-                Divider()
-                Button("İndirmeler") { model.showDownloads.toggle() }
-                    .keyboardShortcut("j", modifiers: .command)
-                Divider()
-                Button(model.isBackingUp ? "Yedekleniyor…" : "Şimdi yedekle") { Task { await model.runBackup() } }
-                    .disabled(model.backupFolder == nil || model.isBackingUp)
-            }
-            CommandMenu("Görünüm") {
-                Picker("Tema", selection: $model.theme) {
-                    ForEach(AppTheme.allCases) { th in
-                        Label(th.label, systemImage: th.iconName).tag(th)
-                    }
+                Button { Task { await model.reload() } } label: {
+                    Label("Yenile", systemImage: "arrow.clockwise")
                 }
+                .keyboardShortcut("r", modifiers: .command)
+                Divider()
+                Button { model.showBulkTags = true } label: {
+                    Label("Seçilenleri etiketle…", systemImage: "tag")
+                }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .disabled(model.selection.isEmpty)
+                Button { model.requestDelete(Array(model.selection)) } label: {
+                    Label("Seçilenleri sil", systemImage: "trash")
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(model.selection.isEmpty)
+                Divider()
+                Button { model.layout = .grid } label: {
+                    Label("Kart görünümü", systemImage: "square.grid.2x2")
+                }
+                .keyboardShortcut("1", modifiers: .command)
+                Button { model.layout = .list } label: {
+                    Label("Liste görünümü", systemImage: "list.bullet")
+                }
+                .keyboardShortcut("2", modifiers: .command)
+                Button { model.layout = .feed } label: {
+                    Label("Akış görünümü", systemImage: "rectangle.grid.1x2")
+                }
+                .keyboardShortcut("3", modifiers: .command)
+                Divider()
+                Button { model.showFilters = true } label: {
+                    Label("Filtreler…", systemImage: "line.3.horizontal.decrease.circle")
+                }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+                Button { model.showSaveSearch = true } label: {
+                    Label("Aramayı kaydet…", systemImage: "bookmark")
+                }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(model.searchToSave.isEmpty)
+                Button { model.scope = .triage } label: {
+                    Label("Ayıkla", systemImage: "arrow.left.arrow.right.square")
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                Divider()
+                Button { model.showDownloads.toggle() } label: {
+                    Label("İndirmeler", systemImage: "arrow.down.circle")
+                }
+                .keyboardShortcut("j", modifiers: .command)
+                Divider()
+                Button { Task { await model.runBackup() } } label: {
+                    Label(model.isBackingUp ? "Yedekleniyor…" : "Şimdi yedekle", systemImage: "externaldrive.badge.timemachine")
+                }
+                .disabled(model.backupFolder == nil || model.isBackingUp)
             }
         }
 
@@ -104,7 +126,6 @@ struct WroopmarkApp: App {
         Settings {
             SettingsView()
                 .environment(model)
-                .preferredColorScheme(model.theme.colorScheme)
                 .tint(Theme.accent)
         }
     }

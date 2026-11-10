@@ -17,7 +17,19 @@ use crate::model::{Folder, Item, Link, Media, MediaKind, Platform};
 use crate::query::{Has, Query, Sort, tag_key};
 use crate::text::{fold, host_of, normalize_url, now};
 
-pub type Result<T> = rusqlite::Result<T>;
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error("{0}")]
+    Sqlite(#[from] rusqlite::Error),
+    #[error("JSON hatası: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("klasör adı boş olamaz")]
+    EmptyFolderName,
+    #[error("beklenmeyen boş sonuç")]
+    EmptyResult,
+}
+
+pub type Result<T> = std::result::Result<T, StoreError>;
 
 /// A folder offered for a post, and the strongest reason why
 /// (`author`, `tag` or `link`).
@@ -29,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -136,6 +148,28 @@ const MIGRATE_10: &str = "ALTER TABLE links ADD COLUMN status INTEGER;
                           ALTER TABLE links ADD COLUMN checked_at INTEGER;
                           ALTER TABLE links ADD COLUMN dead INTEGER NOT NULL DEFAULT 0;";
 
+/// forkOS Nano contract: the dashboard opens this library read-only and reads
+/// only `dashboard_v1 (id, title, url, tags, created_at)`, so the columns stay
+/// fixed even when the tables change. `id` is the item id that
+/// `wroopmark://item/<id>` opens; `title` falls back to the start of the text
+/// (most posts have none); `tags` is a JSON array; `created_at` is when the item
+/// was saved (Unix seconds).
+const MIGRATE_11: &str = "DROP VIEW IF EXISTS dashboard_v1;
+CREATE VIEW dashboard_v1 AS
+SELECT
+  i.id AS id,
+  COALESCE(
+    NULLIF(trim(i.title), ''),
+    NULLIF(trim(substr(replace(replace(i.text, char(10), ' '), char(13), ' '), 1, 140)), ''),
+    i.author_name, i.author_handle, i.url
+  ) AS title,
+  i.url AS url,
+  (SELECT json_group_array(name) FROM (
+     SELECT t.name FROM item_tags it JOIN tags t ON t.id = it.tag
+     WHERE it.item = i.pk ORDER BY t.name)) AS tags,
+  i.saved_at AS created_at
+FROM items i;";
+
 /// A video of the item is not on disk and its URL is a post page, not a
 /// file (TikTok): only an outside downloader can get it.
 const NEEDS_EXTERNAL_VIDEO: &str = "EXISTS (SELECT 1 FROM json_each(i.media) m
@@ -168,6 +202,111 @@ pub struct SearchResult {
     pub links: Vec<Link>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkCategory {
+    Github,
+    Drive,
+    Mega,
+    Youtube,
+    Arxiv,
+    Twitter,
+    Other,
+}
+
+impl LinkCategory {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "github" => Some(Self::Github),
+            "drive" => Some(Self::Drive),
+            "mega" => Some(Self::Mega),
+            "youtube" => Some(Self::Youtube),
+            "arxiv" => Some(Self::Arxiv),
+            "twitter" => Some(Self::Twitter),
+            "other" => Some(Self::Other),
+            _ => None,
+        }
+    }
+
+    pub fn classify(host: &str, url: &str) -> Self {
+        let h = host.to_ascii_lowercase();
+        let u = url.to_ascii_lowercase();
+        if h.contains("github.com") || h.contains("github.io") || h.contains("githubusercontent.com") {
+            Self::Github
+        } else if h.contains("drive.google.com") || h.contains("docs.google.com") {
+            Self::Drive
+        } else if h.contains("mega.nz") || h.contains("mega.io") || u.contains("mega.nz") {
+            Self::Mega
+        } else if h.contains("youtube.com") || h.contains("youtu.be") {
+            Self::Youtube
+        } else if h.contains("arxiv.org") {
+            Self::Arxiv
+        } else if is_domain(&h, "x.com") || is_domain(&h, "twitter.com") || is_domain(&h, "t.co") {
+            Self::Twitter
+        } else {
+            Self::Other
+        }
+    }
+
+    fn sql_predicate(self) -> String {
+        const GITHUB: &str =
+            "(lower(l.host) LIKE '%github.com%' OR lower(l.host) LIKE '%github.io%' OR lower(l.host) LIKE '%githubusercontent.com%')";
+        const DRIVE: &str = "(lower(l.host) LIKE '%drive.google.com%' OR lower(l.host) LIKE '%docs.google.com%')";
+        const MEGA: &str = "(lower(l.host) LIKE '%mega.nz%' OR lower(l.host) LIKE '%mega.io%' OR lower(l.url) LIKE '%mega.nz%')";
+        const YOUTUBE: &str = "(lower(l.host) LIKE '%youtube.com%' OR lower(l.host) LIKE '%youtu.be%')";
+        const ARXIV: &str = "(lower(l.host) LIKE '%arxiv.org%')";
+        const TWITTER: &str = "(lower(l.host) = 'x.com' OR lower(l.host) LIKE '%.x.com' OR lower(l.host) = 'twitter.com' OR lower(l.host) LIKE '%.twitter.com' OR lower(l.host) = 't.co' OR lower(l.host) LIKE '%.t.co')";
+
+        let ordered = [
+            (Self::Github, GITHUB),
+            (Self::Drive, DRIVE),
+            (Self::Mega, MEGA),
+            (Self::Youtube, YOUTUBE),
+            (Self::Arxiv, ARXIV),
+            (Self::Twitter, TWITTER),
+        ];
+        if self == Self::Other {
+            let all: Vec<&str> = ordered.iter().map(|(_, sql)| *sql).collect();
+            return format!("NOT ({})", all.join(" OR "));
+        }
+        let mut earlier = Vec::new();
+        for (cat, sql) in ordered {
+            if cat == self {
+                if earlier.is_empty() {
+                    return sql.to_string();
+                }
+                return format!("(NOT ({}) AND {sql})", earlier.join(" OR "));
+            }
+            earlier.push(sql);
+        }
+        String::from("1 = 1")
+    }
+}
+
+fn is_domain(host: &str, domain: &str) -> bool {
+    host == domain || (host.len() > domain.len() && host.ends_with(domain) && host.as_bytes().get(host.len() - domain.len() - 1) == Some(&b'.'))
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
+pub struct LinkCounts {
+    pub total: i64,
+    pub dead: i64,
+    pub github: i64,
+    pub drive: i64,
+    pub mega: i64,
+    pub youtube: i64,
+    pub arxiv: i64,
+    pub twitter: i64,
+    pub other: i64,
+}
+
+#[derive(Debug, Default, Serialize)]
+pub struct LinksPage {
+    pub links: Vec<Link>,
+    pub total: i64,
+    pub dead_total: i64,
+    pub counts: LinkCounts,
+}
+
 #[derive(Debug, Serialize)]
 pub struct TagCount {
     pub name: String,
@@ -194,16 +333,39 @@ pub struct Store {
     conn: Connection,
 }
 
-fn json<T: Serialize>(v: &T) -> String {
-    serde_json::to_string(v).unwrap_or_else(|_| "null".into())
+fn compress_json(v: &serde_json::Value) -> Option<Vec<u8>> {
+    let mut enc = zstd::Encoder::new(Vec::new(), 3).ok()?;
+    serde_json::to_writer(&mut enc, v).ok()?;
+    enc.finish().ok()
+}
+
+fn decompress_json(blob: &[u8]) -> Option<serde_json::Value> {
+    let dec = zstd::Decoder::new(blob).ok()?;
+    serde_json::from_reader(dec).ok()
 }
 
 fn escape_like(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
 }
 
-fn media_flags(item: &Item) -> (bool, bool, bool) {
-    let all = item.media.iter().chain(item.quote.iter().flat_map(|q| q.media.iter()));
+fn append_placeholders(out: &mut String, count: usize) {
+    for i in 0..count {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push('?');
+    }
+}
+
+fn media_flags_parts(media: &[Media], quote: Option<&Item>) -> (bool, bool, bool) {
+    let all = media.iter().chain(quote.into_iter().flat_map(|q| q.media.iter()));
     let (mut img, mut vid, mut pending) = (false, false, false);
     for m in all {
         match m.kind {
@@ -214,6 +376,14 @@ fn media_flags(item: &Item) -> (bool, bool, bool) {
         pending |= m.video_file.is_none() && m.downloadable_video().is_some();
     }
     (img, vid, pending)
+}
+
+fn media_flags(item: &Item) -> (bool, bool, bool) {
+    media_flags_parts(&item.media, item.quote.as_deref())
+}
+
+fn iter_image_files<'a>(media: &'a [Media], quote: Option<&'a Item>) -> impl Iterator<Item = &'a str> {
+    media.iter().chain(quote.into_iter().flat_map(|q| q.media.iter())).filter_map(|m| m.file.as_deref())
 }
 
 /// File names only ever come from the media store. One arriving from
@@ -253,12 +423,7 @@ fn remember_files(conn: &Connection, media: &[Media]) -> Result<()> {
     Ok(())
 }
 
-/// Local pictures of an item and its quote: images and video posters.
-fn image_files(item: &Item) -> Vec<String> {
-    item.media.iter().chain(item.quote.iter().flat_map(|q| q.media.iter())).filter_map(|m| m.file.clone()).collect()
-}
-
-fn read_item(row: &Row) -> Result<(i64, Item)> {
+fn read_item(row: &Row) -> rusqlite::Result<(i64, Item)> {
     let platform: String = row.get(2)?;
     let media: String = row.get(11)?;
     let quote: Option<String> = row.get(12)?;
@@ -285,7 +450,7 @@ fn read_item(row: &Row) -> Result<(i64, Item)> {
     ))
 }
 
-fn read_link(row: &Row) -> Result<Link> {
+fn read_link(row: &Row) -> rusqlite::Result<Link> {
     Ok(Link {
         id: row.get(0)?,
         url: row.get(1)?,
@@ -321,43 +486,99 @@ fn reindex_item(conn: &Connection, pk: i64) -> Result<()> {
         Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?))
     })?;
     let quote: Option<Item> = quote.and_then(|q| serde_json::from_str(&q).ok());
-    let mut body: Vec<&str> = vec![];
-    body.extend(title.as_deref());
-    body.push(&text);
-    body.extend(note.as_deref());
-    body.extend(extra.as_deref());
-    body.extend(ocr.as_deref());
-    if let Some(q) = &quote {
-        body.extend(q.title.as_deref());
-        body.push(&q.text);
-    }
-    let mut stmt = conn.prepare_cached("SELECT l.url FROM item_links il JOIN links l ON l.id = il.link WHERE il.item = ?1")?;
-    let urls: Vec<String> = stmt.query_map([pk], |r| r.get(0))?.collect::<Result<_>>()?;
-    let urls: Vec<&str> = urls.iter().map(|u| u.trim_start_matches("https://")).collect();
-    body.extend(urls);
 
-    let mut author: Vec<&str> = vec![];
-    author.extend(author_h.as_deref());
-    author.extend(author_n.as_deref());
-    if let Some(q) = &quote {
-        author.extend(q.author_handle.as_deref());
-        author.extend(q.author_name.as_deref());
+    let push_part = |buf: &mut String, sep: char, s: &str| {
+        if !buf.is_empty() {
+            buf.push(sep);
+        }
+        buf.push_str(s);
+    };
+
+    let mut body_raw = String::new();
+    if let Some(t) = title.as_deref() {
+        push_part(&mut body_raw, '\n', t);
     }
-    let mut stmt = conn.prepare_cached("SELECT t.key FROM item_tags it JOIN tags t ON t.id = it.tag WHERE it.item = ?1")?;
-    let tags: Vec<String> = stmt.query_map([pk], |r| r.get::<_, String>(0))?.collect::<Result<_>>()?;
+    push_part(&mut body_raw, '\n', &text);
+    if let Some(n) = note.as_deref() {
+        push_part(&mut body_raw, '\n', n);
+    }
+    if let Some(e) = extra.as_deref() {
+        push_part(&mut body_raw, '\n', e);
+    }
+    if let Some(o) = ocr.as_deref() {
+        push_part(&mut body_raw, '\n', o);
+    }
+    if let Some(q) = &quote {
+        if let Some(t) = q.title.as_deref() {
+            push_part(&mut body_raw, '\n', t);
+        }
+        push_part(&mut body_raw, '\n', &q.text);
+    }
+    {
+        let mut stmt = conn.prepare_cached("SELECT l.url FROM item_links il JOIN links l ON l.id = il.link WHERE il.item = ?1")?;
+        let mut rows = stmt.query([pk])?;
+        while let Some(r) = rows.next()? {
+            let url: String = r.get(0)?;
+            push_part(&mut body_raw, '\n', url.trim_start_matches("https://"));
+        }
+    }
+    let body_folded = fold(&body_raw);
+    drop(body_raw);
+
+    let mut author_raw = String::new();
+    if let Some(h) = author_h.as_deref() {
+        push_part(&mut author_raw, ' ', h);
+    }
+    if let Some(n) = author_n.as_deref() {
+        push_part(&mut author_raw, ' ', n);
+    }
+    if let Some(q) = &quote {
+        if let Some(h) = q.author_handle.as_deref() {
+            push_part(&mut author_raw, ' ', h);
+        }
+        if let Some(n) = q.author_name.as_deref() {
+            push_part(&mut author_raw, ' ', n);
+        }
+    }
+    let author_folded = fold(&author_raw);
+    drop(author_raw);
+
+    let mut tags_raw = String::new();
+    {
+        let mut stmt = conn.prepare_cached("SELECT t.key FROM item_tags it JOIN tags t ON t.id = it.tag WHERE it.item = ?1")?;
+        let mut rows = stmt.query([pk])?;
+        while let Some(r) = rows.next()? {
+            let key: String = r.get(0)?;
+            if !tags_raw.is_empty() {
+                tags_raw.push(' ');
+            }
+            for ch in key.chars() {
+                tags_raw.push(if ch == '/' { ' ' } else { ch });
+            }
+        }
+    }
 
     conn.execute("DELETE FROM items_fts WHERE rowid = ?1", [pk])?;
-    conn.execute(
-        "INSERT INTO items_fts(rowid, body, author, tags) VALUES (?1, ?2, ?3, ?4)",
-        params![pk, fold(&body.join("\n")), fold(&author.join(" ")), tags.join(" ").replace('/', " ")],
-    )?;
+    conn.execute("INSERT INTO items_fts(rowid, body, author, tags) VALUES (?1, ?2, ?3, ?4)", params![pk, body_folded, author_folded, tags_raw])?;
     Ok(())
 }
 
 fn reindex_link(conn: &Connection, id: i64) -> Result<()> {
     let (url, title, desc): (String, Option<String>, Option<String>) =
         conn.query_row("SELECT url, title, description FROM links WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
-    let body = [Some(url.trim_start_matches("https://")), title.as_deref(), desc.as_deref()].into_iter().flatten().collect::<Vec<_>>().join("\n");
+    let mut body = String::from(url.trim_start_matches("https://"));
+    if let Some(t) = title.as_deref() {
+        if !body.is_empty() {
+            body.push('\n');
+        }
+        body.push_str(t);
+    }
+    if let Some(d) = desc.as_deref() {
+        if !body.is_empty() {
+            body.push('\n');
+        }
+        body.push_str(d);
+    }
     conn.execute("DELETE FROM links_fts WHERE rowid = ?1", [id])?;
     conn.execute("INSERT INTO links_fts(rowid, body) VALUES (?1, ?2)", params![id, fold(&body)])?;
     Ok(())
@@ -387,9 +608,15 @@ fn ensure_tag(conn: &Connection, name: &str) -> Result<Option<i64>> {
     if key.is_empty() {
         return Ok(None);
     }
-    let display = name.trim().trim_start_matches('#').split('/').map(str::trim).filter(|p| !p.is_empty()).collect::<Vec<_>>().join("/");
+    let mut display = String::with_capacity(name.len());
+    for part in name.trim().trim_start_matches('#').split('/').map(str::trim).filter(|p| !p.is_empty()) {
+        if !display.is_empty() {
+            display.push('/');
+        }
+        display.push_str(part);
+    }
     conn.execute("INSERT OR IGNORE INTO tags(name, key) VALUES (?1, ?2)", params![display, key])?;
-    conn.query_row("SELECT id FROM tags WHERE key = ?1", [&key], |r| r.get(0)).map(Some)
+    Ok(Some(conn.query_row("SELECT id FROM tags WHERE key = ?1", [&key], |r| r.get(0))?))
 }
 
 fn drop_orphan_tags(conn: &Connection) -> Result<()> {
@@ -407,16 +634,21 @@ fn drop_orphan_links(conn: &Connection) -> Result<()> {
 /// WHERE terms (on `items i`) for everything a query says about items
 /// other than their text.
 fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
-    let marks = |n: usize| vec!["?"; n].join(",");
     for (platforms, neg) in [(&q.platforms, ""), (&q.not_platforms, "NOT ")] {
         if !platforms.is_empty() {
-            wh.push(format!("i.platform {neg}IN ({})", marks(platforms.len())));
+            let mut clause = format!("i.platform {neg}IN (");
+            append_placeholders(&mut clause, platforms.len());
+            clause.push(')');
+            wh.push(clause);
             args.extend(platforms.iter().map(|p| Sql::from(p.as_str().to_string())));
         }
     }
     for (authors, neg) in [(&q.authors, ""), (&q.not_authors, "NOT ")] {
         if !authors.is_empty() {
-            wh.push(format!("lower(coalesce(i.author_handle, '')) {neg}IN ({})", marks(authors.len())));
+            let mut clause = format!("lower(coalesce(i.author_handle, '')) {neg}IN (");
+            append_placeholders(&mut clause, authors.len());
+            clause.push(')');
+            wh.push(clause);
             args.extend(authors.iter().map(|a| Sql::from(a.clone())));
         }
     }
@@ -462,7 +694,10 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
         None => {}
     }
     if !q.ids.is_empty() {
-        wh.push(format!("i.id IN ({})", vec!["?"; q.ids.len()].join(",")));
+        let mut clause = String::from("i.id IN (");
+        append_placeholders(&mut clause, q.ids.len());
+        clause.push(')');
+        wh.push(clause);
         args.extend(q.ids.iter().map(|id| id.clone().into()));
     }
     if let Some(f) = &q.folder {
@@ -506,10 +741,10 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
     }
 }
 
-/// Inserts or refreshes one item inside the caller's transaction.
-fn upsert_in(tx: &Connection, item: &Item) -> Result<Saved> {
+/// Inserts or refreshes one item inside the caller's transaction, mutating
+/// `item` in place to normalize media filenames and carry preserved quote state.
+fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
     let ts = now();
-    let mut item = item.clone();
     drop_foreign_files(&mut item.media);
     if let Some(q) = item.quote.as_mut() {
         drop_foreign_files(&mut q.media);
@@ -528,10 +763,10 @@ fn upsert_in(tx: &Connection, item: &Item) -> Result<Saved> {
             _ => {}
         }
     }
-    let (img, vid, pending) = media_flags(&item);
-    let raw = item.raw.as_ref().and_then(|r| zstd::encode_all(json(r).as_bytes(), 3).ok());
-    let quote = item.quote.as_ref().map(json);
-    let media = json(&item.media);
+    let (img, vid, pending) = media_flags(item);
+    let raw = item.raw.as_ref().and_then(compress_json);
+    let quote = item.quote.as_deref().map(serde_json::to_string).transpose()?;
+    let media = serde_json::to_string(&item.media)?;
 
     let (pk, created) = match existing {
         Some((pk, ..)) => {
@@ -621,11 +856,11 @@ fn upsert_in(tx: &Connection, item: &Item) -> Result<Saved> {
         }
     }
     reindex_item(tx, pk)?;
-    Ok(Saved { id: item.id, created })
+    Ok(Saved { id: item.id.clone(), created })
 }
 
 fn pk_of(conn: &Connection, id: &str) -> Result<i64> {
-    conn.query_row("SELECT pk FROM items WHERE id = ?1", [id], |r| r.get(0))
+    Ok(conn.query_row("SELECT pk FROM items WHERE id = ?1", [id], |r| r.get(0))?)
 }
 
 impl Store {
@@ -633,6 +868,7 @@ impl Store {
         Self::init(Connection::open(path)?)
     }
 
+    #[cfg(test)]
     pub fn open_in_memory() -> Result<Self> {
         Self::init(Connection::open_in_memory()?)
     }
@@ -647,7 +883,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -680,6 +916,9 @@ impl Store {
         if (1..10).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_10} PRAGMA user_version = 10; COMMIT;"))?;
         }
+        if (1..11).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_11} PRAGMA user_version = 11; COMMIT;"))?;
+        }
         Ok(store)
     }
 
@@ -687,57 +926,87 @@ impl Store {
     /// reads first and then writes fails at once with "database is locked"
     /// (no busy wait) when the other process committed in between.
     fn write(&mut self) -> Result<Transaction<'_>> {
-        self.conn.transaction_with_behavior(TransactionBehavior::Immediate)
+        Ok(self.conn.transaction_with_behavior(TransactionBehavior::Immediate)?)
     }
 
     /// Bumps whenever another connection (the browser extension's host)
     /// commits; the app polls it to refresh live.
     pub fn data_version(&self) -> Result<i64> {
-        self.conn.query_row("PRAGMA data_version", [], |r| r.get(0))
+        Ok(self.conn.query_row("PRAGMA data_version", [], |r| r.get(0))?)
     }
 
     /// v2 → v3: X bookmarks saved before the bookmark-time rule worked get
     /// their real save time from the `sortIndex` kept in their raw payload.
     fn reapply_bookmark_times(&mut self) -> Result<usize> {
         let tx = self.write()?;
-        let rows: Vec<(i64, String, Option<i64>, Vec<u8>)> = tx
-            .prepare("SELECT pk, id, created_at, raw FROM items WHERE platform = 'x' AND raw IS NOT NULL")?
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
-            .collect::<Result<_>>()?;
-        let mut n = 0;
-        for (pk, id, created_at, blob) in rows {
-            let raw: Option<serde_json::Value> = zstd::decode_all(&blob[..]).ok().and_then(|b| serde_json::from_slice(&b).ok());
-            let Some(sort) = raw.as_ref().and_then(|r| r.get("__sortIndex")).and_then(|v| v.as_str()) else { continue };
-            let probe = Item { id, created_at, ..Default::default() };
-            if let Some(t) = crate::x::bookmark_time(sort, &probe) {
-                n += tx.execute("UPDATE items SET saved_at = ?2 WHERE pk = ?1", [pk, t])?;
+        let mut updates: Vec<(i64, i64)> = Vec::new();
+        {
+            let mut stmt = tx.prepare("SELECT pk, id, created_at, raw FROM items WHERE platform = 'x' AND raw IS NOT NULL")?;
+            let mut rows = stmt.query([])?;
+            while let Some(row) = rows.next()? {
+                let pk: i64 = row.get(0)?;
+                let id: String = row.get(1)?;
+                let created_at: Option<i64> = row.get(2)?;
+                let blob: Vec<u8> = row.get(3)?;
+                let Some(raw) = decompress_json(&blob) else { continue };
+                let Some(sort) = raw.get("__sortIndex").and_then(|v| v.as_str()) else { continue };
+                let probe = Item { id, created_at, ..Default::default() };
+                if let Some(t) = crate::x::bookmark_time(sort, &probe) {
+                    updates.push((pk, t));
+                }
             }
         }
+        let mut n = 0;
+        let mut upd = tx.prepare("UPDATE items SET saved_at = ?2 WHERE pk = ?1")?;
+        for (pk, t) in updates {
+            n += upd.execute([pk, t])?;
+        }
+        drop(upd);
         tx.commit()?;
         Ok(n)
     }
 
     /// The local file a media URL was already saved as, if any.
     pub fn known_file(&self, url: &str) -> Result<Option<String>> {
-        self.conn.query_row("SELECT file FROM media_files WHERE url = ?1", [url], |r| r.get(0)).optional()
+        Ok(self.conn.query_row("SELECT file FROM media_files WHERE url = ?1", [url], |r| r.get(0)).optional()?)
     }
 
     fn backfill_media_files(&mut self) -> Result<()> {
         let tx = self.write()?;
-        let rows: Vec<(String, Option<String>)> =
-            tx.prepare("SELECT media, quote FROM items")?.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<Result<_>>()?;
-        for (media, quote) in rows {
-            let mut all: Vec<Media> = serde_json::from_str(&media).unwrap_or_default();
-            if let Some(q) = quote.and_then(|q| serde_json::from_str::<Item>(&q).ok()) {
-                all.extend(q.media);
+        let mut pairs: Vec<(String, String)> = Vec::new();
+        {
+            let mut stmt = tx.prepare("SELECT media, quote FROM items")?;
+            let mut rows = stmt.query([])?;
+            while let Some(row) = rows.next()? {
+                let media_json: String = row.get(0)?;
+                let quote_json: Option<String> = row.get(1)?;
+                let media: Vec<Media> = serde_json::from_str(&media_json).unwrap_or_default();
+                let quote = quote_json.as_deref().and_then(|q| serde_json::from_str::<Item>(q).ok());
+                for m in media.iter().chain(quote.iter().flat_map(|q| q.media.iter())) {
+                    if let Some(f) = &m.file {
+                        let src = m.local_source();
+                        if !src.is_empty() {
+                            pairs.push((src.to_string(), f.clone()));
+                        }
+                    }
+                    if let Some(v) = &m.video_file {
+                        pairs.push((m.url.clone(), v.clone()));
+                    }
+                }
             }
-            remember_files(&tx, &all)?;
         }
-        tx.commit()
+        {
+            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO media_files(url, file) VALUES (?1, ?2)")?;
+            for (url, file) in &pairs {
+                stmt.execute([url.as_str(), file.as_str()])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn setting(&self, key: &str) -> Result<Option<String>> {
-        self.conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional()
+        Ok(self.conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional()?)
     }
 
     pub fn set_setting(&mut self, key: &str, value: &str) -> Result<()> {
@@ -747,29 +1016,37 @@ impl Store {
 
     /// Puts every item with a video back in the download queue.
     pub fn queue_videos(&mut self) -> Result<usize> {
-        self.conn.execute("UPDATE items SET media_pending = 1 WHERE has_video = 1", [])
+        Ok(self.conn.execute("UPDATE items SET media_pending = 1 WHERE has_video = 1", [])?)
+    }
+
+    /// Frees unused SQLite cache/allocator memory back to the OS.
+    pub fn shrink_memory(&self) {
+        let _ = self.conn.execute_batch("PRAGMA shrink_memory;");
     }
 
     pub fn checkpoint(&self) {
-        let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+        let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA shrink_memory;");
     }
 
-    /// Inserts or refreshes an item. A refresh keeps the note, downloaded
-    /// media files, the quoted post if the new payload lacks it, and existing
-    /// tags (new tags are added). The save time is kept too, unless the new
-    /// payload carries one (X bookmarks know when they were bookmarked).
+    /// Inserts or refreshes an item (test helper).
+    #[cfg(test)]
     pub fn upsert(&mut self, item: &Item) -> Result<Saved> {
-        Ok(self.upsert_all(std::slice::from_ref(item))?.remove(0))
+        let mut copy = item.clone();
+        self.upsert_all(std::slice::from_mut(&mut copy))?.into_iter().next().ok_or(StoreError::EmptyResult)
     }
 
-    /// Saves a batch (one page of an import) in a single transaction.
-    pub fn upsert_all(&mut self, items: &[Item]) -> Result<Vec<Saved>> {
+    /// Saves a batch (one page of an import) in a single transaction,
+    /// normalizing item media in place without cloning payloads.
+    pub fn upsert_all(&mut self, items: &mut [Item]) -> Result<Vec<Saved>> {
         let tx = self.write()?;
-        let saved = items.iter().map(|item| upsert_in(&tx, item)).collect::<Result<Vec<_>>>()?;
+        let saved = items.iter_mut().map(|item| upsert_in(&tx, item)).collect::<Result<Vec<_>>>()?;
         if saved.iter().any(|s| !s.created) {
             drop_orphan_links(&tx)?;
         }
         tx.commit()?;
+        if items.len() >= 10 {
+            self.shrink_memory();
+        }
         Ok(saved)
     }
 
@@ -778,18 +1055,20 @@ impl Store {
             return Ok(vec![]);
         }
         let pks: Vec<i64> = rows.iter().map(|(pk, _)| *pk).collect();
-        let marks = vec!["?"; pks.len()].join(",");
+        let mut tags_sql = String::from("SELECT it.item, t.name FROM item_tags it JOIN tags t ON t.id = it.tag WHERE it.item IN (");
+        append_placeholders(&mut tags_sql, pks.len());
+        tags_sql.push_str(") ORDER BY t.key");
         let mut tags: HashMap<i64, Vec<String>> = HashMap::new();
-        let mut stmt = self
-            .conn
-            .prepare(&format!("SELECT it.item, t.name FROM item_tags it JOIN tags t ON t.id = it.tag WHERE it.item IN ({marks}) ORDER BY t.key"))?;
+        let mut stmt = self.conn.prepare(&tags_sql)?;
         for r in stmt.query_map(params_from_iter(&pks), |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))? {
             let (pk, name) = r?;
             tags.entry(pk).or_default().push(name);
         }
+        let mut links_sql = String::from("SELECT il.item, l.url FROM item_links il JOIN links l ON l.id = il.link WHERE il.item IN (");
+        append_placeholders(&mut links_sql, pks.len());
+        links_sql.push(')');
         let mut links: HashMap<i64, Vec<String>> = HashMap::new();
-        let mut stmt =
-            self.conn.prepare(&format!("SELECT il.item, l.url FROM item_links il JOIN links l ON l.id = il.link WHERE il.item IN ({marks})"))?;
+        let mut stmt = self.conn.prepare(&links_sql)?;
         for r in stmt.query_map(params_from_iter(&pks), |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))? {
             let (pk, url) = r?;
             links.entry(pk).or_default().push(url);
@@ -821,7 +1100,7 @@ impl Store {
     /// The original payload an item was parsed from.
     pub fn raw(&self, id: &str) -> Result<Option<serde_json::Value>> {
         let blob: Option<Option<Vec<u8>>> = self.conn.query_row("SELECT raw FROM items WHERE id = ?1", [id], |r| r.get(0)).optional()?;
-        Ok(blob.flatten().and_then(|b| zstd::decode_all(&b[..]).ok()).and_then(|b| serde_json::from_slice(&b).ok()))
+        Ok(blob.flatten().and_then(|b| decompress_json(&b)))
     }
 
     pub fn search(&self, q: &Query, sort: Sort, limit: i64, offset: i64) -> Result<SearchResult> {
@@ -849,20 +1128,18 @@ impl Store {
         let where_sql = if wh.is_empty() { String::new() } else { format!("WHERE {}", wh.join(" AND ")) };
 
         let total: i64 = self.conn.query_row(&format!("SELECT count(*) FROM {from} {where_sql}"), params_from_iter(&args), |r| r.get(0))?;
-        let mut page_args = args.clone();
-        page_args.push(limit.into());
-        page_args.push(offset.into());
+        args.push(limit.into());
+        args.push(offset.into());
         let mut stmt = self.conn.prepare(&format!("SELECT {ITEM_COLS} FROM {from} {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"))?;
-        let rows = stmt.query_map(params_from_iter(&page_args), read_item)?.collect::<Result<Vec<_>>>()?;
+        let rows = stmt.query_map(params_from_iter(&args), read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
         let items = self.attach(rows)?;
 
         let links = if offset == 0 && q.has_text() { self.search_links(q, 20, 0)? } else { vec![] };
         Ok(SearchResult { items, total, links })
     }
 
-    /// Links matching the query's text. Item filters (tags, author, dates…)
-    /// keep the links that appear in at least one matching item.
-    fn search_links(&self, q: &Query, limit: i64, offset: i64) -> Result<Vec<Link>> {
+    /// Builds shared FROM/ORDER/WHERE/ARGS parts for link pool queries.
+    fn build_link_query(q: &Query) -> (String, &'static str, Vec<String>, Vec<Sql>) {
         let mut from = "links l".to_string();
         let mut order = "l.first_seen DESC, l.id DESC";
         let mut wh: Vec<String> = vec![];
@@ -884,11 +1161,73 @@ impl Store {
             item_filters(q, &mut inner, &mut args);
             wh.push(format!("EXISTS (SELECT 1 FROM item_links il JOIN items i ON i.pk = il.item WHERE {})", inner.join(" AND ")));
         }
+        (from, order, wh, args)
+    }
+
+    /// Links matching the query's text. Item filters (tags, author, dates…)
+    /// keep the links that appear in at least one matching item.
+    fn search_links(&self, q: &Query, limit: i64, offset: i64) -> Result<Vec<Link>> {
+        let (from, order, wh, mut args) = Self::build_link_query(q);
         let where_sql = if wh.is_empty() { String::new() } else { format!("WHERE {}", wh.join(" AND ")) };
         args.push(limit.into());
         args.push(offset.into());
         let mut stmt = self.conn.prepare(&format!("SELECT {LINK_COLS} FROM {from} {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"))?;
-        stmt.query_map(params_from_iter(&args), read_link)?.collect()
+        let links = stmt.query_map(params_from_iter(&args), read_link)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(links)
+    }
+
+    /// Compact per-category counts for sidebar badges without copying link rows.
+    pub fn link_counts(&self) -> Result<LinkCounts> {
+        let mut counts = LinkCounts::default();
+        let mut stmt = self.conn.prepare_cached("SELECT host, url, dead FROM links")?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let host: String = row.get(0)?;
+            let url: String = row.get(1)?;
+            let dead: bool = row.get(2)?;
+            counts.total += 1;
+            if dead {
+                counts.dead += 1;
+            }
+            match LinkCategory::classify(&host, &url) {
+                LinkCategory::Github => counts.github += 1,
+                LinkCategory::Drive => counts.drive += 1,
+                LinkCategory::Mega => counts.mega += 1,
+                LinkCategory::Youtube => counts.youtube += 1,
+                LinkCategory::Arxiv => counts.arxiv += 1,
+                LinkCategory::Twitter => counts.twitter += 1,
+                LinkCategory::Other => counts.other += 1,
+            }
+        }
+        Ok(counts)
+    }
+
+    /// Filtered and paginated link pool, transferring only the requested slice over FFI.
+    pub fn links_page(&self, text: &str, category: Option<LinkCategory>, only_dead: bool, limit: i64, offset: i64) -> Result<LinksPage> {
+        let q = Query::parse(text);
+        let (from, order, mut wh, mut args) = Self::build_link_query(&q);
+        if let Some(cat) = category {
+            wh.push(cat.sql_predicate());
+        }
+        let base_where_sql = if wh.is_empty() { String::new() } else { format!("WHERE {}", wh.join(" AND ")) };
+        let dead_where_sql = if wh.is_empty() { "WHERE l.dead = 1".to_string() } else { format!("WHERE {} AND l.dead = 1", wh.join(" AND ")) };
+        let dead_total: i64 = self.conn.query_row(&format!("SELECT count(*) FROM {from} {dead_where_sql}"), params_from_iter(&args), |r| r.get(0))?;
+
+        if only_dead {
+            wh.push("l.dead = 1".into());
+        }
+        let where_sql = if wh.is_empty() { String::new() } else { format!("WHERE {}", wh.join(" AND ")) };
+        let total: i64 = if only_dead {
+            dead_total
+        } else {
+            self.conn.query_row(&format!("SELECT count(*) FROM {from} {base_where_sql}"), params_from_iter(&args), |r| r.get(0))?
+        };
+        args.push(limit.into());
+        args.push(offset.into());
+        let mut stmt = self.conn.prepare(&format!("SELECT {LINK_COLS} FROM {from} {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"))?;
+        let links = stmt.query_map(params_from_iter(&args), read_link)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let counts = self.link_counts()?;
+        Ok(LinksPage { links, total, dead_total, counts })
     }
 
     /// The link pool, newest first, optionally filtered by free text.
@@ -896,28 +1235,32 @@ impl Store {
         self.search_links(&Query::parse(text), limit, offset)
     }
 
-    pub fn link_items(&self, link_id: i64) -> Result<Vec<Item>> {
-        let mut stmt = self
-            .conn
-            .prepare(&format!("SELECT {ITEM_COLS} FROM items i JOIN item_links il ON il.item = i.pk WHERE il.link = ?1 ORDER BY i.saved_at DESC"))?;
-        let rows = stmt.query_map([link_id], read_item)?.collect::<Result<Vec<_>>>()?;
+    pub fn link_items(&self, link_id: i64, limit: i64, offset: i64) -> Result<Vec<Item>> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {ITEM_COLS} FROM items i JOIN item_links il ON il.item = i.pk WHERE il.link = ?1 ORDER BY i.saved_at DESC, i.pk DESC LIMIT ?2 OFFSET ?3"
+        ))?;
+        let rows = stmt
+            .query_map(params![link_id, limit.clamp(1, 200), offset.max(0)], read_item)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
         self.attach(rows)
     }
 
     pub fn add_link(&mut self, url: &str) -> Result<Option<Link>> {
         let Some(id) = ensure_link(&self.conn, url, true)? else { return Ok(None) };
-        self.conn.query_row(&format!("SELECT {LINK_COLS} FROM links l WHERE l.id = ?1"), [id], read_link).optional()
+        Ok(self.conn.query_row(&format!("SELECT {LINK_COLS} FROM links l WHERE l.id = ?1"), [id], read_link).optional()?)
     }
 
     pub fn delete_link(&mut self, id: i64) -> Result<()> {
         let tx = self.write()?;
-        let items: Vec<i64> = tx.prepare("SELECT item FROM item_links WHERE link = ?1")?.query_map([id], |r| r.get(0))?.collect::<Result<_>>()?;
+        let items: Vec<i64> =
+            tx.prepare("SELECT item FROM item_links WHERE link = ?1")?.query_map([id], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
         tx.execute("DELETE FROM links WHERE id = ?1", [id])?;
         tx.execute("DELETE FROM links_fts WHERE rowid = ?1", [id])?;
         for pk in items {
             reindex_item(&tx, pk)?;
         }
-        tx.commit()
+        tx.commit()?;
+        Ok(())
     }
 
     /// Links without page details yet. One that failed is left alone for an
@@ -927,7 +1270,10 @@ impl Store {
             "SELECT id, url FROM links WHERE fetched_at IS NULL AND fetch_failures < ?2 AND coalesce(fetch_tried_at, 0) < ?3
              ORDER BY manual DESC, id DESC LIMIT ?1",
         )?;
-        stmt.query_map(params![limit, LINK_TRIES, now() - LINK_RETRY_SECS], |r| Ok((r.get(0)?, r.get(1)?)))?.collect()
+        let rows = stmt
+            .query_map(params![limit, LINK_TRIES, now().saturating_sub(LINK_RETRY_SECS)], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
     }
 
     /// The page could not be fetched; it stays in line for another try.
@@ -949,7 +1295,8 @@ impl Store {
         let mut stmt = self.conn.prepare_cached(
             "SELECT id, url FROM links WHERE coalesce(checked_at, 0) < ?2 ORDER BY checked_at IS NOT NULL, checked_at, id DESC LIMIT ?1",
         )?;
-        stmt.query_map(params![limit, now() - max_age], |r| Ok((r.get(0)?, r.get(1)?)))?.collect()
+        let rows = stmt.query_map(params![limit, now().saturating_sub(max_age)], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
     }
 
     /// `status` is the HTTP status, or 0 when the host did not answer.
@@ -993,13 +1340,16 @@ impl Store {
                FROM votes v JOIN folders f ON f.id = v.folder
               GROUP BY f.id ORDER BY s DESC, lower(f.name) LIMIT ?2",
         )?;
-        stmt.query_map(params![pk, limit], |r| Ok(FolderSuggestion { id: r.get(0)?, name: r.get(1)?, score: r.get(2)?, reason: r.get(3)? }))?
-            .collect()
+        let rows = stmt
+            .query_map(params![pk, limit], |r| Ok(FolderSuggestion { id: r.get(0)?, name: r.get(1)?, score: r.get(2)?, reason: r.get(3)? }))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
     }
 
     /// Copies the database into `dest` as one consistent file (no WAL).
     pub fn backup_to(&self, dest: &Path) -> Result<()> {
         self.conn.execute("VACUUM INTO ?1", [dest.to_string_lossy()])?;
+        self.shrink_memory();
         Ok(())
     }
 
@@ -1015,7 +1365,8 @@ impl Store {
         }
         drop_orphan_tags(&tx)?;
         reindex_item(&tx, pk)?;
-        tx.commit()
+        tx.commit()?;
+        Ok(())
     }
 
     /// Adds and removes tags on many items at once (multi-select in the UI).
@@ -1035,7 +1386,8 @@ impl Store {
             reindex_item(&tx, pk)?;
         }
         drop_orphan_tags(&tx)?;
-        tx.commit()
+        tx.commit()?;
+        Ok(())
     }
 
     /// Renames a tag and everything under it: `dev` → `kod` turns `dev/rust`
@@ -1045,14 +1397,15 @@ impl Store {
         if from_key.is_empty() || tag_key(&to_name).is_empty() {
             return Ok(0);
         }
+        let depth = from_key.split('/').count();
         let tx = self.write()?;
         let affected: Vec<(i64, String)> = tx
             .prepare("SELECT id, name FROM tags WHERE key = ?1 OR key LIKE ?2 ESCAPE '\\'")?
             .query_map(params![from_key, format!("{}/%", escape_like(&from_key))], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<Result<_>>()?;
+            .collect::<rusqlite::Result<_>>()?;
         let mut items: Vec<i64> = vec![];
         for (old_id, old_name) in &affected {
-            let suffix = old_name.splitn(from_key.split('/').count() + 1, '/').nth(from_key.split('/').count());
+            let suffix = old_name.splitn(depth.saturating_add(1), '/').nth(depth);
             let new_name = match suffix {
                 Some(s) => format!("{to_name}/{s}"),
                 None => to_name.clone(),
@@ -1064,7 +1417,8 @@ impl Store {
                 tx.execute("UPDATE tags SET name = ?2 WHERE id = ?1", params![old_id, new_name])?;
                 continue;
             }
-            let pks: Vec<i64> = tx.prepare("SELECT item FROM item_tags WHERE tag = ?1")?.query_map([old_id], |r| r.get(0))?.collect::<Result<_>>()?;
+            let pks: Vec<i64> =
+                tx.prepare("SELECT item FROM item_tags WHERE tag = ?1")?.query_map([old_id], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
             for pk in &pks {
                 tx.execute("INSERT OR IGNORE INTO item_tags(item, tag) VALUES (?1, ?2)", [pk, &new_id])?;
             }
@@ -1084,7 +1438,8 @@ impl Store {
         let mut stmt = self.conn.prepare_cached(
             "SELECT t.name, t.key, count(it.item) FROM tags t LEFT JOIN item_tags it ON it.tag = t.id GROUP BY t.id ORDER BY t.key",
         )?;
-        stmt.query_map([], |r| Ok(TagCount { name: r.get(0)?, key: r.get(1)?, count: r.get(2)? }))?.collect()
+        let rows = stmt.query_map([], |r| Ok(TagCount { name: r.get(0)?, key: r.get(1)?, count: r.get(2)? }))?.collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
     }
 
     pub fn folders(&self) -> Result<Vec<Folder>> {
@@ -1095,13 +1450,16 @@ impl Store {
              GROUP BY f.id
              ORDER BY lower(f.name) ASC",
         )?;
-        stmt.query_map([], |r| Ok(Folder { id: r.get(0)?, name: r.get(1)?, created_at: r.get(2)?, count: r.get(3)? }))?.collect()
+        let rows = stmt
+            .query_map([], |r| Ok(Folder { id: r.get(0)?, name: r.get(1)?, created_at: r.get(2)?, count: r.get(3)? }))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
     }
 
     pub fn add_folder(&mut self, name: &str) -> Result<Folder> {
         let clean = name.trim();
         if clean.is_empty() {
-            return Err(rusqlite::Error::InvalidParameterName("klasör adı boş olamaz".into()));
+            return Err(StoreError::EmptyFolderName);
         }
         let now = now();
         self.conn.execute("INSERT INTO folders(name, created_at) VALUES (?1, ?2)", params![clean, now])?;
@@ -1112,7 +1470,7 @@ impl Store {
     pub fn rename_folder(&mut self, id: i64, name: &str) -> Result<()> {
         let clean = name.trim();
         if clean.is_empty() {
-            return Err(rusqlite::Error::InvalidParameterName("klasör adı boş olamaz".into()));
+            return Err(StoreError::EmptyFolderName);
         }
         self.conn.execute("UPDATE folders SET name = ?2 WHERE id = ?1", params![id, clean])?;
         Ok(())
@@ -1122,7 +1480,8 @@ impl Store {
         let tx = self.write()?;
         tx.execute("UPDATE items SET folder_id = NULL WHERE folder_id = ?1", [id])?;
         tx.execute("DELETE FROM folders WHERE id = ?1", [id])?;
-        tx.commit()
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn move_to_folder(&mut self, id: &str, folder_id: Option<i64>) -> Result<()> {
@@ -1139,7 +1498,8 @@ impl Store {
                 tx.execute("UPDATE items SET folder_id = ?2, updated_at = ?3 WHERE pk = ?1", params![pk, folder_id, now])?;
             }
         }
-        tx.commit()
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn completed_video_downloads(&self, limit: i64) -> Result<Vec<Item>> {
@@ -1148,7 +1508,7 @@ impl Store {
                AND EXISTS (SELECT 1 FROM json_each(i.media) m WHERE json_extract(m.value, '$.video_file') IS NOT NULL)
              ORDER BY i.saved_at DESC LIMIT ?1"
         ))?;
-        let rows = stmt.query_map([limit], read_item)?.collect::<Result<Vec<_>>>()?;
+        let rows = stmt.query_map([limit], read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
         self.attach(rows)
     }
 
@@ -1158,7 +1518,7 @@ impl Store {
                AND {NEEDS_EXTERNAL_VIDEO}
              ORDER BY coalesce(i.video_tried_at, 0) DESC LIMIT ?1"
         ))?;
-        let rows = stmt.query_map([limit], read_item)?.collect::<Result<Vec<_>>>()?;
+        let rows = stmt.query_map([limit], read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
         self.attach(rows)
     }
 
@@ -1168,7 +1528,9 @@ impl Store {
     }
 
     pub fn retry_all_video_downloads(&mut self) -> Result<usize> {
-        self.conn.execute("UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE has_video = 1 AND video_tries > 0", [])
+        Ok(self
+            .conn
+            .execute("UPDATE items SET video_tries = 0, video_tried_at = 0, media_pending = 1 WHERE has_video = 1 AND video_tries > 0", [])?)
     }
 
     pub fn set_note(&mut self, id: &str, note: Option<&str>) -> Result<()> {
@@ -1197,11 +1559,10 @@ impl Store {
         else {
             return Ok(vec![]);
         };
-        let mut all: Vec<Media> = serde_json::from_str(&media).unwrap_or_default();
-        if let Some(q) = quote.and_then(|q| serde_json::from_str::<Item>(&q).ok()) {
-            all.extend(q.media);
-        }
-        let files: Vec<String> = all.into_iter().flat_map(|m| [m.file, m.video_file]).flatten().collect();
+        let media_items: Vec<Media> = serde_json::from_str(&media).unwrap_or_default();
+        let quote_item = quote.and_then(|q| serde_json::from_str::<Item>(&q).ok());
+        let files: Vec<String> =
+            media_items.into_iter().chain(quote_item.into_iter().flat_map(|q| q.media)).flat_map(|m| [m.file, m.video_file]).flatten().collect();
         tx.execute("DELETE FROM items WHERE pk = ?1", [pk])?;
         tx.execute("DELETE FROM items_fts WHERE rowid = ?1", [pk])?;
         drop_orphan_tags(&tx)?;
@@ -1226,26 +1587,36 @@ impl Store {
     pub fn pending_media(&self, limit: i64) -> Result<Vec<Item>> {
         let mut stmt =
             self.conn.prepare_cached(&format!("SELECT {ITEM_COLS} FROM items i WHERE i.media_pending = 1 ORDER BY i.saved_at DESC LIMIT ?1"))?;
-        stmt.query_map([limit], read_item)?.map(|r| r.map(|(_, item)| item)).collect()
+        let items = stmt.query_map([limit], read_item)?.map(|r| r.map(|(_, item)| item)).collect::<rusqlite::Result<_>>()?;
+        Ok(items)
     }
 
     /// Stores the media list after a download pass; the item is no longer
     /// pending even if some files failed (they are retried only on demand).
     pub fn set_media(&mut self, id: &str, media: &[Media], quote: Option<&Item>) -> Result<()> {
-        let probe = Item { media: media.to_vec(), quote: quote.cloned().map(Box::new), ..Default::default() };
-        let (img, vid, _) = media_flags(&probe);
+        let (img, vid, _) = media_flags_parts(media, quote);
         // New pictures on disk mean the OCR text (if any) is incomplete.
-        let before = self.get(id)?.map(|i| image_files(&i)).unwrap_or_default();
-        let reset_ocr = image_files(&probe) != before;
-        remember_files(&self.conn, &probe.media)?;
+        let prev: Option<(String, Option<String>)> =
+            self.conn.query_row("SELECT media, quote FROM items WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+        let reset_ocr = match &prev {
+            Some((m_json, q_json)) => {
+                let old_media: Vec<Media> = serde_json::from_str(m_json).unwrap_or_default();
+                let old_quote: Option<Item> = q_json.as_deref().and_then(|q| serde_json::from_str(q).ok());
+                !iter_image_files(media, quote).eq(iter_image_files(&old_media, old_quote.as_ref()))
+            }
+            None => iter_image_files(media, quote).next().is_some(),
+        };
+        remember_files(&self.conn, media)?;
         if let Some(q) = quote {
             remember_files(&self.conn, &q.media)?;
         }
+        let media_json = serde_json::to_string(media)?;
+        let quote_json = quote.map(serde_json::to_string).transpose()?;
         self.conn.execute(
             "UPDATE items SET media = ?2, quote = coalesce(?3, quote), has_image = ?4, has_video = ?5, media_pending = 0,
                ocr = CASE WHEN ?6 THEN NULL ELSE ocr END
              WHERE id = ?1",
-            params![id, json(&media), quote.map(json), img, vid, reset_ocr],
+            params![id, media_json, quote_json, img, vid, reset_ocr],
         )?;
         Ok(())
     }
@@ -1261,7 +1632,7 @@ impl Store {
             ))?;
             for row in stmt.query_map([limit], read_item)? {
                 let (_, item) = row?;
-                let files = image_files(&item);
+                let files: Vec<String> = iter_image_files(&item.media, item.quote.as_deref()).map(str::to_string).collect();
                 if files.is_empty() { empty.push(item.id) } else { out.push((item.id, files)) }
             }
         }
@@ -1279,7 +1650,11 @@ impl Store {
                AND i.video_tries < ?2 AND coalesce(i.video_tried_at, 0) < ?3
              ORDER BY i.saved_at DESC LIMIT ?1"
         ))?;
-        stmt.query_map(params![limit, VIDEO_TRIES, now() - VIDEO_RETRY_SECS], read_item)?.map(|r| r.map(|(_, item)| item)).collect()
+        let items = stmt
+            .query_map(params![limit, VIDEO_TRIES, now().saturating_sub(VIDEO_RETRY_SECS)], read_item)?
+            .map(|r| r.map(|(_, item)| item))
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(items)
     }
 
     /// An outside download failed; the item waits before the next try.
@@ -1292,9 +1667,10 @@ impl Store {
     /// out of it until reset.
     pub fn set_reviewed(&mut self, ids: &[String], reviewed: bool) -> Result<usize> {
         let tx = self.write()?;
+        let ts = now();
         let mut n = 0;
         for id in ids {
-            n += tx.execute("UPDATE items SET reviewed_at = CASE WHEN ?2 THEN ?3 ELSE NULL END WHERE id = ?1", params![id, reviewed, now()])?;
+            n += tx.execute("UPDATE items SET reviewed_at = CASE WHEN ?2 THEN ?3 ELSE NULL END WHERE id = ?1", params![id, reviewed, ts])?;
         }
         tx.commit()?;
         Ok(n)
@@ -1302,7 +1678,7 @@ impl Store {
 
     /// Puts every kept item back in the clean-up view.
     pub fn reset_reviewed(&mut self) -> Result<usize> {
-        self.conn.execute("UPDATE items SET reviewed_at = NULL WHERE reviewed_at IS NOT NULL", [])
+        Ok(self.conn.execute("UPDATE items SET reviewed_at = NULL WHERE reviewed_at IS NOT NULL", [])?)
     }
 
     /// Stores recognized text ('' when there was none) and reindexes.
@@ -1316,31 +1692,46 @@ impl Store {
     /// on disk (a failed picture, poster or video).
     pub fn retry_media(&mut self) -> Result<usize> {
         let tx = self.write()?;
-        let rows: Vec<(i64, String, Option<String>)> = tx
-            .prepare("SELECT pk, media, quote FROM items WHERE media_pending = 0")?
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-            .collect::<Result<_>>()?;
+        let mut pending_pks: Vec<i64> = Vec::new();
+        {
+            let mut stmt = tx.prepare("SELECT pk, media, quote FROM items WHERE media_pending = 0")?;
+            let mut rows = stmt.query([])?;
+            while let Some(row) = rows.next()? {
+                let pk: i64 = row.get(0)?;
+                let media_json: String = row.get(1)?;
+                let quote_json: Option<String> = row.get(2)?;
+                let media: Vec<Media> = serde_json::from_str(&media_json).unwrap_or_default();
+                let quote = quote_json.as_deref().and_then(|q| serde_json::from_str::<Item>(q).ok());
+                if media_flags_parts(&media, quote.as_ref()).2 {
+                    pending_pks.push(pk);
+                }
+            }
+        }
         let mut n = 0;
-        for (pk, media, quote) in rows {
-            let probe = Item {
-                media: serde_json::from_str(&media).unwrap_or_default(),
-                quote: quote.and_then(|q| serde_json::from_str(&q).ok()).map(Box::new),
-                ..Default::default()
-            };
-            if media_flags(&probe).2 {
-                n += tx.execute("UPDATE items SET media_pending = 1 WHERE pk = ?1", [pk])?;
+        {
+            let mut upd = tx.prepare("UPDATE items SET media_pending = 1 WHERE pk = ?1")?;
+            for pk in pending_pks {
+                n += upd.execute([pk])?;
             }
         }
         tx.commit()?;
+        self.shrink_memory();
         Ok(n)
     }
 
     pub fn stats(&self) -> Result<Stats> {
         let one = |sql: &str| self.conn.query_row(sql, [], |r| r.get::<_, i64>(0));
-        let mut by_platform = HashMap::new();
-        for p in Platform::ALL {
-            let n: i64 = self.conn.query_row("SELECT count(*) FROM items WHERE platform = ?1", [p.as_str()], |r| r.get(0))?;
-            by_platform.insert(p.as_str(), n);
+        let mut by_platform: HashMap<&'static str, i64> = Platform::ALL.iter().map(|p| (p.as_str(), 0)).collect();
+        {
+            let mut stmt = self.conn.prepare_cached("SELECT platform, count(*) FROM items GROUP BY platform")?;
+            let mut rows = stmt.query([])?;
+            while let Some(row) = rows.next()? {
+                let name: String = row.get(0)?;
+                let count: i64 = row.get(1)?;
+                if let Some(p) = Platform::parse(&name) {
+                    by_platform.insert(p.as_str(), count);
+                }
+            }
         }
         Ok(Stats {
             items: one("SELECT count(*) FROM items")?,
@@ -1355,7 +1746,7 @@ impl Store {
                     "SELECT count(*) FROM items i WHERE i.has_video = 1 AND i.platform != 'youtube' AND {NEEDS_EXTERNAL_VIDEO}
                        AND i.video_tries < ?1 AND coalesce(i.video_tried_at, 0) < ?2"
                 ),
-                params![VIDEO_TRIES, now() - VIDEO_RETRY_SECS],
+                params![VIDEO_TRIES, now().saturating_sub(VIDEO_RETRY_SECS)],
                 |r| r.get(0),
             )?,
         })
@@ -1487,6 +1878,22 @@ mod tests {
         // Item search shows links only through matching items.
         let r = s.search(&Query::parse("github -platform:tiktok"), Sort::Default, 50, 0).unwrap();
         assert_eq!(r.links.iter().map(|l| l.url.as_str()).collect::<Vec<_>>(), vec!["https://github.com/rust-lang/rust"]);
+    }
+
+    #[test]
+    fn link_items_paginate() {
+        let mut s = Store::open_in_memory().unwrap();
+        for n in 1..=3 {
+            let mut p = post(&n.to_string(), "bağlantı");
+            p.links = vec!["https://example.com/shared".into()];
+            s.upsert(&p).unwrap();
+        }
+        let link = s.links("", 10, 0).unwrap().into_iter().find(|l| l.url == "https://example.com/shared").unwrap();
+        assert_eq!(s.link_items(link.id, 2, 0).unwrap().len(), 2);
+        let second = s.link_items(link.id, 2, 2).unwrap();
+        assert_eq!(second.len(), 1);
+        assert_eq!(second[0].id, "x:1");
+        assert!(s.link_items(link.id, 2, 3).unwrap().is_empty());
     }
 
     #[test]
@@ -1636,6 +2043,38 @@ mod tests {
     }
 
     #[test]
+    fn dashboard_v1_view_for_forkos_nano() {
+        let mut s = Store::open_in_memory().unwrap();
+        s.upsert(&post("1", "Bir tweet metni\nikinci satır")).unwrap();
+        s.conn
+            .execute_batch(
+                "INSERT INTO tags (id, name, key) VALUES (1, 'rust', 'rust'), (2, 'db', 'db');
+                 INSERT INTO item_tags (item, tag) SELECT pk, 1 FROM items;
+                 INSERT INTO item_tags (item, tag) SELECT pk, 2 FROM items;",
+            )
+            .unwrap();
+        let cols: Vec<String> = s
+            .conn
+            .prepare("SELECT name FROM pragma_table_info('dashboard_v1')")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(rusqlite::Result::unwrap)
+            .collect();
+        assert_eq!(cols, ["id", "title", "url", "tags", "created_at"]);
+        let (id, title, tags, saved): (String, String, String, i64) = s
+            .conn
+            .query_row("SELECT id, title, tags, created_at FROM dashboard_v1", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .unwrap();
+        let item_id: String = s.conn.query_row("SELECT id FROM items", [], |r| r.get(0)).unwrap();
+        assert_eq!(id, item_id, "wroopmark://item/<id> ile açılan kimlik");
+        assert_eq!(title, "Bir tweet metni ikinci satır", "başlık yoksa metnin başı");
+        assert_eq!(tags, r#"["db","rust"]"#);
+        let stored: i64 = s.conn.query_row("SELECT saved_at FROM items", [], |r| r.get(0)).unwrap();
+        assert_eq!(saved, stored);
+    }
+
+    #[test]
     fn migrates_old_libraries() {
         let path = std::env::temp_dir().join(format!("wm-migrate-{}.sqlite", std::process::id()));
         let _ = std::fs::remove_file(&path);
@@ -1698,5 +2137,49 @@ mod tests {
         assert_eq!(s.folders().unwrap().len(), 0);
         let item_after = s.get("x:1").unwrap().unwrap();
         assert_eq!(item_after.folder_id, None);
+    }
+
+    #[test]
+    fn link_counts_and_paginated_categories_match() {
+        let mut s = Store::open_in_memory().unwrap();
+        let samples = [
+            "https://github.com/rust-lang/rust",
+            "https://drive.google.com/file/d/123",
+            "https://mega.nz/file/abc",
+            "https://youtu.be/xyz",
+            "https://arxiv.org/abs/2401.00001",
+            "https://api.twitter.com/post/1",
+            "https://dropbox.com/s/1",   // must NOT match x.com
+            "https://microsoft.com/doc", // must NOT match t.co
+        ];
+        let mut added = Vec::new();
+        for url in samples {
+            added.push(s.add_link(url).unwrap().unwrap());
+        }
+        s.set_link_status(added[0].id, 404, true).unwrap();
+        s.set_link_status(added[6].id, 410, true).unwrap();
+
+        let counts = s.link_counts().unwrap();
+        assert_eq!(counts, LinkCounts { total: 8, dead: 2, github: 1, drive: 1, mega: 1, youtube: 1, arxiv: 1, twitter: 1, other: 2 });
+
+        let gh = s.links_page("", Some(LinkCategory::Github), false, 10, 0).unwrap();
+        assert_eq!(gh.total, 1);
+        assert_eq!(gh.dead_total, 1);
+        assert_eq!(gh.links[0].url, "https://github.com/rust-lang/rust");
+
+        let tw = s.links_page("", Some(LinkCategory::Twitter), false, 10, 0).unwrap();
+        assert_eq!(tw.total, 1);
+        assert_eq!(tw.links[0].host, "api.twitter.com");
+
+        let other = s.links_page("", Some(LinkCategory::Other), false, 10, 0).unwrap();
+        assert_eq!(other.total, 2);
+        assert_eq!(other.dead_total, 1);
+
+        let dead_only = s.links_page("", None, true, 1, 0).unwrap();
+        assert_eq!(dead_only.total, 2);
+        assert_eq!(dead_only.links.len(), 1);
+        let dead_page2 = s.links_page("", None, true, 1, 1).unwrap();
+        assert_eq!(dead_page2.links.len(), 1);
+        assert_ne!(dead_only.links[0].id, dead_page2.links[0].id);
     }
 }

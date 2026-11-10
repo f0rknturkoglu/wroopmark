@@ -1,5 +1,6 @@
 import CoreSpotlight
 import Foundation
+import os
 import UniformTypeIdentifiers
 
 /// Puts saved posts in Spotlight: text, author, tags and the text read from
@@ -10,58 +11,99 @@ enum Spotlight {
     static var enabled: Bool { UserDefaults.standard.object(forKey: "spotlight") as? Bool ?? true }
 
     private static let indexedAtKey = "spotlightIndexedAt"
-    private static let page = 500
+    private nonisolated static let page = 500
+    private nonisolated static let logger = Logger(subsystem: "com.wroopmark", category: "Spotlight")
     private static var fullTask: Task<Void, Never>?
+    private static var recentTask: Task<Void, Never>?
 
-    private struct Page: Decodable { let items: [Item] }
+    private struct Page: Decodable, Sendable { let items: [Item] }
 
     /// Indexes the whole library, at most every six hours unless forced.
-    /// Starts from an empty index, so posts deleted elsewhere (the CLI,
-    /// another copy of the library) do not linger in Spotlight.
-    static func reindex(force: Bool = false) {
+    /// Ensures the library can open before clearing the index so DB failures
+    /// or cancellations do not wipe existing Spotlight entries.
+    static func reindex(force: Bool = false, core: any CoreClient = Core.shared) {
         guard enabled, fullTask == nil else { return }
-        if !force, let last = UserDefaults.standard.object(forKey: indexedAtKey) as? Date, Date.now.timeIntervalSince(last) < 6 * 3600 { return }
+        if !force, let last = UserDefaults.standard.object(forKey: indexedAtKey) as? Date, Date.now.timeIntervalSince(last) < 6 * 3600 {
+            return
+        }
         fullTask = Task(priority: .background) {
             defer { fullTask = nil }
-            try? await CSSearchableIndex.default().deleteAllSearchableItems()
+            let completed = await performFullReindex(core: core)
+            if completed && !Task.isCancelled {
+                UserDefaults.standard.set(Date.now, forKey: indexedAtKey)
+            }
+        }
+    }
+
+    private nonisolated static func performFullReindex(core: any CoreClient) async -> Bool {
+        guard await core.ensureOpen(), !Task.isCancelled else { return false }
+        do {
+            try await CSSearchableIndex.default().deleteAllSearchableItems()
             var offset = 0
             while !Task.isCancelled {
-                guard let r: Page = try? await Core.shared.call(["cmd": "search", "q": "", "sort": "saved", "limit": page, "offset": offset]),
-                      !r.items.isEmpty else { break }
-                await index(r.items)
+                let r: Page = try await core.call(.search(q: "", sort: "saved", limit: page, offset: offset))
+                guard !r.items.isEmpty, !Task.isCancelled else { break }
+                let entries = r.items.map { entry($0, core: core) }
+                try await CSSearchableIndex.default().indexSearchableItems(entries)
                 offset += r.items.count
                 if r.items.count < page { break }
             }
-            UserDefaults.standard.set(Date.now, forKey: indexedAtKey)
+            return !Task.isCancelled
+        } catch is CancellationError {
+            return false
+        } catch {
+            logger.error("Spotlight full reindex failed: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
     /// The newest saves, after the library changed behind the app's back
     /// (the browser extension).
-    static func indexRecent() {
+    static func indexRecent(core: any CoreClient = Core.shared) {
         guard enabled else { return }
-        Task(priority: .background) {
-            guard let r: Page = try? await Core.shared.call(["cmd": "search", "q": "", "sort": "saved", "limit": 50]) else { return }
-            await index(r.items)
+        recentTask?.cancel()
+        recentTask = Task(priority: .background) {
+            defer { recentTask = nil }
+            await performRecentIndex(core: core)
+        }
+    }
+
+    private nonisolated static func performRecentIndex(core: any CoreClient) async {
+        do {
+            let r: Page = try await core.call(.search(q: "", sort: "saved", limit: 50, offset: 0))
+            guard !Task.isCancelled, !r.items.isEmpty else { return }
+            let entries = r.items.map { entry($0, core: core) }
+            try await CSSearchableIndex.default().indexSearchableItems(entries)
+        } catch is CancellationError {
+            return
+        } catch {
+            logger.error("Spotlight recent index failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     static func remove(_ ids: [String]) {
         guard !ids.isEmpty else { return }
-        CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: ids) { _ in }
+        CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: ids) { error in
+            if let error {
+                logger.error("Spotlight delete failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     static func clear() {
         fullTask?.cancel()
+        fullTask = nil
+        recentTask?.cancel()
+        recentTask = nil
         UserDefaults.standard.removeObject(forKey: indexedAtKey)
-        CSSearchableIndex.default().deleteAllSearchableItems { _ in }
+        CSSearchableIndex.default().deleteAllSearchableItems { error in
+            if let error {
+                logger.error("Spotlight clear failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
-    private nonisolated static func index(_ items: [Item]) async {
-        try? await CSSearchableIndex.default().indexSearchableItems(items.map(entry))
-    }
-
-    private nonisolated static func entry(_ item: Item) -> CSSearchableItem {
+    private nonisolated static func entry(_ item: Item, core: any CoreClient) -> CSSearchableItem {
         let a = CSSearchableItemAttributeSet(contentType: .text)
         let who = item.authorName ?? item.authorHandle.map { "@\($0)" }
         let firstLine = item.text.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init)
@@ -72,7 +114,7 @@ enum Spotlight {
         if let who { a.authorNames = [who] }
         a.contentCreationDate = Date(timeIntervalSince1970: TimeInterval(item.createdAt ?? item.savedAt))
         a.contentURL = URL(string: item.url)
-        if let file = item.cover?.file { a.thumbnailURL = Core.shared.mediaURL(file) }
+        if let file = item.cover?.file { a.thumbnailURL = core.mediaURL(file) }
         return CSSearchableItem(uniqueIdentifier: item.id, domainIdentifier: item.platform, attributeSet: a)
     }
 }

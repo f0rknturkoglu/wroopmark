@@ -47,7 +47,7 @@ Chromium/Safari eklentisi; hepsi tek bir yerel kütüphaneyi kullanır.
 - Menü çubuğundan link kaydet; her uygulamada ⌃⌥⌘S panodaki linki kaydeder.
 - Eklentide ⌥⇧S, sağ tıkla klasöre kaydet; arşivdeki sayfalarda simgede ✓.
 
-## Kurulum (macOS 14+)
+## Kurulum (macOS 26+)
 
 ### Tek komut
 

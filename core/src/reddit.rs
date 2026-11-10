@@ -19,7 +19,7 @@ fn n(v: &Value, ptr: &str) -> Option<u32> {
 
 /// Without `raw_json=1` Reddit escapes `&` in every URL.
 fn unescape(u: String) -> String {
-    u.replace("&amp;", "&")
+    if u.contains("&amp;") { u.replace("&amp;", "&") } else { u }
 }
 
 /// Every post or comment in a listing, a list of listings (a post page) or
@@ -49,7 +49,8 @@ fn permalink(d: &Value) -> Option<String> {
 }
 
 fn created(d: &Value) -> Option<i64> {
-    d.get("created_utc").and_then(Value::as_f64).map(|t| t as i64)
+    let t = d.get("created_utc").and_then(Value::as_f64)?;
+    if t.is_finite() && t >= i64::MIN as f64 && t < 9_223_372_036_854_775_808.0 { Some(t.trunc() as i64) } else { None }
 }
 
 fn post_media(d: &Value) -> Vec<Media> {
@@ -85,14 +86,11 @@ fn post_media(d: &Value) -> Vec<Media> {
         }
     }
     let dest = s(d, "/url_overridden_by_dest").or_else(|| s(d, "/url")).map(unescape);
-    if let Some(u) = &dest {
-        let path = u.split(['?', '#']).next().unwrap_or("").to_ascii_lowercase();
-        if [".jpg", ".jpeg", ".png", ".webp", ".gif"].iter().any(|e| path.ends_with(e)) {
-            return vec![Media {
-                width: n(d, "/preview/images/0/source/width"),
-                height: n(d, "/preview/images/0/source/height"),
-                ..Media::image(u.clone())
-            }];
+    if let Some(u) = dest {
+        let path = u.split(['?', '#']).next().unwrap_or("");
+        const IMAGE_EXTS: [&str; 5] = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+        if IMAGE_EXTS.iter().any(|e| path.len() >= e.len() && path.get(path.len() - e.len()..).is_some_and(|tail| tail.eq_ignore_ascii_case(e))) {
+            return vec![Media { width: n(d, "/preview/images/0/source/width"), height: n(d, "/preview/images/0/source/height"), ..Media::image(u) }];
         }
     }
     // A link post: its preview picture.

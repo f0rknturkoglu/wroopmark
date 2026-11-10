@@ -13,7 +13,6 @@ struct TriageView: View {
     /// focus stays in the sidebar list, which would take the arrows.
     @State private var keyMonitor: Any?
     @State private var showNewFolderSheet = false
-    @State private var newFolderName = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,49 +20,53 @@ struct TriageView: View {
                 if let item = model.items.first {
                     TriageCard(item: item)
                         .id(item.id)
+                        .contextMenu { menu(for: item) }
                         .transition(.asymmetric(insertion: .opacity, removal: .move(edge: leaving).combined(with: .opacity)))
                 } else if !model.isLoading {
-                    done
+                    if let err = model.gridError {
+                        ContentUnavailableView {
+                            Label("Kayıtlar yüklenemedi", systemImage: "exclamationmark.triangle")
+                        } description: {
+                            Text(err)
+                        } actions: {
+                            Button {
+                                Task { await model.reload() }
+                            } label: {
+                                Label("Tekrar Dene", systemImage: "arrow.clockwise")
+                            }
+                        }
+                    } else {
+                        done
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(20)
+            .padding(Theme.Spacing.xl)
             controls
         }
-        .background(Theme.canvas)
         .sheet(isPresented: $showNewFolderSheet) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Yeni klasör").font(.headline)
-                Text("Kayıtları tek tıkla bu klasöre taşıyabilirsin.").font(.caption).foregroundStyle(.secondary)
-                TextField("Klasör adı", text: $newFolderName)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 260, idealWidth: 320)
-                HStack {
-                    Spacer()
-                    Button("Vazgeç") { showNewFolderSheet = false }.keyboardShortcut(.cancelAction)
-                    Button("Oluştur") {
-                        let name = newFolderName
-                        showNewFolderSheet = false
-                        Task { _ = await model.addFolder(name: name) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+            NameSheet(
+                title: "Yeni klasör",
+                message: "Kayıtları tek tıkla bu klasöre taşıyabilirsin.",
+                placeholder: "Klasör adı",
+                actionTitle: "Oluştur",
+                symbol: "folder.badge.plus"
+            ) { name in
+                Task { _ = await model.addFolder(name: name) }
             }
-            .padding(20)
         }
         .task(id: model.items.first?.id) { await model.loadTriageSuggestions() }
         .onAppear {
-            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                MainActor.assumeIsolated { handle(event) } ? nil : event
+            if keyMonitor == nil {
+                keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                    MainActor.assumeIsolated { handle(event) } ? nil : event
+                }
             }
         }
         .onDisappear {
             if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
             keyMonitor = nil
         }
-        .navigationTitle("")
     }
 
     /// ← → and ⌘Z, unless the user is typing (search, tags, note) or the
@@ -115,40 +118,86 @@ struct TriageView: View {
         withAnimation(.easeOut(duration: 0.18)) { model.undoTriage() }
     }
 
-    private var controls: some View {
-        VStack(spacing: 12) {
-            if !model.triageSuggestions.isEmpty, !model.items.isEmpty {
-                HStack(spacing: 8) {
-                    Label("Önerilen", systemImage: "sparkles")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                    ForEach(Array(model.triageSuggestions.enumerated()), id: \.element.id) { i, s in
-                        if let folder = suggestedFolder(at: i) {
-                            Button { moveToFolder(folder) } label: {
-                                HStack(spacing: 6) {
-                                    Text("\(i + 1)")
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 16, height: 16)
-                                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                    Text(s.name.replacingOccurrences(of: "/", with: " › "))
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text(s.reasonLabel)
-                                        .font(.system(size: 10.5))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(Theme.accent)
-                            .help("\"\(s.name)\" klasörüne taşı ve sakla (\(i + 1))")
+    @ViewBuilder
+    private func menu(for item: Item) -> some View {
+        Button {
+            if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
+        } label: {
+            Label("Kaynağında aç", systemImage: "arrow.up.right.square")
+        }
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(item.url, forType: .string)
+        } label: {
+            Label("Bağlantıyı kopyala", systemImage: "doc.on.doc")
+        }
+        Divider()
+        Button { decide(delete: false) } label: {
+            Label("Sakla", systemImage: "arrow.right")
+        }
+        Button(role: .destructive) { decide(delete: true) } label: {
+            Label("Sil", systemImage: "arrow.left")
+        }
+        if !model.folders.isEmpty {
+            Divider()
+            Menu("Klasöre taşı") {
+                ForEach(model.folders) { folder in
+                    Button {
+                        moveToFolder(folder)
+                    } label: {
+                        Label {
+                            Text(folder.name)
+                        } icon: {
+                            Image(nsImage: FolderIcons.image(forFolder: folder.name))
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    private var controls: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            if !model.triageSuggestions.isEmpty, !model.items.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Label("Önerilen", systemImage: "sparkles")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
+                        GlassEffectContainer(spacing: Theme.Spacing.sm) {
+                            HStack(spacing: Theme.Spacing.sm) {
+                                ForEach(Array(model.triageSuggestions.enumerated()), id: \.element.id) { i, s in
+                                    if let folder = suggestedFolder(at: i) {
+                                        Button { moveToFolder(folder) } label: {
+                                            HStack(spacing: Theme.Spacing.sm) {
+                                                Text("\(i + 1)")
+                                                    .font(.caption.bold())
+                                                    .monospacedDigit()
+                                                    .foregroundStyle(.white)
+                                                    .frame(width: 20, height: 20)
+                                                    .background(Theme.accent, in: .rect(cornerRadius: Theme.Radius.xs))
+                                                Text(s.name.replacingOccurrences(of: "/", with: " › "))
+                                                    .font(.caption.weight(.semibold))
+                                                Text(s.reasonLabel)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        .buttonStyle(.glass)
+                                        .controlSize(.small)
+                                        .tint(Theme.accent)
+                                        .help("\"\(s.name)\" klasörüne taşı ve sakla (\(i + 1))")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.lg)
+                }
             }
             if !model.folders.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Spacing.sm) {
                         Text("Klasöre taşı:")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -163,57 +212,64 @@ struct TriageView: View {
                                         .renderingMode(.template)
                                         .resizable()
                                         .scaledToFit()
-                                        .frame(width: 12, height: 12)
+                                        .frame(width: 16, height: 16)
                                 }
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.caption.weight(.medium))
                             }
                             .buttonStyle(.bordered)
-                            .controlSize(.regular)
+                            .controlSize(.small)
                             .help("\"\(folder.name)\" klasörüne taşı ve sakla")
                         }
                         Button {
-                            newFolderName = ""
                             showNewFolderSheet = true
                         } label: {
                             Label("Yeni klasör…", systemImage: "plus")
-                                .font(.system(size: 12))
+                                .font(.caption.weight(.medium))
                         }
                         .buttonStyle(.borderless)
+                        .controlSize(.small)
                         .foregroundStyle(Theme.accent)
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Theme.Spacing.lg)
                 }
             }
 
-            HStack(spacing: 14) {
-                Button { decide(delete: true) } label: {
-                    Label("Sil", systemImage: "arrow.left").frame(minWidth: 110)
+            GlassEffectContainer(spacing: Theme.Spacing.md) {
+                HStack(spacing: Theme.Spacing.md) {
+                    Button { decide(delete: true) } label: {
+                        Label("Sil", systemImage: "arrow.left")
+                            .frame(minWidth: 112)
+                    }
+                    .tint(.red)
+                    .help("Sil (←)")
+                    Button(action: undo) {
+                        Label("Geri al", systemImage: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.glass)
+                    .disabled(!model.canUndoTriage)
+                    .help("Son kararı geri al (⌘Z)")
+                    Button { decide(delete: false) } label: {
+                        Label("Sakla", systemImage: "arrow.right")
+                            .labelStyle(TrailingIcon())
+                            .frame(minWidth: 112)
+                    }
+                    .tint(.green)
+                    .help("Sakla (→)")
                 }
-                .tint(.red)
-                .help("Sil (←)")
-                Button(action: undo) {
-                    Label("Geri al", systemImage: "arrow.uturn.backward")
-                }
-                .disabled(!model.canUndoTriage)
-                .help("Son kararı geri al (⌘Z)")
-                Button { decide(delete: false) } label: {
-                    Label("Sakla", systemImage: "arrow.right").labelStyle(TrailingIcon()).frame(minWidth: 110)
-                }
-                .tint(.green)
-                .help("Sakla (→)")
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .disabled(model.items.isEmpty)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(model.items.isEmpty)
 
             Text(summary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+                .padding(.horizontal, Theme.Spacing.lg)
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, Theme.Spacing.lg)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background(.background)
         .overlay(alignment: .top) { Divider() }
     }
 
@@ -234,14 +290,16 @@ struct TriageView: View {
         } description: {
             Text("Sakladıkların buraya bir daha gelmez. Filtreleri değiştirebilir ya da saklananları yeniden gözden geçirebilirsin.")
         } actions: {
-            Button("Saklananları yeniden göster") { Task { await model.resetReviewed() } }
+            Button { Task { await model.resetReviewed() } } label: {
+                Label("Saklananları yeniden göster", systemImage: "arrow.counterclockwise")
+            }
         }
     }
 }
 
 private struct TrailingIcon: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.Spacing.sm) {
             configuration.title
             configuration.icon
         }
@@ -255,7 +313,7 @@ private struct TriageCard: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 AuthorLine(item: item, showHandle: true)
                 if let vm = (item.media.first(where: { $0.isVideo }) ?? item.quote?.item.media.first(where: { $0.isVideo })), let vf = vm.videoFile {
                     // Reviewing is quicker when the clip starts by itself.
@@ -268,22 +326,30 @@ private struct TriageCard: View {
                     .frame(maxHeight: 460)
                 }
                 if let title = item.title, !title.isEmpty {
-                    Text(title).font(.system(size: 17, weight: .semibold))
+                    Text(title)
+                        .font(.headline)
                 }
                 if !item.text.isEmpty {
-                    Text(item.text).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled)
+                    Text(item.text)
+                        .font(.body)
+                        .lineSpacing(4)
+                        .textSelection(.enabled)
                 }
                 if let quote = item.quote?.item, !item.media.isEmpty || !quote.text.isEmpty {
                     QuoteSnippet(item: quote)
                 }
                 if !item.tags.isEmpty { CardTags(tags: item.tags) }
             }
-            .padding(18)
+            .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: 640)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .background(.background.secondary, in: .rect(cornerRadius: Theme.Radius.lg))
+        .containerShape(.rect(cornerRadius: Theme.Radius.lg))
+        .clipShape(.rect(cornerRadius: Theme.Radius.lg))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+        }
     }
 }

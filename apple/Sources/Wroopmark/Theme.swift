@@ -2,56 +2,72 @@ import AppKit
 import SwiftUI
 
 enum Theme {
-    /// The icon's violet.
+    /// The app's single accent. Everything tintable uses it; nothing else
+    /// defines its own palette.
     static let accent = Color(red: 0.47, green: 0.29, blue: 0.93)
-    /// High-contrast dynamic accent text for chips and badges (meets WCAG AA 4.5:1 in Light and Dark mode).
-    static let accentText = Color(nsColor: NSColor(name: nil, dynamicProvider: { appearance in
-        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor(red: 0.76, green: 0.64, blue: 1.0, alpha: 1.0)
-            : NSColor(red: 0.38, green: 0.20, blue: 0.80, alpha: 1.0)
-    }))
-    /// Content area behind the cards.
-    static let canvas = Color(nsColor: .underPageBackgroundColor)
-    /// Card surface: white in light mode, raised dark in dark mode.
-    static let card = Color(nsColor: .textBackgroundColor)
-    static let hairline = Color.primary.opacity(0.08)
-    static let cardRadius: CGFloat = 12
-    static let cardHeight: CGFloat = 300
-    static let coverHeight: CGFloat = 148
     /// The UI is Turkish, so dates are too, whatever the system language.
     static let locale = Locale(identifier: "tr_TR")
+
+    /// Strict 4pt / 8pt spatial rhythm across all views.
+    enum Spacing {
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 16
+        static let xl: CGFloat = 20
+        static let xxl: CGFloat = 24
+    }
+
+    /// Concentric corner radii: outer card (`24`) = inner (`8`) + padding (`16`),
+    /// medium panels (`16`) = inner (`8`) + padding (`8`).
+    enum Radius {
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 16
+        static let lg: CGFloat = 24
+    }
+
+    enum Stroke {
+        static let hairlineWidth: CGFloat = 0.5
+        static let selectionWidth: CGFloat = 2
+        static let surfaceBorder = Color.primary.opacity(0.08)
+        static let surfaceHoverBorder = Color.primary.opacity(0.16)
+        static let subtleFill = Color.primary.opacity(0.04)
+        static let subtleHoverFill = Color.primary.opacity(0.08)
+        static let mediaOutline = Color.primary.opacity(0.08)
+        static let darkOverlayBorder = Color.white.opacity(0.14)
+    }
 }
 
-/// Initial on a colored circle; offline and stable per author.
+/// Initial on an accent-tinted circle.
 struct Avatar: View {
     let name: String
-    var size: CGFloat = 22
+    var size: CGFloat = 24
 
     var body: some View {
         Circle()
-            .fill(color.gradient)
+            .fill(Theme.accent.opacity(0.16))
             .frame(width: size, height: size)
-            .overlay(
+            .overlay {
+                Circle()
+                    .strokeBorder(Theme.accent.opacity(0.24), lineWidth: Theme.Stroke.hairlineWidth)
+            }
+            .overlay {
                 Text(initial)
                     .font(.system(size: size * 0.44, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-            )
+                    .foregroundStyle(Theme.accent)
+            }
     }
 
     private var initial: String {
         let clean = name.trimmingCharacters(in: CharacterSet(charactersIn: "@ "))
         return clean.first.map { String($0).uppercased() } ?? "?"
     }
-
-    private var color: Color {
-        // djb2: Swift's hashValue changes per launch.
-        let h = name.unicodeScalars.reduce(UInt32(5381)) { ($0 &<< 5) &+ $0 &+ $1.value }
-        return Color(hue: Double(h % 360) / 360, saturation: 0.45, brightness: 0.72)
-    }
 }
 
 extension Date {
     /// Built once: every card asks for its date on every redraw.
+    @MainActor
     private static let relative: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
         f.locale = Theme.locale
@@ -62,14 +78,42 @@ extension Date {
     private static let dayMonth = Date.FormatStyle.dateTime.day().month(.abbreviated).locale(Theme.locale)
     private static let dayMonthYear = dayMonth.year()
 
+    @MainActor private static var cachedDayKey: Int = .min
+    @MainActor private static var cachedYear: Int = .min
+    @MainActor private static var shortDateCache: [Int64: String] = [:]
+
     /// "3 sa. önce", "dün", "14 Eki", or "14 Eki 2024" from older years.
+    @MainActor
     var short: String {
         let now = Date()
-        if now.timeIntervalSince(self) < 7 * 86_400 {
-            return Self.relative.localizedString(for: self, relativeTo: now)
+        let delta = now.timeIntervalSince(self)
+        let bucket = Int64(timeIntervalSince1970 / 60)
+        let dayKey = Int(now.timeIntervalSince1970 / 60) // minute-level bucket invalidates relative labels cleanly
+        if Self.cachedDayKey != dayKey {
+            Self.cachedDayKey = dayKey
+            Self.cachedYear = Calendar.current.component(.year, from: now)
+            if Self.shortDateCache.count > 512 {
+                Self.shortDateCache.removeAll(keepingCapacity: true)
+            } else if delta < 7 * 86_400 {
+                // Only clear relative strings when minute advances; simpler & fast to clear bounded cache
+                Self.shortDateCache.removeAll(keepingCapacity: true)
+            }
         }
-        let sameYear = Calendar.current.isDate(self, equalTo: now, toGranularity: .year)
-        return formatted(sameYear ? Self.dayMonth : Self.dayMonthYear)
+        if let cached = Self.shortDateCache[bucket] {
+            return cached
+        }
+        let formattedValue: String
+        if delta < 7 * 86_400 {
+            formattedValue = Self.relative.localizedString(for: self, relativeTo: now)
+        } else {
+            let sameYear = Calendar.current.component(.year, from: self) == Self.cachedYear
+            formattedValue = formatted(sameYear ? Self.dayMonth : Self.dayMonthYear)
+        }
+        if Self.shortDateCache.count >= 512 {
+            Self.shortDateCache.removeAll(keepingCapacity: true)
+        }
+        Self.shortDateCache[bucket] = formattedValue
+        return formattedValue
     }
 }
 
@@ -80,28 +124,46 @@ struct TagChip: View {
     var removable = false
     var action: () -> Void = {}
     var remove: () -> Void = {}
+    @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.Spacing.xs) {
             Button(action: action) {
-                Text("#\(name)").lineLimit(1)
+                Text("#\(name)")
+                    .lineLimit(1)
             }
             .buttonStyle(.plain)
             if removable {
                 Button(action: remove) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .frame(width: 20, height: 20)
+                        .font(.caption.weight(.bold))
+                        .frame(width: 16, height: 16)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+                .foregroundStyle(selected ? Color.white.opacity(0.88) : Color.secondary)
                 .accessibilityLabel("Etiketi kaldır: #\(name)")
             }
         }
-        .font(.system(size: 11.5, weight: .medium))
-        .foregroundStyle(selected ? Color.white : Theme.accentText)
-        .padding(.horizontal, 8).padding(.vertical, 3)
-        .background(selected ? Theme.accent : Theme.accent.opacity(0.12), in: Capsule())
+        .font(.caption.weight(.medium))
+        .controlSize(.small)
+        .foregroundStyle(selected ? Color.white : Theme.accent)
+        .padding(.horizontal, Theme.Spacing.sm)
+        .padding(.vertical, Theme.Spacing.xs)
+        .background(
+            selected
+                ? (hovering ? Theme.accent.opacity(0.92) : Theme.accent)
+                : Theme.accent.opacity(hovering ? 0.18 : 0.12),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    selected ? Color.white.opacity(0.16) : Theme.accent.opacity(hovering ? 0.36 : 0.18),
+                    lineWidth: Theme.Stroke.hairlineWidth
+                )
+        }
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }

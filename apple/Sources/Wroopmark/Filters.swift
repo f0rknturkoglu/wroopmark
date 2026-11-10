@@ -161,12 +161,8 @@ struct AdvancedFilters: Equatable {
         tag.contains(" ") ? "\"\(tag)\"" : tag
     }
 
-    private static let dayFormat: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
-
-    private static func day(_ d: Date) -> String { dayFormat.string(from: d) }
+    private static func day(_ d: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: d)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 1, c.day ?? 1)
+    }
 }

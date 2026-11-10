@@ -13,7 +13,14 @@ struct MediaViewer: View {
     /// so the area around a portrait video is backdrop, not player.
     @State private var videoAspect: CGFloat?
 
-    private var media: Media { viewer.media[viewer.index] }
+    private let arrowSize: CGFloat = 44
+    private var arrowClearance: CGFloat { Theme.Spacing.lg + arrowSize + Theme.Spacing.md }
+    private let thumbSize: CGFloat = 56
+
+    private var media: Media? {
+        guard !viewer.media.isEmpty else { return nil }
+        return viewer.media.indices.contains(viewer.index) ? viewer.media[viewer.index] : viewer.media.first
+    }
 
     var body: some View {
         ZStack {
@@ -28,8 +35,8 @@ struct MediaViewer: View {
                 topBar
                 ZStack {
                     content
-                        .padding(.horizontal, 72)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, arrowClearance)
+                        .padding(.vertical, Theme.Spacing.sm)
                     arrows
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -38,9 +45,9 @@ struct MediaViewer: View {
         }
         .environment(\.colorScheme, .dark)
         .onChange(of: viewer.index) { _, _ in viaBrowser = false }
-        .task(id: media.videoFile) {
+        .task(id: media?.videoFile) {
             videoAspect = nil
-            guard let file = media.videoFile else { return }
+            guard let file = media?.videoFile else { return }
             videoAspect = await LocalVideo.aspect(of: Core.shared.mediaURL(file))
         }
     }
@@ -49,88 +56,115 @@ struct MediaViewer: View {
 
     @ViewBuilder
     private var content: some View {
-        if media.isVideo, let file = media.videoFile {
-            LocalVideo(url: Core.shared.mediaURL(file), loops: true)
-                .id(file)
-                .aspectRatio(videoAspect ?? media.aspect ?? 9.0 / 16.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
-        } else if let file = media.file {
-            LocalImage(file: file, maxPixel: 3200, contentMode: .fit, placeholder: false)
-                .id(file)
-                .aspectRatio(media.aspect, contentMode: .fit)
-                .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
-                .overlay {
-                    if media.isVideo { notDownloaded }
-                }
-        } else {
-            notDownloaded
+        if let media {
+            if media.isVideo, let file = media.videoFile {
+                LocalVideo(url: Core.shared.mediaURL(file), loops: true)
+                    .id(file)
+                    .aspectRatio(videoAspect ?? media.aspect ?? 9.0 / 16.0, contentMode: .fit)
+                    .clipShape(.rect(cornerRadius: Theme.Radius.sm))
+                    .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
+            } else if let file = media.file {
+                LocalImage(file: file, maxPixel: 3200, contentMode: .fit, placeholder: false)
+                    .id(file)
+                    .aspectRatio(media.aspect, contentMode: .fit)
+                    .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
+                    .overlay {
+                        if media.isVideo { notDownloaded(for: media) }
+                    }
+            } else {
+                notDownloaded(for: media)
+            }
         }
     }
 
     /// A video behind a post page (TikTok): yt-dlp / gallery-dl fetch it,
     /// and if they cannot, the post is loaded in the browser behind this
     /// window for the extension; it plays here as soon as it arrives.
-    private var pageVideo: Bool { media.isVideo && !media.canDownloadVideo }
+    private func isPageVideo(_ media: Media) -> Bool {
+        media.isVideo && !media.canDownloadVideo
+    }
 
-    private var notDownloaded: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "icloud.and.arrow.down").font(.system(size: 34)).foregroundStyle(.white.opacity(0.85))
+    private func notDownloaded(for media: Media) -> some View {
+        let pageVideo = isPageVideo(media)
+        return VStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "icloud.and.arrow.down")
+                .font(.largeTitle)
+                .foregroundStyle(.white.opacity(0.85))
             Text(model.isBusy ? "İndiriliyor…" : viaBrowser ? "Tarayıcıyla indiriliyor…" : "Henüz indirilmedi")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(.white)
             if viaBrowser {
                 Text("İndirici başaramadı; gönderi tarayıcıda arka planda açıldı, video gelince burada oynar.")
-                    .font(.caption).foregroundStyle(.white.opacity(0.75))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)
             }
             if (media.canDownloadVideo || media.file == nil || pageVideo) && !viaBrowser {
-                Button("İndir") {
+                Button {
                     Task {
                         let done = await model.downloadMedia(viewer.ownerID, browserFallback: pageVideo ? viewer.postURL : nil)
                         if !done && pageVideo { viaBrowser = true }
                     }
+                } label: {
+                    Label("İndir", systemImage: "arrow.down.circle")
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
                 .disabled(model.isBusy)
             }
             if model.isBusy || viaBrowser { ProgressView().controlSize(.small) }
         }
-        .padding(24)
-        .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(Theme.Spacing.xl)
+        .background(.black.opacity(0.7), in: .rect(cornerRadius: Theme.Radius.md))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .strokeBorder(Theme.Stroke.darkOverlayBorder, lineWidth: Theme.Stroke.hairlineWidth)
+        }
     }
 
     // MARK: Chrome
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.Spacing.md) {
             if viewer.media.count > 1 {
                 Text("\(viewer.index + 1) / \(viewer.media.count)")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .foregroundStyle(.white.opacity(0.92))
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.xs)
                     .background(.white.opacity(0.12), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Theme.Stroke.darkOverlayBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                    }
             }
-            if let alt = media.alt, !alt.isEmpty {
-                Text(alt).lineLimit(1).font(.caption).foregroundStyle(.white.opacity(0.7))
+            if let alt = media?.alt, !alt.isEmpty {
+                Text(alt)
+                    .lineLimit(1)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
             }
-            Spacer(minLength: 12)
-            if let file = media.videoFile ?? media.file {
-                chromeButton("folder", label: "Finder'da göster") {
-                    NSWorkspace.shared.activateFileViewerSelecting([Core.shared.mediaURL(file)])
+            Spacer(minLength: Theme.Spacing.md)
+            GlassEffectContainer(spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if let file = media?.videoFile ?? media?.file {
+                        chromeButton("folder", label: "Finder'da göster") {
+                            NSWorkspace.shared.activateFileViewerSelecting([Core.shared.mediaURL(file)])
+                        }
+                    }
+                    if let url = URL(string: viewer.postURL) {
+                        chromeButton("arrow.up.right.square", label: "Kaynağında aç") { NSWorkspace.shared.open(url) }
+                    }
+                    chromeButton("xmark", label: "Kapat (Esc)", action: close)
+                        .keyboardShortcut(.cancelAction)
                 }
             }
-            if let url = URL(string: viewer.postURL) {
-                chromeButton("arrow.up.right.square", label: "Kaynağında aç") { NSWorkspace.shared.open(url) }
-            }
-            chromeButton("xmark", label: "Kapat (Esc)", action: close)
-                .keyboardShortcut(.cancelAction)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, Theme.Spacing.md)
+        .padding(.bottom, Theme.Spacing.xs)
     }
 
     private var arrows: some View {
@@ -141,7 +175,7 @@ struct MediaViewer: View {
             arrow("chevron.right", label: "Sonraki medya", enabled: viewer.index < viewer.media.count - 1) { move(1) }
                 .keyboardShortcut(.rightArrow, modifiers: [])
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Theme.Spacing.lg)
     }
 
     /// Thumbnails of every medium in the post; the current one is outlined.
@@ -151,11 +185,11 @@ struct MediaViewer: View {
         GeometryReader { geo in
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+                HStack(spacing: Theme.Spacing.sm) {
                     ForEach(Array(viewer.media.enumerated()), id: \.offset) { i, m in
                         Button { go(to: i) } label: {
                             Color.clear
-                                .frame(width: 52, height: 52)
+                                .frame(width: thumbSize, height: thumbSize)
                                 .overlay {
                                     if let file = m.file {
                                         LocalImage(file: file, maxPixel: 160)
@@ -166,18 +200,21 @@ struct MediaViewer: View {
                                 .overlay(alignment: .bottomTrailing) {
                                     if m.isVideo {
                                         Image(systemName: "play.fill")
-                                            .font(.system(size: 8, weight: .bold))
+                                            .font(.caption.bold())
                                             .foregroundStyle(.white)
-                                            .padding(3)
-                                            .background(.black.opacity(0.6), in: Circle())
-                                            .padding(3)
+                                            .padding(Theme.Spacing.xs)
+                                            .background(.black.opacity(0.65), in: Circle())
+                                            .padding(Theme.Spacing.xs)
                                     }
                                 }
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(i == viewer.index ? Color.white : .white.opacity(0.12), lineWidth: i == viewer.index ? 2 : 1)
-                                )
+                                .clipShape(.rect(cornerRadius: Theme.Radius.sm))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                                        .strokeBorder(
+                                            i == viewer.index ? Color.white : .white.opacity(0.14),
+                                            lineWidth: i == viewer.index ? Theme.Stroke.selectionWidth : Theme.Stroke.hairlineWidth
+                                        )
+                                }
                                 .opacity(i == viewer.index ? 1 : 0.6)
                         }
                         .buttonStyle(.plain)
@@ -185,8 +222,8 @@ struct MediaViewer: View {
                         .id(i)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.vertical, Theme.Spacing.md)
                 .frame(minWidth: geo.size.width)
             }
             .onChange(of: viewer.index) { _, i in
@@ -194,33 +231,35 @@ struct MediaViewer: View {
             }
         }
         }
-        .frame(height: 76)
+        .frame(height: thumbSize + Theme.Spacing.md * 2)
     }
 
     private func chromeButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
+            Label(label, systemImage: symbol)
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(.white.opacity(0.12), in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
         .help(label)
         .accessibilityLabel(label)
     }
 
     private func arrow(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
+            Label(label, systemImage: symbol)
+                .labelStyle(.iconOnly)
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(.white.opacity(0.12), in: Circle())
+                .frame(width: arrowSize, height: arrowSize)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
         .opacity(enabled ? 1 : 0)
         .disabled(!enabled)
         .help(label)
@@ -257,11 +296,11 @@ struct InlineVideoPlayer: View {
             .aspectRatio(fileAspect ?? aspect ?? 16.0 / 9.0, contentMode: .fit)
             .frame(maxHeight: maxHeight)
             .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Theme.hairline, lineWidth: 1)
-            )
+            .clipShape(.rect(cornerRadius: Theme.Radius.sm))
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+            }
             .frame(maxWidth: .infinity)
             .task(id: file) { fileAspect = await LocalVideo.aspect(of: Core.shared.mediaURL(file)) }
     }

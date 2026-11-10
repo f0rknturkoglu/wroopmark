@@ -4,6 +4,8 @@
 //! the web app's own API responses (favorites, likes, profile lists), so the
 //! URL capturer and the extensions share this parser.
 
+use std::collections::HashSet;
+
 use serde_json::Value;
 
 use crate::model::{Item, Media, MediaKind, Platform};
@@ -43,8 +45,19 @@ pub fn parse_item_struct(it: &Value) -> Option<Item> {
         .filter_map(|img| {
             // Each picture comes in several encodings; JPEG decodes
             // everywhere (HEIC is often listed first).
-            let urls: Vec<&str> = img.pointer("/imageURL/urlList")?.as_array()?.iter().filter_map(Value::as_str).collect();
-            let src = urls.iter().find(|u| u.contains(".jpeg") || u.contains(".jpg")).or(urls.first())?.to_string();
+            let url_list = img.pointer("/imageURL/urlList")?.as_array()?;
+            let mut first: Option<&str> = None;
+            let mut preferred: Option<&str> = None;
+            for u in url_list.iter().filter_map(Value::as_str) {
+                if first.is_none() {
+                    first = Some(u);
+                }
+                if u.contains(".jpeg") || u.contains(".jpg") {
+                    preferred = Some(u);
+                    break;
+                }
+            }
+            let src = preferred.or(first)?.to_string();
             Some(Media { width: dim(img, "/imageWidth"), height: dim(img, "/imageHeight"), ..Media::image(src) })
         })
         .collect();
@@ -83,32 +96,39 @@ pub fn parse_item_struct(it: &Value) -> Option<Item> {
 pub fn parse_video_page(html: &str) -> Option<Item> {
     let marker = "id=\"__UNIVERSAL_DATA_FOR_REHYDRATION__\"";
     let start = html.find(marker)?;
-    let body_start = start + html[start..].find('>')? + 1;
-    let body_end = body_start + html[body_start..].find("</script>")?;
-    let state: Value = serde_json::from_str(&html[body_start..body_end]).ok()?;
+    let after_marker = html.get(start..)?;
+    let open_end = after_marker.find('>')? + 1;
+    let body = after_marker.get(open_end..)?;
+    let body_end = body.find("</script>")?;
+    let json_text = body.get(..body_end)?;
+    let state: Value = serde_json::from_str(json_text).ok()?;
     parse_item_struct(state.pointer("/__DEFAULT_SCOPE__/webapp.video-detail/itemInfo/itemStruct")?)
 }
 
 /// Every item in a TikTok web API response (`itemList`, `items`, …).
 pub fn parse_api(v: &Value) -> Vec<Item> {
-    fn walk(v: &Value, out: &mut Vec<Item>) {
+    fn walk<'a>(v: &'a Value, out: &mut Vec<Item>, seen: &mut HashSet<&'a str>) {
         match v {
             Value::Object(map) => {
                 let looks_like_item = map.contains_key("id") && map.contains_key("desc") && map.contains_key("author");
-                if looks_like_item && let Some(item) = parse_item_struct(v) {
-                    if !out.iter().any(|o| o.id == item.id) {
+                if looks_like_item && let Some(raw_id) = map.get("id").and_then(Value::as_str).filter(|s| !s.is_empty()) {
+                    if !seen.contains(raw_id)
+                        && let Some(item) = parse_item_struct(v)
+                    {
+                        seen.insert(raw_id);
                         out.push(item);
                     }
                     return;
                 }
-                map.values().for_each(|c| walk(c, out));
+                map.values().for_each(|c| walk(c, out, seen));
             }
-            Value::Array(a) => a.iter().for_each(|c| walk(c, out)),
+            Value::Array(a) => a.iter().for_each(|c| walk(c, out, seen)),
             _ => {}
         }
     }
     let mut out = vec![];
-    walk(v, &mut out);
+    let mut seen = HashSet::new();
+    walk(v, &mut out, &mut seen);
     out
 }
 

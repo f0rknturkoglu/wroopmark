@@ -193,6 +193,39 @@ struct LinkRow: Decodable, Identifiable, Hashable, Sendable {
     let checkedAt: Int64?
 }
 
+struct LinkCounts: Decodable, Equatable, Sendable {
+    var total: Int = 0
+    var dead: Int = 0
+    var github: Int = 0
+    var drive: Int = 0
+    var mega: Int = 0
+    var youtube: Int = 0
+    var arxiv: Int = 0
+    var twitter: Int = 0
+    var other: Int = 0
+
+    static let empty = LinkCounts()
+
+    func count(for category: LinkCategory) -> Int {
+        switch category {
+        case .github: github
+        case .drive: drive
+        case .mega: mega
+        case .youtube: youtube
+        case .arxiv: arxiv
+        case .twitter: twitter
+        case .other: other
+        }
+    }
+}
+
+struct LinksPage: Decodable, Equatable, Sendable {
+    let links: [LinkRow]
+    let total: Int
+    let deadTotal: Int
+    let counts: LinkCounts
+}
+
 /// A search kept in the sidebar. Stored in the library (so in its backups).
 struct SavedSearch: Codable, Identifiable, Hashable, Sendable {
     var id: String
@@ -257,12 +290,6 @@ struct VideoTool: Decodable, Hashable, Sendable {
     let path: String
 }
 
-struct ImportReport: Decodable, Sendable {
-    let new: Int
-    let updated: Int
-    let ids: [String]
-}
-
 enum Platform: String, CaseIterable, Identifiable, Sendable {
     case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, web
 
@@ -300,21 +327,6 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var tint: Color {
-        switch self {
-        case .x: .primary
-        case .tiktok: .pink
-        case .pinterest: .red
-        case .facebook: .blue
-        case .reddit: .orange
-        case .youtube: .red
-        case .instagram: .purple
-        case .github: .primary
-        case .hackernews: .orange
-        case .arxiv: .red
-        case .web: .teal
-        }
-    }
 }
 
 /// A node of the tag tree built from `a/b/c` names.
@@ -350,35 +362,6 @@ struct TagNode: Identifiable, Hashable, Sendable {
             var kids = nodes[i].children ?? []
             insert(&kids, names: names.dropFirst(), keys: keys.dropFirst(), prefix: path, count: count)
             nodes[i].children = kids
-        }
-    }
-}
-
-enum AppTheme: String, CaseIterable, Identifiable, Codable, Sendable {
-    case system = "system"
-    case light = "light"
-    case dark = "dark"
-
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .system: "Sistem"
-        case .light: "Açık Tema"
-        case .dark: "Koyu Tema"
-        }
-    }
-    var iconName: String {
-        switch self {
-        case .system: "circle.lefthalf.filled"
-        case .light: "sun.max.fill"
-        case .dark: "moon.stars.fill"
-        }
-    }
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: nil
-        case .light: .light
-        case .dark: .dark
         }
     }
 }

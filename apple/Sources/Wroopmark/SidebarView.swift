@@ -3,17 +3,13 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     @State private var renaming: TagNode?
-    @State private var newName = ""
     @State private var showNewFolderSheet = false
-    @State private var newFolderName = ""
     @State private var folderRenaming: Folder?
-    @State private var folderNewName = ""
     @State private var folderToDelete: Folder?
     @State private var parentForSubfolder: Folder?
-    @State private var newSubfolderName = ""
     @AppStorage("linkPoolExpanded") private var linkPoolExpanded = true
     @State private var searchRenaming: SavedSearch?
-    @State private var searchNewName = ""
+    @State private var hoveringDownloads = false
 
     var body: some View {
         @Bindable var model = model
@@ -43,46 +39,50 @@ struct SidebarView: View {
                             .tag(Scope.folder(id: fid, name: node.id))
                             .contextMenu {
                                 if let f = node.folder {
-                                    Button("Alt klasör ekle…") {
+                                    Button {
                                         parentForSubfolder = f
-                                        newSubfolderName = ""
+                                    } label: {
+                                        Label("Alt klasör ekle…", systemImage: "folder.badge.plus")
                                     }
                                     Divider()
-                                    Button("Yeniden adlandır…") {
+                                    Button {
                                         folderRenaming = f
-                                        folderNewName = node.name
+                                    } label: {
+                                        Label("Yeniden adlandır…", systemImage: "pencil")
                                     }
                                     Divider()
-                                    Button("Klasörü sil", role: .destructive) {
+                                    Button(role: .destructive) {
                                         folderToDelete = f
+                                    } label: {
+                                        Label("Klasörü sil", systemImage: "trash")
                                     }
                                 }
                             }
                     }
                 } else {
                     Button {
-                        newFolderName = ""
                         showNewFolderSheet = true
                     } label: {
                         Label("Klasör oluştur…", systemImage: "folder.badge.plus")
-                            .font(.system(size: 12))
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 2)
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .padding(.vertical, Theme.Spacing.xs)
                 }
             } header: {
-                HStack {
+                HStack(spacing: Theme.Spacing.sm) {
                     Text("Klasörler")
                     Spacer()
                     Button {
-                        newFolderName = ""
                         showNewFolderSheet = true
                     } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .semibold))
+                        Label("Yeni klasör ekle", systemImage: "plus")
+                            .labelStyle(.iconOnly)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
                     .accessibilityLabel("Yeni klasör ekle")
                     .help("Yeni klasör ekle")
                 }
@@ -94,12 +94,15 @@ struct SidebarView: View {
                             .tag(Scope.saved(saved))
                             .help(saved.query)
                             .contextMenu {
-                                Button("Yeniden adlandır…") {
-                                    searchNewName = saved.name
+                                Button {
                                     searchRenaming = saved
+                                } label: {
+                                    Label("Yeniden adlandır…", systemImage: "pencil")
                                 }
-                                Button("Aramayı sil", role: .destructive) {
+                                Button(role: .destructive) {
                                     Task { await model.deleteSavedSearch(saved) }
+                                } label: {
+                                    Label("Aramayı sil", systemImage: "trash")
                                 }
                             }
                     }
@@ -123,9 +126,10 @@ struct SidebarView: View {
                         row(node.name, "number", node.count > 0 ? node.count : nil)
                             .tag(Scope.tag(node.id))
                             .contextMenu {
-                                Button("Yeniden adlandır…") {
-                                    newName = node.id
+                                Button {
                                     renaming = node
+                                } label: {
+                                    Label("Yeniden adlandır…", systemImage: "pencil")
                                 }
                             }
                     }
@@ -133,125 +137,102 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .leading, spacing: 6) {
+        .contentMargins(.bottom, Theme.Spacing.lg, for: .scrollContent)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Button {
                     model.showDownloads.toggle()
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.Spacing.sm) {
                         Image(systemName: model.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle")
+                            .frame(width: 16, height: 16)
                             .foregroundStyle(model.isDownloading ? Theme.accent : .secondary)
                         Text(model.isDownloading ? "İndirmeler sürüyor…" : "İndirmeler")
-                            .font(.caption)
+                            .font(.callout.weight(.medium))
                             .foregroundStyle(model.isDownloading ? Theme.accent : .primary)
-                        Spacer()
+                        Spacer(minLength: Theme.Spacing.sm)
                         if model.activeOrQueuedDownloadsCount > 0 {
                             Text("\(model.activeOrQueuedDownloadsCount)")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.caption.bold())
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 6).padding(.vertical, 1)
+                                .padding(.horizontal, Theme.Spacing.sm)
+                                .padding(.vertical, Theme.Spacing.xs)
                                 .background(Theme.accent, in: Capsule())
                                 .monospacedDigit()
                         }
                     }
-                    .padding(.vertical, 4).padding(.horizontal, 6)
-                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .background(
+                        hoveringDownloads ? Theme.Stroke.subtleHoverFill : Theme.Stroke.subtleFill,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(
+                                hoveringDownloads ? Theme.Stroke.surfaceHoverBorder : Theme.Stroke.surfaceBorder,
+                                lineWidth: Theme.Stroke.hairlineWidth
+                            )
+                    }
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .controlSize(.small)
+                .onHover { hoveringDownloads = $0 }
+                .animation(.easeOut(duration: 0.12), value: hoveringDownloads)
                 .help("İndirme paneli (⌘J)")
 
                 if let s = model.stats, s.mediaPending > 0 {
-                    Label("\(s.mediaPending) kaydın medyası iniyor", systemImage: "arrow.down.circle")
-                        .monospacedDigit()
+                    statusLine("\(s.mediaPending) kaydın medyası iniyor", symbol: "arrow.down.circle")
                 }
                 if model.isFetchingVideos, let n = model.stats?.videosMissing, n > 0 {
-                    Label("\(n) video iniyor", systemImage: "film")
-                        .monospacedDigit()
+                    statusLine("\(n) video iniyor", symbol: "film")
                 }
                 if model.isReadingText, let n = model.stats?.ocrPending, n > 0 {
-                    Label("\(n) kayıtta yazı okunuyor", systemImage: "text.viewfinder")
-                        .monospacedDigit()
+                    statusLine("\(n) kayıtta yazı okunuyor", symbol: "text.viewfinder")
                 }
             }
-            .font(.caption).foregroundStyle(.secondary).padding(8)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(Theme.Spacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.background)
+            .overlay(alignment: .top) { Divider() }
         }
         .navigationTitle("wroopmark")
-        .alert("Aramayı yeniden adlandır", isPresented: Binding(get: { searchRenaming != nil }, set: { if !$0 { searchRenaming = nil } })) {
-            TextField("Ad", text: $searchNewName)
-            Button("Adlandır") {
-                if let saved = searchRenaming {
-                    let name = searchNewName
-                    Task { await model.renameSavedSearch(saved, to: name) }
-                }
-            }
-            Button("Vazgeç", role: .cancel) {}
-        }
         .sheet(isPresented: $showNewFolderSheet) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Yeni klasör").font(.headline)
-                Text("Kayıtları bu klasörde toplayabilirsin.").font(.caption).foregroundStyle(.secondary)
-                TextField("Klasör adı", text: $newFolderName)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 260, idealWidth: 320)
-                HStack {
-                    Spacer()
-                    Button("Vazgeç") { showNewFolderSheet = false }.keyboardShortcut(.cancelAction)
-                    Button("Oluştur") {
-                        let name = newFolderName
-                        showNewFolderSheet = false
-                        Task { _ = await model.addFolder(name: name) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+            NameSheet(
+                title: "Yeni klasör",
+                message: "Kayıtları bu klasörde toplayabilirsin.",
+                placeholder: "Klasör adı",
+                actionTitle: "Oluştur",
+                symbol: "folder.badge.plus"
+            ) { name in
+                Task { _ = await model.addFolder(name: name) }
             }
-            .padding(20)
         }
         .sheet(item: $folderRenaming) { folder in
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Klasörü yeniden adlandır").font(.headline)
-                TextField("Yeni ad", text: $folderNewName)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 260, idealWidth: 320)
-                HStack {
-                    Spacer()
-                    Button("Vazgeç") { folderRenaming = nil }.keyboardShortcut(.cancelAction)
-                    Button("Adlandır") {
-                        let id = folder.id
-                        let name = folderNewName
-                        folderRenaming = nil
-                        Task { await model.renameFolder(id: id, name: name) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(folderNewName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+            NameSheet(
+                title: "Klasörü yeniden adlandır",
+                message: "Yeni ad, alt klasörlerin yolunu da günceller.",
+                placeholder: "Yeni ad",
+                actionTitle: "Adlandır",
+                symbol: "pencil",
+                initialName: folder.name
+            ) { name in
+                Task { await model.renameFolder(id: folder.id, name: name) }
             }
-            .padding(20)
         }
         .sheet(item: $parentForSubfolder) { parent in
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Yeni Alt Klasör").font(.headline)
-                Text("\"\(parent.name)\" klasörünün altına yeni alt klasör ekle.").font(.caption).foregroundStyle(.secondary)
-                TextField("Alt klasör adı", text: $newSubfolderName)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 260, idealWidth: 320)
-                HStack {
-                    Spacer()
-                    Button("Vazgeç") { parentForSubfolder = nil }.keyboardShortcut(.cancelAction)
-                    Button("Ekle") {
-                        let name = newSubfolderName
-                        parentForSubfolder = nil
-                        Task { _ = await model.addSubfolder(parent: parent, name: name) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(newSubfolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+            NameSheet(
+                title: "Yeni Alt Klasör",
+                message: "\"\(parent.name)\" klasörünün altına yeni alt klasör ekle.",
+                placeholder: "Alt klasör adı",
+                actionTitle: "Ekle",
+                symbol: "folder.badge.plus"
+            ) { name in
+                Task { _ = await model.addSubfolder(parent: parent, name: name) }
             }
-            .padding(20)
         }
         .confirmationDialog(
             "\"\(folderToDelete?.name ?? "")\" klasörünü silmek istediğine emin misin?",
@@ -269,40 +250,58 @@ struct SidebarView: View {
             Text("Klasör silinir ancak içindeki kayıtlar kütüphanenizde kalmaya devam eder.")
         }
         .sheet(item: $renaming) { node in
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Etiketi yeniden adlandır").font(.headline)
-                Text("Alt etiketler de taşınır: \(node.id)/… → yeni/…").font(.caption).foregroundStyle(.secondary)
-                TextField("yeni ad", text: $newName)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 260, idealWidth: 320)
-                HStack {
-                    Spacer()
-                    Button("Vazgeç") { renaming = nil }.keyboardShortcut(.cancelAction)
-                    Button("Adlandır") {
-                        let from = node.id
-                        let to = newName
-                        renaming = nil
-                        Task { await model.renameTag(from: from, to: to) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(parseTags(newName).isEmpty)
-                }
+            NameSheet(
+                title: "Etiketi yeniden adlandır",
+                message: "Alt etiketler de taşınır: \(node.id)/… → yeni/…",
+                placeholder: "yeni ad",
+                actionTitle: "Adlandır",
+                symbol: "tag",
+                initialName: node.id
+            ) { name in
+                Task { await model.renameTag(from: node.id, to: name) }
             }
-            .padding(20)
+        }
+        .sheet(item: $searchRenaming) { saved in
+            NameSheet(
+                title: "Aramayı yeniden adlandır",
+                message: saved.query,
+                placeholder: "Ad",
+                actionTitle: "Adlandır",
+                symbol: "magnifyingglass",
+                initialName: saved.name
+            ) { name in
+                Task { await model.renameSavedSearch(saved, to: name) }
+            }
         }
     }
 
+    private func statusLine(_ text: String, symbol: String) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: symbol)
+                .frame(width: 16, height: 16)
+            Text(text)
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .padding(.horizontal, Theme.Spacing.xs)
+    }
+
     private func row(_ title: String, _ symbol: String, _ count: Int?) -> some View {
-        HStack {
+        HStack(spacing: Theme.Spacing.sm) {
             Label(title, systemImage: symbol)
-            Spacer()
-            if let count { Text(count.formatted()).foregroundStyle(.secondary).monospacedDigit() }
+                .help(title)
+            Spacer(minLength: Theme.Spacing.sm)
+            if let count {
+                Text(count.formatted())
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
         }
     }
 
     private func row(_ title: String, image: NSImage, _ count: Int?) -> some View {
-        HStack {
+        HStack(spacing: Theme.Spacing.sm) {
             Label {
                 Text(title)
             } icon: {
@@ -310,10 +309,16 @@ struct SidebarView: View {
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 15, height: 15)
+                    .frame(width: 16, height: 16)
             }
-            Spacer()
-            if let count { Text(count.formatted()).foregroundStyle(.secondary).monospacedDigit() }
+            .help(title)
+            Spacer(minLength: Theme.Spacing.sm)
+            if let count {
+                Text(count.formatted())
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
         }
     }
 }

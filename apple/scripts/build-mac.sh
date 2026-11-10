@@ -11,7 +11,7 @@ CORE="$ROOT/core"
 APP_PKG="$ROOT/apple"
 OUT="$APP_PKG/build"
 APP="$OUT/wroopmark.app"
-export MACOSX_DEPLOYMENT_TARGET=14.0
+export MACOSX_DEPLOYMENT_TARGET=26.0
 
 echo "==> Rust core (release, LTO)"
 (cd "$CORE" && cargo build --release)
@@ -59,7 +59,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
-  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>MIT — Furkan Türkoğlu</string>
@@ -128,7 +128,7 @@ cat > "$APPEX/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>XPC!</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
-  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSHumanReadableDescription</key><string>X yer imlerini, TikTok favorilerini ve sayfaları wroopmark arşivine kaydeder.</string>
   <key>NSExtension</key>
   <dict>

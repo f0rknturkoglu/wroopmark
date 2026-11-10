@@ -34,16 +34,27 @@ fn tmp_name() -> String {
 
 /// File extension for a response content type (or sniffed bytes).
 pub fn ext_for(content_type: &str, bytes: &[u8]) -> &'static str {
-    let ct = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
-    match ct.as_str() {
-        "image/jpeg" | "image/jpg" => return "jpg",
-        "image/png" => return "png",
-        "image/webp" => return "webp",
-        "image/gif" => return "gif",
-        "image/avif" => return "avif",
-        "image/heic" => return "heic",
-        "video/mp4" => return "mp4",
-        _ => {}
+    let ct = content_type.split(';').next().unwrap_or("").trim();
+    if ct.eq_ignore_ascii_case("image/jpeg") || ct.eq_ignore_ascii_case("image/jpg") {
+        return "jpg";
+    }
+    if ct.eq_ignore_ascii_case("image/png") {
+        return "png";
+    }
+    if ct.eq_ignore_ascii_case("image/webp") {
+        return "webp";
+    }
+    if ct.eq_ignore_ascii_case("image/gif") {
+        return "gif";
+    }
+    if ct.eq_ignore_ascii_case("image/avif") {
+        return "avif";
+    }
+    if ct.eq_ignore_ascii_case("image/heic") {
+        return "heic";
+    }
+    if ct.eq_ignore_ascii_case("video/mp4") {
+        return "mp4";
     }
     match bytes {
         [0xFF, 0xD8, 0xFF, ..] => "jpg",
@@ -77,7 +88,7 @@ impl MediaStore {
 
     /// Size of a stored file in bytes, if it exists.
     pub fn file_size(&self, name: &str) -> Option<i64> {
-        if is_name(name) { fs::metadata(self.path(name)).map(|m| m.len() as i64).ok() } else { None }
+        if is_name(name) { fs::metadata(self.path(name)).ok().and_then(|m| i64::try_from(m.len()).ok()) } else { None }
     }
 
     /// Stores the bytes and returns their name. Writes go through a temp file
@@ -88,16 +99,21 @@ impl MediaStore {
         if path.is_file() {
             return Ok(name);
         }
-        let dir = path.parent().expect("media path has a parent");
+        let dir = path.parent().ok_or_else(|| io::Error::other("geçersiz medya yolu"))?;
         fs::create_dir_all(dir)?;
         let tmp = dir.join(tmp_name());
-        {
+        let result = (|| {
             let mut f = fs::File::create(&tmp)?;
             f.write_all(bytes)?;
             f.sync_all()?;
+            drop(f);
+            fs::rename(&tmp, &path)?;
+            Ok(name)
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&tmp);
         }
-        fs::rename(&tmp, &path)?;
-        Ok(name)
+        result
     }
 
     /// Streams a download to disk while hashing it, so a 300 MB video never
@@ -108,29 +124,40 @@ impl MediaStore {
         let result = (|| {
             let mut f = fs::File::create(&tmp)?;
             let mut hasher = Xxh3::new();
-            let mut head: Vec<u8> = Vec::with_capacity(16);
+            let mut head = [0u8; 16];
+            let mut head_len = 0usize;
             let mut buf = vec![0u8; 256 * 1024];
             loop {
-                let n = r.read(&mut buf)?;
-                if n == 0 {
-                    break;
+                let n = match r.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => n,
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(e) => return Err(e),
+                };
+                let chunk = buf.get(..n).ok_or_else(|| io::Error::other("okuma boyutu aşıldı"))?;
+                if head_len < head.len() {
+                    let take = n.min(head.len() - head_len);
+                    if let (Some(dst), Some(src)) = (head.get_mut(head_len..head_len + take), chunk.get(..take)) {
+                        dst.copy_from_slice(src);
+                        head_len += take;
+                    }
                 }
-                if head.len() < 16 {
-                    head.extend_from_slice(&buf[..n.min(16 - head.len())]);
-                }
-                hasher.update(&buf[..n]);
-                f.write_all(&buf[..n])?;
+                hasher.update(chunk);
+                f.write_all(chunk)?;
             }
-            if head.is_empty() {
+            let head_slice = head.get(..head_len).unwrap_or(&[]);
+            if head_slice.is_empty() {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "boş yanıt"));
             }
             f.sync_all()?;
-            let name = format!("{:032x}.{}", hasher.digest128(), ext_for(content_type, &head));
+            drop(f);
+            let name = format!("{:032x}.{}", hasher.digest128(), ext_for(content_type, head_slice));
             let path = self.path(&name);
             if path.is_file() {
                 fs::remove_file(&tmp)?;
             } else {
-                fs::create_dir_all(path.parent().expect("media path has a parent"))?;
+                let dir = path.parent().ok_or_else(|| io::Error::other("geçersiz medya yolu"))?;
+                fs::create_dir_all(dir)?;
                 fs::rename(&tmp, &path)?;
             }
             Ok(name)
@@ -145,10 +172,11 @@ impl MediaStore {
     pub fn bytes(&self) -> u64 {
         let Ok(dirs) = fs::read_dir(&self.root) else { return 0 };
         dirs.flatten()
+            .filter(|d| d.file_type().is_ok_and(|t| t.is_dir()))
             .filter_map(|d| fs::read_dir(d.path()).ok())
             .flat_map(|files| files.flatten())
+            .filter(|f| f.file_type().is_ok_and(|t| t.is_file()))
             .filter_map(|f| f.metadata().ok())
-            .filter(|m| m.is_file())
             .map(|m| m.len())
             .sum()
     }

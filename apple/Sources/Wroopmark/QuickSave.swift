@@ -16,6 +16,7 @@ final class QuickSave {
     private var hideTask: Task<Void, Never>?
 
     static let hotKeyLabel = "⌃⌥⌘S"
+    private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
     var hotKeyEnabled: Bool { UserDefaults.standard.object(forKey: "quickSaveHotKey") as? Bool ?? true }
 
     func attach(_ model: AppModel) {
@@ -50,9 +51,9 @@ final class QuickSave {
     }
 
     static func firstURL(in text: String) -> String? {
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        guard !text.isEmpty, let detector = linkDetector else { return nil }
         let range = NSRange(text.startIndex..., in: text)
-        return detector?.matches(in: text, range: range)
+        return detector.matches(in: text, range: range)
             .compactMap(\.url)
             .first { $0.scheme == "http" || $0.scheme == "https" }?
             .absoluteString
@@ -71,17 +72,18 @@ final class QuickSave {
     @discardableResult
     func save(_ link: String, tags: [String] = [], folderID: Int64? = nil) async -> Bool {
         show(symbol: "arrow.down.circle", title: "Kaydediliyor…", detail: link, stay: true)
-        var req: [String: Any] = ["cmd": "add_url", "url": link, "tags": tags]
-        if let folderID { req["folder_id"] = folderID }
+        let client: any CoreClient = model?.core ?? Core.shared
         do {
-            let item: Item = try await Core.shared.call(req, network: true)
+            let item: Item = try await client.call(.addURL(url: link, tags: tags, note: nil, folderID: folderID), network: true)
             let title = item.title ?? item.text.split(separator: "\n").first.map(String.init) ?? item.url
             show(symbol: "checkmark.circle.fill", title: "Kaydedildi", detail: String(title.prefix(90)))
             if let model {
                 await model.refreshLoaded()
                 await model.loadRecent()
             }
-            Spotlight.indexRecent()
+            if model?.enableSystemIntegrations ?? true {
+                Spotlight.indexRecent(core: client)
+            }
             return true
         } catch {
             show(symbol: "exclamationmark.triangle.fill", title: "Kaydedilemedi", detail: error.localizedDescription)
@@ -130,21 +132,25 @@ private struct Banner: View {
     let detail: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Spacing.md) {
             Image(systemName: symbol)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.title3)
                 .foregroundStyle(Theme.accent)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 13, weight: .semibold))
-                Text(detail).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(title)
+                    .font(.callout.weight(.semibold))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Theme.Spacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+        .glassEffect(.regular, in: .rect(cornerRadius: Theme.Radius.md))
     }
 }
 
@@ -158,7 +164,7 @@ struct QuickAddMenu: View {
     @State private var saving = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Text("Hızlı kaydet").font(.headline)
             TextField("https://…", text: $link)
                 .textFieldStyle(.roundedBorder)
@@ -172,52 +178,53 @@ struct QuickAddMenu: View {
                     Text(node.displayPath).tag(Int(node.folder?.id ?? 0))
                 }
             }
-            HStack {
+            HStack(spacing: Theme.Spacing.sm) {
                 Text("\(QuickSave.hotKeyLabel): panodaki linki kaydet")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Kaydet", action: save)
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(QuickSave.firstURL(in: link) == nil || saving)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: Theme.Spacing.sm)
+                Button(action: save) {
+                    Label("Kaydet", systemImage: "checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .keyboardShortcut(.defaultAction)
+                .disabled(QuickSave.firstURL(in: link) == nil || saving)
             }
 
             if !model.recentItems.isEmpty {
                 Divider()
-                Text("Son kaydedilenler").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(model.recentItems.prefix(5)) { item in
-                    Button {
-                        model.reveal(id: item.id)
-                        openMain()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(nsImage: FolderIcons.image(forPlatform: Platform(rawValue: item.platform) ?? .web))
-                                .renderingMode(.template)
-                                .resizable().scaledToFit().frame(width: 13, height: 13)
-                                .foregroundStyle(.secondary)
-                            Text(item.title ?? (item.text.isEmpty ? item.url : item.text))
-                                .lineLimit(1)
-                            Spacer(minLength: 0)
+                Label("Son kaydedilenler", systemImage: "clock")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                VStack(spacing: Theme.Spacing.xs) {
+                    ForEach(model.recentItems.prefix(5)) { item in
+                        RecentSaveRow(item: item) {
+                            model.reveal(id: item.id)
+                            openMain()
                         }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
             Divider()
-            HStack {
-                Button("wroopmark'ı aç", action: openMain)
+            HStack(spacing: Theme.Spacing.sm) {
+                Button(action: openMain) {
+                    Label("wroopmark'ı aç", systemImage: "macwindow")
+                }
                 Spacer()
-                Button("Çık") { NSApp.terminate(nil) }
+                Button { NSApp.terminate(nil) } label: {
+                    Label("Çık", systemImage: "power")
+                }
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
         }
-        .padding(14)
-        .frame(width: 330)
-        .onAppear {
+        .padding(Theme.Spacing.lg)
+        .frame(width: 340)
+        .task {
             if link.isEmpty, let c = QuickSave.clipboardURL() { link = c }
-            Task { await model.loadRecent() }
+            await model.loadRecent()
         }
     }
 
@@ -242,5 +249,42 @@ struct QuickAddMenu: View {
         if !NSApp.windows.contains(where: { $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }) {
             openWindow(id: "main")
         }
+    }
+}
+
+/// A recent save in the menu bar panel; plain until hovered.
+private struct RecentSaveRow: View {
+    let item: Item
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(nsImage: FolderIcons.image(forPlatform: Platform(rawValue: item.platform) ?? .web))
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(.secondary)
+                Text(item.title ?? (item.text.isEmpty ? item.url : item.text))
+                    .font(.callout)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(Theme.Spacing.sm)
+            .background(
+                hovering ? Theme.Stroke.subtleFill : .clear,
+                in: .rect(cornerRadius: Theme.Radius.sm)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .strokeBorder(hovering ? Theme.Stroke.surfaceBorder : .clear, lineWidth: Theme.Stroke.hairlineWidth)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }

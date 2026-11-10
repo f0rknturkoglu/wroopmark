@@ -13,6 +13,7 @@ enum LinkCategory: String, CaseIterable, Identifiable, Hashable, Sendable {
     case other
 
     var id: String { rawValue }
+    var apiKey: String { rawValue }
 
     var label: String {
         switch self {
@@ -38,6 +39,7 @@ enum LinkCategory: String, CaseIterable, Identifiable, Hashable, Sendable {
         }
     }
 
+    @MainActor
     var iconImage: NSImage {
         FolderIcons.image(forCategory: self)
     }
@@ -73,8 +75,8 @@ private extension String {
 
 // MARK: - Folder Icons & SVGs
 
+@MainActor
 enum FolderIcons {
-    private static let lock = NSLock()
     private static var cache: [String: NSImage] = [:]
 
     static func image(forCategory category: LinkCategory) -> NSImage {
@@ -99,8 +101,8 @@ enum FolderIcons {
         case .instagram: return get("instagram", svg: instagramSvg)
         case .hackernews: return get("hackernews", svg: hackernewsSvg)
         case .tiktok: return get("tiktok", svg: tiktokSvg)
-        case .facebook: return NSImage(systemSymbolName: "person.2", accessibilityDescription: nil) ?? NSImage()
-        case .pinterest: return NSImage(systemSymbolName: "pin", accessibilityDescription: nil) ?? NSImage()
+        case .facebook: return symbol("person.2")
+        case .pinterest: return symbol("pin")
         case .web: return get("other", svg: otherSvg)
         }
     }
@@ -160,9 +162,16 @@ enum FolderIcons {
         return s
     }
 
+    private static func symbol(_ name: String) -> NSImage {
+        let key = "sym:\(name)"
+        if let existing = cache[key] { return existing }
+        let img = NSImage(systemSymbolName: name, accessibilityDescription: nil) ?? NSImage()
+        img.isTemplate = true
+        cache[key] = img
+        return img
+    }
+
     private static func get(_ key: String, svg: String) -> NSImage {
-        lock.lock()
-        defer { lock.unlock() }
         if let existing = cache[key] { return existing }
         if let data = svg.data(using: .utf8), let img = NSImage(data: data) {
             img.isTemplate = true

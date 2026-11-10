@@ -34,14 +34,16 @@ pub fn parse_api(v: &Value) -> Vec<Item> {
     out
 }
 
-fn walk(v: &Value, out: &mut Vec<Item>, seen: &mut HashSet<String>) {
+fn walk<'a>(v: &'a Value, out: &mut Vec<Item>, seen: &mut HashSet<&'a str>) {
     match v {
         Value::Array(a) => a.iter().for_each(|x| walk(x, out, seen)),
         Value::Object(o) => {
             if is_media(v) {
-                if let Some(item) = parse_media(v)
-                    && seen.insert(item.id.clone())
+                if let Some(code) = v.get("code").and_then(Value::as_str)
+                    && !seen.contains(code)
+                    && let Some(item) = parse_media(v)
                 {
+                    seen.insert(code);
                     out.push(item);
                 }
                 return;
