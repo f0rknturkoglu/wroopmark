@@ -1,45 +1,49 @@
+import AppKit
 import SafariServices
 import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
+    case general = "general"
     case appearance = "appearance"
+    case library = "library"
     case media = "media"
     case ocr = "ocr"
-    case library = "library"
     case backup = "backup"
-    case quick = "quick"
     case extensionHost = "extension"
+    case about = "about"
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
+        case .general: "Genel"
         case .appearance: "Görünüm"
+        case .library: "Kütüphane"
         case .media: "Medya"
         case .ocr: "Yazı Tanıma"
-        case .library: "Kütüphane"
         case .backup: "Yedek"
-        case .quick: "Hızlı Kayıt"
         case .extensionHost: "Eklenti"
+        case .about: "Hakkında"
         }
     }
 
     var icon: String {
         switch self {
-        case .appearance: "rectangle.grid.2x2.fill"
-        case .media: "play.rectangle.fill"
+        case .general: "gearshape"
+        case .appearance: "paintbrush"
+        case .library: "internaldrive"
+        case .media: "play.rectangle"
         case .ocr: "text.viewfinder"
-        case .library: "internaldrive.fill"
-        case .backup: "externaldrive.fill.badge.timemachine"
-        case .quick: "bolt.fill"
-        case .extensionHost: "puzzlepiece.extension.fill"
+        case .backup: "externaldrive.badge.timemachine"
+        case .extensionHost: "puzzlepiece.extension"
+        case .about: "info.circle"
         }
     }
 }
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
-    @State private var activeTab: SettingsTab = .appearance
+    @AppStorage("settingsTab") private var activeTab: SettingsTab = .general
     @AppStorage("menuBarIcon") private var menuBarIcon = true
     @State private var hotKeyOn = QuickSave.shared.hotKeyEnabled
     @State private var extensionStatus = ExtensionStatus.empty
@@ -47,30 +51,23 @@ struct SettingsView: View {
     @State private var backupFolderExists = false
 
     var body: some View {
-        TabView(selection: $activeTab) {
-            Tab(SettingsTab.appearance.label, systemImage: SettingsTab.appearance.icon, value: .appearance) {
-                appearanceSection
+        NavigationSplitView(columnVisibility: .constant(.all)) {
+            List(selection: tabSelection) {
+                ForEach(SettingsTab.allCases) { tab in
+                    Label(tab.label, systemImage: tab.icon)
+                        .tag(tab)
+                }
             }
-            Tab(SettingsTab.media.label, systemImage: SettingsTab.media.icon, value: .media) {
-                mediaSection
-            }
-            Tab(SettingsTab.ocr.label, systemImage: SettingsTab.ocr.icon, value: .ocr) {
-                ocrSection
-            }
-            Tab(SettingsTab.library.label, systemImage: SettingsTab.library.icon, value: .library) {
-                librarySection
-            }
-            Tab(SettingsTab.backup.label, systemImage: SettingsTab.backup.icon, value: .backup) {
-                backupSection
-            }
-            Tab(SettingsTab.quick.label, systemImage: SettingsTab.quick.icon, value: .quick) {
-                quickSection
-            }
-            Tab(SettingsTab.extensionHost.label, systemImage: SettingsTab.extensionHost.icon, value: .extensionHost) {
-                extensionSection
-            }
+            .listStyle(.sidebar)
+            .tint(Theme.accent)
+            .toolbar(removing: .sidebarToggle)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 240)
+        } detail: {
+            activeSection
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 640, idealWidth: 680, minHeight: 500, idealHeight: 540)
+        .navigationSplitViewStyle(.balanced)
+        .frame(width: 780, height: 560)
         .task {
             async let meta: Void = model.refreshMeta()
             async let tools: Void = model.loadVideoTools()
@@ -87,7 +84,76 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 1. Görünüm
+    private var tabSelection: Binding<SettingsTab?> {
+        Binding(
+            get: { activeTab },
+            set: { if let value = $0 { activeTab = value } }
+        )
+    }
+
+    @ViewBuilder
+    private var activeSection: some View {
+        switch activeTab {
+        case .general: generalSection
+        case .appearance: appearanceSection
+        case .library: librarySection
+        case .media: mediaSection
+        case .ocr: ocrSection
+        case .backup: backupSection
+        case .extensionHost: extensionSection
+        case .about: aboutSection
+        }
+    }
+
+    // MARK: - Genel
+
+    private var generalSection: some View {
+        @Bindable var model = model
+        return Form {
+            Section {
+                Toggle(isOn: $menuBarIcon) {
+                    Label("Menü çubuğunda göster", systemImage: "menubar.rectangle")
+                }
+            } header: {
+                Text("Menü Çubuğu")
+            } footer: {
+                Text("Kapalıyken uygulama yalnızca Dock ve uygulama menüsünden açılır.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle(isOn: Binding(
+                    get: { hotKeyOn },
+                    set: { on in
+                        hotKeyOn = on
+                        QuickSave.shared.setHotKey(on)
+                    }
+                )) {
+                    Label("\(QuickSave.hotKeyLabel) ile panodaki linki kaydet", systemImage: "keyboard")
+                }
+                Toggle(isOn: $model.spotlightEnabled) {
+                    Label("Kayıtları Spotlight'ta göster", systemImage: "magnifyingglass")
+                }
+            } header: {
+                Text("Sistem Entegrasyonu")
+            } footer: {
+                Text("Kısayol her uygulamada çalışır. Spotlight'ta metin, yazar, etiketler ve görsellerdeki yazı aranır; hiçbir şey cihazdan çıkmaz.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Text("wroopmark://item/<id> · wroopmark://search?q=… · wroopmark://add?url=…")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            } header: {
+                Text("Bağlantılar")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Görünüm
 
     private var appearanceSection: some View {
         @Bindable var model = model
@@ -100,95 +166,22 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
             } header: {
-                Label("Kütüphane Görünümü", systemImage: "rectangle.grid.2x2")
+                Text("Kütüphane Görünümü")
             } footer: {
                 Text("Görünüm sistem ayarını izler; uygulama ayrı bir tema tutmaz.")
                     .foregroundStyle(.secondary)
             }
-        }
-        .formStyle(.grouped)
-    }
-
-    // MARK: - 2. Medya
-
-    private var mediaSection: some View {
-        @Bindable var model = model
-        return Form {
-            Section {
-                Toggle(isOn: $model.downloadVideos) {
-                    Label("Videoları otomatik indir", systemImage: "arrow.down.circle")
-                }
-                .onChange(of: model.downloadVideos) { _, on in
-                    Task { await model.setDownloadVideos(on) }
-                }
-            } footer: {
-                Text("Görseller ve video kapakları her zaman indirilir. Kapalıyken videolar tek tek detay ekranından veya görüntüleyiciden indirilebilir.")
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Durum") {
-                LabeledContent("Diskteki medya") {
-                    Text(ByteCountFormatter.string(fromByteCount: model.stats?.mediaBytes ?? 0, countStyle: .file))
-                        .monospacedDigit()
-                }
-                if let pending = model.stats?.mediaPending, pending > 0 {
-                    LabeledContent("İndirilmeyi bekleyen") {
-                        Text("\(pending) kayıt").monospacedDigit()
-                    }
-                }
-                LabeledContent("Harici video indirici") {
-                    if model.videoTools.isEmpty {
-                        Label("Kurulu değil", systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.orange)
-                    } else {
-                        Label(model.videoTools.map(\.name).joined(separator: " → "), systemImage: "checkmark.circle")
-                            .foregroundStyle(.green)
-                    }
-                }
-            }
 
             Section {
-                Button {
-                    Task { await model.retryMedia() }
-                } label: {
-                    Label("Eksik medyaları şimdi tara ve indir", systemImage: "arrow.clockwise")
-                }
+                AppearancePreview()
+            } header: {
+                Text("Önizleme")
             }
         }
         .formStyle(.grouped)
     }
 
-    // MARK: - 3. OCR
-
-    private var ocrSection: some View {
-        @Bindable var model = model
-        return Form {
-            Section {
-                Toggle(isOn: $model.ocrEnabled) {
-                    Label("Görsellerdeki yazıyı tanı ve aranabilir yap", systemImage: "text.viewfinder")
-                }
-            } footer: {
-                Text("macOS'un yerel Apple Vision altyapısı kullanılır. Tüm işlemler çevrimdışı ve cihazınızda gerçekleşir; Türkçe ve İngilizce metinleri tanır.")
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Durum") {
-                LabeledContent("Tanıma") {
-                    Label(model.ocrEnabled ? "Etkin" : "Kapalı",
-                          systemImage: model.ocrEnabled ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(model.ocrEnabled ? .green : .secondary)
-                }
-                if let n = model.stats?.ocrPending, n > 0 {
-                    LabeledContent("Okunmayı bekleyen") {
-                        Text("\(n) kayıt").monospacedDigit()
-                    }
-                }
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    // MARK: - 4. Kütüphane
+    // MARK: - Kütüphane
 
     private var librarySection: some View {
         Form {
@@ -207,10 +200,10 @@ struct SettingsView: View {
                     Label("Finder'da Göster", systemImage: "folder")
                 }
             } header: {
-                Label("Veritabanı ve Medya", systemImage: "internaldrive")
+                Text("Veritabanı ve Medya")
             }
 
-            Section("İstatistik") {
+            Section {
                 if let s = model.stats {
                     LabeledContent("Toplam kayıt") {
                         Text("\(s.items)").monospacedDigit()
@@ -221,17 +214,118 @@ struct SettingsView: View {
                     LabeledContent("Link havuzu") {
                         Text("\(s.links)").monospacedDigit()
                     }
+                    LabeledContent("Diskteki medya") {
+                        Text(ByteCountFormatter.string(fromByteCount: s.mediaBytes ?? 0, countStyle: .file))
+                            .monospacedDigit()
+                    }
                 } else {
                     Label("İstatistikler yükleniyor…", systemImage: "chart.bar")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("İstatistik")
+            }
+
+            Section {
+                Button {
+                    Task {
+                        await model.reload()
+                        await model.refreshMeta()
+                    }
+                } label: {
+                    Label("Kütüphaneyi yenile", systemImage: "arrow.clockwise")
+                }
+                .disabled(model.isLoading)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Medya
+
+    private var mediaSection: some View {
+        @Bindable var model = model
+        return Form {
+            Section {
+                Toggle(isOn: $model.downloadVideos) {
+                    Label("Videoları otomatik indir", systemImage: "arrow.down.circle")
+                }
+                .onChange(of: model.downloadVideos) { _, on in
+                    Task { await model.setDownloadVideos(on) }
+                }
+            } footer: {
+                Text("Görseller ve video kapakları her zaman indirilir. Kapalıyken videolar tek tek detay ekranından veya görüntüleyiciden indirilebilir.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Diskteki medya") {
+                    Text(ByteCountFormatter.string(fromByteCount: model.stats?.mediaBytes ?? 0, countStyle: .file))
+                        .monospacedDigit()
+                }
+                if let pending = model.stats?.mediaPending, pending > 0 {
+                    LabeledContent("İndirilmeyi bekleyen") {
+                        Text("\(pending) kayıt").monospacedDigit()
+                    }
+                }
+                LabeledContent("Harici video indirici") {
+                    if model.videoTools.isEmpty {
+                        Label("Kurulu değil", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                    } else {
+                        Label(model.videoTools.map(\.name).joined(separator: " → "), systemImage: "checkmark.circle")
+                            .foregroundStyle(.green)
+                    }
+                }
+            } header: {
+                Text("Durum")
+            }
+
+            Section {
+                Button {
+                    Task { await model.retryMedia() }
+                } label: {
+                    Label("Eksik medyaları şimdi tara ve indir", systemImage: "arrow.clockwise")
                 }
             }
         }
         .formStyle(.grouped)
     }
 
-    // MARK: - 5. Yedek
+    // MARK: - Yazı Tanıma
+
+    private var ocrSection: some View {
+        @Bindable var model = model
+        return Form {
+            Section {
+                Toggle(isOn: $model.ocrEnabled) {
+                    Label("Görsellerdeki yazıyı tanı ve aranabilir yap", systemImage: "text.viewfinder")
+                }
+            } footer: {
+                Text("macOS'un yerel Apple Vision altyapısı kullanılır. Tüm işlemler çevrimdışı ve cihazınızda gerçekleşir; Türkçe ve İngilizce metinleri tanır.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Tanıma") {
+                    Label(model.ocrEnabled ? "Etkin" : "Kapalı",
+                          systemImage: model.ocrEnabled ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(model.ocrEnabled ? .green : .secondary)
+                }
+                if let n = model.stats?.ocrPending, n > 0 {
+                    LabeledContent("Okunmayı bekleyen") {
+                        Text("\(n) kayıt").monospacedDigit()
+                    }
+                }
+            } header: {
+                Text("Durum")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Yedek
 
     private var backupSection: some View {
         @Bindable var model = model
@@ -261,7 +355,7 @@ struct SettingsView: View {
                 }
                 .disabled(model.backupFolder == nil)
             } header: {
-                Label("Yedek", systemImage: "externaldrive.badge.timemachine")
+                Text("Yedek")
             } footer: {
                 Text("Veritabanı, tüm medya ve her programın okuyabileceği bir dışa aktarım (items.jsonl) kopyalanır. İlk yedek her şeyi, sonrakiler yalnızca yenileri taşır.")
                     .foregroundStyle(.secondary)
@@ -310,45 +404,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    // MARK: - 6. Hızlı Kayıt
-
-    private var quickSection: some View {
-        @Bindable var model = model
-        return Form {
-            Section {
-                Toggle(isOn: $menuBarIcon) {
-                    Label("Menü çubuğunda göster", systemImage: "menubar.rectangle")
-                }
-                Toggle(isOn: Binding(
-                    get: { hotKeyOn },
-                    set: { on in
-                        hotKeyOn = on
-                        QuickSave.shared.setHotKey(on)
-                    }
-                )) {
-                    Label("\(QuickSave.hotKeyLabel) ile panodaki linki kaydet", systemImage: "keyboard")
-                }
-                Toggle(isOn: $model.spotlightEnabled) {
-                    Label("Kayıtları Spotlight'ta göster", systemImage: "magnifyingglass")
-                }
-            } header: {
-                Label("Hızlı Kayıt", systemImage: "bolt")
-            } footer: {
-                Text("Kısayol her uygulamada çalışır: bir bağlantı kopyala, kısayola bas. Spotlight'ta metin, yazar, etiketler ve görsellerdeki yazı aranır; hiçbir şey cihazdan çıkmaz.")
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Bağlantılar") {
-                Text("wroopmark://item/<id> · wroopmark://search?q=… · wroopmark://add?url=…")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    // MARK: - 7. Eklenti
+    // MARK: - Eklenti
 
     private var extensionSection: some View {
         Form {
@@ -391,7 +447,7 @@ struct SettingsView: View {
                         .foregroundStyle(.orange)
                 }
             } header: {
-                Label("Chromium", systemImage: "puzzlepiece.extension")
+                Text("Chromium")
             }
 
             Section {
@@ -401,7 +457,7 @@ struct SettingsView: View {
                     Label("Safari'de aç", systemImage: "safari")
                 }
             } header: {
-                Label("Safari", systemImage: "safari")
+                Text("Safari")
             } footer: {
                 Text("Uygulamanın içinde gelir. İmzasız kurulumda önce Safari → Ayarlar → Geliştirici → \"İmzasız eklentilere izin ver\" gerekir (Safari her açılışta sıfırlar).")
                     .foregroundStyle(.secondary)
@@ -426,5 +482,112 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: - Hakkında
+
+    private var aboutSection: some View {
+        Form {
+            Section {
+                HStack(spacing: Theme.Spacing.lg) {
+                    if let icon = NSApp.applicationIconImage {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 64, height: 64)
+                            .accessibilityHidden(true)
+                    }
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("wroopmark")
+                            .font(.title2.weight(.semibold))
+                        Text("Sürüm \(appVersion)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                        Text("Kaydettiklerin, çevrimdışı ve aranabilir.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, Theme.Spacing.xs)
+            }
+
+            Section {
+                Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark")!) {
+                    Label("GitHub'da aç", systemImage: "arrow.up.forward.square")
+                }
+                Button {
+                    NSWorkspace.shared.open(Core.shared.libraryURL)
+                } label: {
+                    Label("Kütüphane klasörünü aç", systemImage: "folder")
+                }
+            } header: {
+                Text("Bağlantılar")
+            }
+
+            Section {
+                LabeledContent("Lisans", value: "MIT")
+                LabeledContent("Telif", value: "© 2026 Furkan Türkoğlu")
+            } footer: {
+                Text("Sunucu, hesap ve bulut yok; arşiv yalnızca bu Mac'te durur.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "geliştirme"
+    }
+}
+
+/// A miniature library card so the appearance tab shows what the chosen
+/// layout actually looks like instead of an empty form.
+private struct AppearancePreview: View {
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                .fill(Theme.Stroke.subtleFill)
+                .frame(width: 88, height: 64)
+                .overlay {
+                    Image(systemName: "photo")
+                        .font(.title2)
+                        .foregroundStyle(.tertiary)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                }
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text("Kütüphane görünümü")
+                    .font(.subheadline.weight(.semibold))
+                Text("Etiketler, notlar ve medya tek bakışta.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                HStack(spacing: Theme.Spacing.xs) {
+                    Text("#okunacak")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, Theme.Spacing.sm)
+                        .padding(.vertical, Theme.Spacing.xs)
+                        .background(Theme.accent.opacity(0.12), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(Theme.accent.opacity(0.18), lineWidth: Theme.Stroke.hairlineWidth)
+                        }
+                    CountPill(value: "12")
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Theme.Spacing.md)
+        .background(Theme.Stroke.subtleFill, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+        }
     }
 }

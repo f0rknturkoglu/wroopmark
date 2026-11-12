@@ -34,10 +34,14 @@ struct NameSheet: View {
     }
 
     var body: some View {
-        Form {
-            Section {
+        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+            Label(title, systemImage: symbol)
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 TextField(placeholder, text: $name)
                     .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.leading)
                     .onSubmit(submit)
                 if !message.isEmpty {
                     Text(message)
@@ -45,35 +49,46 @@ struct NameSheet: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            } header: {
-                Label(title, systemImage: symbol)
-                    .font(.headline)
             }
-        }
-        .formStyle(.grouped)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            HStack(spacing: Theme.Spacing.sm) {
-                Spacer()
-                Button { dismiss() } label: {
-                    Label("Vazgeç", systemImage: "xmark")
-                }
-                .buttonStyle(.bordered)
-                .keyboardShortcut(.cancelAction)
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Stroke.subtleFill, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+            }
 
-                Button(action: submit) {
-                    Label(actionTitle, systemImage: "checkmark")
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(trimmed.isEmpty)
-            }
-            .controlSize(.regular)
-            .padding(.horizontal, Theme.Spacing.xl)
-            .padding(.vertical, Theme.Spacing.md)
-            .background(.background)
-            .overlay(alignment: .top) { Divider() }
+            Spacer(minLength: 0)
         }
-        .frame(minWidth: 420, idealWidth: 440, minHeight: 220, idealHeight: message.isEmpty ? 224 : 264)
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            sheetActions
+        }
+        .frame(minWidth: 420, idealWidth: 440, minHeight: 240, idealHeight: message.isEmpty ? 240 : 280)
+    }
+
+    private var sheetActions: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Spacer()
+            Button { dismiss() } label: {
+                Label("Vazgeç", systemImage: "xmark")
+            }
+            .buttonStyle(.bordered)
+            .keyboardShortcut(.cancelAction)
+
+            Button(action: submit) {
+                Label(actionTitle, systemImage: "checkmark")
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
+            .disabled(trimmed.isEmpty)
+        }
+        .controlSize(.regular)
+        .padding(.horizontal, Theme.Spacing.xl)
+        .padding(.vertical, Theme.Spacing.md)
+        .background(.background)
+        .overlay(alignment: .top) { Divider() }
     }
 
     private func submit() {
@@ -99,24 +114,32 @@ struct AddURLSheet: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                TextField(
-                    "Bağlantı",
+        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+            Label("Bağlantı kaydet", systemImage: "bookmark.badge.plus")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                SheetField(
+                    title: "Bağlantı",
                     text: $url,
-                    prompt: Text("https://…  (X, TikTok, Pinterest ya da herhangi bir sayfa)")
+                    prompt: "https://…",
+                    hint: "X, TikTok, Pinterest ya da herhangi bir sayfa"
                 )
-                .textFieldStyle(.roundedBorder)
-                TextField("Etiketler", text: $tags, prompt: Text("dev/rust, okunacak"))
-                    .textFieldStyle(.roundedBorder)
-                TextField("Not", text: $note, prompt: Text("isteğe bağlı"))
-                    .textFieldStyle(.roundedBorder)
-            } header: {
-                Label("Bağlantı kaydet", systemImage: "bookmark.badge.plus")
-                    .font(.headline)
+                SheetField(title: "Etiketler", text: $tags, prompt: "dev/rust, okunacak")
+                SheetField(title: "Not", text: $note, prompt: "isteğe bağlı")
             }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Stroke.subtleFill, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+            }
+
+            Spacer(minLength: 0)
         }
-        .formStyle(.grouped)
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: Theme.Spacing.md) {
                 if model.isBusy {
@@ -152,7 +175,7 @@ struct AddURLSheet: View {
             .background(.background)
             .overlay(alignment: .top) { Divider() }
         }
-        .frame(minWidth: 440, idealWidth: 500, minHeight: 300)
+        .frame(minWidth: 440, idealWidth: 500, minHeight: 340)
         .onAppear {
             // Pre-fill from the clipboard when it holds a link.
             if let s = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -171,31 +194,35 @@ struct BulkTagSheet: View {
     @State private var remove = ""
 
     var body: some View {
-        Form {
-            Section {
-                LabeledContent("Ekle") {
-                    TextField("Etiketler", text: $add, prompt: Text("virgülle ayır"))
-                        .textFieldStyle(.roundedBorder)
-                }
-                LabeledContent("Kaldır") {
-                    TextField("Etiketler", text: $remove, prompt: Text("virgülle ayır"))
-                        .textFieldStyle(.roundedBorder)
-                }
+        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+            Label(
+                ids.count == 1 ? "Etiketle" : "\(ids.count) kaydı etiketle",
+                systemImage: "tag"
+            )
+            .font(.headline)
+            .monospacedDigit()
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                SheetField(title: "Ekle", text: $add, prompt: "virgülle ayır")
+                SheetField(title: "Kaldır", text: $remove, prompt: "virgülle ayır")
                 if !model.tags.isEmpty {
                     TagSuggestions(current: parseTags(add), all: model.tags) { name in
                         add = (parseTags(add) + [name]).joined(separator: ", ")
                     }
                 }
-            } header: {
-                Label(
-                    ids.count == 1 ? "Etiketle" : "\(ids.count) kaydı etiketle",
-                    systemImage: "tag"
-                )
-                .font(.headline)
-                .monospacedDigit()
             }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Stroke.subtleFill, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+            }
+
+            Spacer(minLength: 0)
         }
-        .formStyle(.grouped)
+        .padding(Theme.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: Theme.Spacing.sm) {
                 Spacer()
@@ -222,6 +249,30 @@ struct BulkTagSheet: View {
             .background(.background)
             .overlay(alignment: .top) { Divider() }
         }
-        .frame(minWidth: 420, idealWidth: 480, minHeight: 300)
+        .frame(minWidth: 420, idealWidth: 480, minHeight: 320)
+    }
+}
+
+/// Label above field: a macOS 26 Form row would otherwise hide the title and
+/// right-align the prompt.
+private struct SheetField: View {
+    let title: String
+    @Binding var text: String
+    let prompt: String
+    var hint: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text(title)
+                .font(.callout.weight(.medium))
+            TextField("", text: $text, prompt: Text(prompt))
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.leading)
+            if let hint {
+                Text(hint)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 }

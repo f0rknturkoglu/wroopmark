@@ -27,6 +27,24 @@ enum Theme {
         static let lg: CGFloat = 24
     }
 
+    /// Window geometry shared by the split view and the views that have to
+    /// line up with it. Keeping these here stops the columns from drifting
+    /// apart when one screen is resized.
+    enum Layout {
+        static let sidebarMinWidth: CGFloat = 220
+        static let sidebarIdealWidth: CGFloat = 250
+        static let sidebarMaxWidth: CGFloat = 320
+
+        static let inspectorMinWidth: CGFloat = 300
+        static let inspectorIdealWidth: CGFloat = 340
+        static let inspectorMaxWidth: CGFloat = 520
+
+        /// Narrowest usable card; cards divide the remaining width evenly.
+        static let cardMinWidth: CGFloat = 260
+        /// Reading measure for the detail column and the feed.
+        static let readingWidth: CGFloat = 660
+    }
+
     enum Stroke {
         static let hairlineWidth: CGFloat = 0.5
         static let selectionWidth: CGFloat = 2
@@ -128,9 +146,15 @@ struct TagChip: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
+            // The padding belongs to the button so the whole capsule body is
+            // clickable, not only the few points covered by the glyphs.
             Button(action: action) {
                 Text("#\(name)")
                     .lineLimit(1)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .padding(.leading, Theme.Spacing.sm)
+                    .padding(.trailing, removable ? 0 : Theme.Spacing.sm)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             if removable {
@@ -142,14 +166,13 @@ struct TagChip: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(selected ? Color.white.opacity(0.88) : Color.secondary)
+                .padding(.trailing, Theme.Spacing.sm)
                 .accessibilityLabel("Etiketi kaldır: #\(name)")
             }
         }
         .font(.caption.weight(.medium))
         .controlSize(.small)
         .foregroundStyle(selected ? Color.white : Theme.accent)
-        .padding(.horizontal, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.xs)
         .background(
             selected
                 ? (hovering ? Theme.accent.opacity(0.92) : Theme.accent)
@@ -165,5 +188,24 @@ struct TagChip: View {
         }
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Quiet count for bars and cards: monospaced, secondary, and small enough
+/// to sit beside a title without pulling the eye.
+struct CountPill: View {
+    let value: String
+
+    var body: some View {
+        Text(value)
+            .font(.caption.weight(.medium).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Theme.Stroke.subtleFill, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+            }
     }
 }

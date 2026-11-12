@@ -246,9 +246,10 @@ struct ItemDetailView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             actions
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.vertical, Theme.Spacing.md)
+                .padding(.horizontal, Theme.Spacing.xl)
+                .frame(maxWidth: Theme.Layout.readingWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.Spacing.md)
                 .background(.background)
                 .overlay(alignment: .top) { Divider() }
         }
@@ -281,6 +282,7 @@ struct ItemDetailView: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(item.authorName ?? item.author ?? URL(string: item.url)?.host() ?? platform.label)
                     .font(.headline)
+                    .lineLimit(1)
                 HStack(spacing: Theme.Spacing.sm) {
                     if let h = item.authorHandle { Text("@\(h)") }
                     Label(platform.label, systemImage: platform.symbol)
@@ -299,73 +301,60 @@ struct ItemDetailView: View {
     }
 
     private var actions: some View {
-        ViewThatFits(in: .horizontal) {
-            actionRow(compact: false)
-            actionRow(compact: true)
-        }
-        .controlSize(.regular)
-    }
-
-    @ViewBuilder
-    private func actionRow(compact: Bool) -> some View {
-        let downloadTitle = item.platform == "youtube" ? "Videoyu lokale indir" : "Medyayı indir"
         HStack(spacing: Theme.Spacing.sm) {
             Button {
                 if let url = URL(string: item.url) { NSWorkspace.shared.open(url) }
             } label: {
-                Label("Kaynağında aç", systemImage: "arrow.up.right.square")
+                ViewThatFits(in: .horizontal) {
+                    Label("Kaynağında aç", systemImage: "arrow.up.right.square")
+                    Label("Aç", systemImage: "arrow.up.right.square")
+                    Label("Kaynağında aç", systemImage: "arrow.up.right.square")
+                        .labelStyle(.iconOnly)
+                }
             }
             .buttonStyle(.borderedProminent)
-            .fixedSize()
-
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(item.url, forType: .string)
-            } label: {
-                if compact {
-                    Label("Bağlantıyı kopyala", systemImage: "doc.on.doc")
-                        .labelStyle(.iconOnly)
-                } else {
-                    Label("Kopyala", systemImage: "doc.on.doc")
-                }
-            }
-            .buttonStyle(.bordered)
-            .fixedSize()
-            .accessibilityLabel("Bağlantıyı kopyala")
-            .help("Bağlantıyı kopyala")
-
-            if item.needsDownload {
-                Button {
-                    Task { await model.downloadMedia(item.id) }
-                } label: {
-                    if compact {
-                        Label(downloadTitle, systemImage: "arrow.down.circle")
-                            .labelStyle(.iconOnly)
-                    } else {
-                        Label(downloadTitle, systemImage: "arrow.down.circle")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(compact ? .small : .regular)
-                .fixedSize()
-                .disabled(model.isBusy)
-                .accessibilityLabel(downloadTitle)
-                .help(downloadTitle)
-            }
+            .help("Kaynağında aç")
 
             Spacer(minLength: Theme.Spacing.sm)
 
-            Button(role: .destructive) {
-                model.requestDelete([item.id])
-            } label: {
-                Label("Kaydı sil", systemImage: "trash")
-                    .labelStyle(.iconOnly)
+            ControlGroup {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(item.url, forType: .string)
+                } label: {
+                    Label("Bağlantıyı kopyala", systemImage: "doc.on.doc")
+                        .labelStyle(.iconOnly)
+                }
+                .help("Bağlantıyı kopyala")
+                .accessibilityLabel("Bağlantıyı kopyala")
+
+                if item.needsDownload {
+                    Button {
+                        Task { await model.downloadMedia(item.id) }
+                    } label: {
+                        Label(downloadTitle, systemImage: "arrow.down.circle")
+                            .labelStyle(.iconOnly)
+                    }
+                    .help(downloadTitle)
+                    .accessibilityLabel(downloadTitle)
+                    .disabled(model.isBusy)
+                }
+
+                Button(role: .destructive) {
+                    model.requestDelete([item.id])
+                } label: {
+                    Label("Kaydı sil", systemImage: "trash")
+                        .labelStyle(.iconOnly)
+                }
+                .help("Sil")
+                .accessibilityLabel("Kaydı sil")
             }
-            .buttonStyle(.bordered)
-            .fixedSize()
-            .accessibilityLabel("Kaydı sil")
-            .help("Sil")
         }
+        .controlSize(.regular)
+    }
+
+    private var downloadTitle: String {
+        item.platform == "youtube" ? "Videoyu lokale indir" : "Medyayı indir"
     }
 
     private var footer: some View {

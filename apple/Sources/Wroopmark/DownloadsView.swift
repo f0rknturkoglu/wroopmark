@@ -74,6 +74,7 @@ struct DownloadsView: View {
                                 .padding(.vertical, Theme.Spacing.xs)
                                 .background(Theme.accent, in: Capsule())
                                 .monospacedDigit()
+                                .accessibilityLabel("\(model.activeOrQueuedDownloadsCount) etkin indirme")
                         }
                     }
                     Text(statusSummary)

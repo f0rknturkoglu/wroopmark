@@ -6,9 +6,14 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var model = model
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: columnVisibility) {
             SidebarView()
-                .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
+                .toolbar(removing: .sidebarToggle)
+                .navigationSplitViewColumnWidth(
+                    min: Theme.Layout.sidebarMinWidth,
+                    ideal: Theme.Layout.sidebarIdealWidth,
+                    max: Theme.Layout.sidebarMaxWidth
+                )
         } detail: {
             Group {
                 switch model.scope {
@@ -22,11 +27,15 @@ struct ContentView: View {
             .searchable(
                 text: $model.query,
                 placement: .toolbar,
-                prompt: Text("Ara: kelime, tag:dev, from:@yazar, has:image…")
+                prompt: Text("Ara…")
             )
             .inspector(isPresented: $model.showDetailPane) {
                 DetailColumn()
-                    .inspectorColumnWidth(min: 320, ideal: 380, max: 550)
+                    .inspectorColumnWidth(
+                        min: Theme.Layout.inspectorMinWidth,
+                        ideal: Theme.Layout.inspectorIdealWidth,
+                        max: Theme.Layout.inspectorMaxWidth
+                    )
             }
         }
         // The media viewer is a lightbox over the whole window rather than a
@@ -59,6 +68,17 @@ struct ContentView: View {
             Task { await model.reload() }
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { model.sidebarVisible.toggle() }
+                } label: {
+                    Label("Kenar Çubuğu", systemImage: "sidebar.left")
+                        .labelStyle(.iconOnly)
+                }
+                .help(model.sidebarVisible ? "Kenar çubuğunu gizle (⌃⌘S)" : "Kenar çubuğunu göster (⌃⌘S)")
+                .accessibilityLabel(model.sidebarVisible ? "Kenar çubuğunu gizle" : "Kenar çubuğunu göster")
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 if model.isBusy {
                     ProgressView()
@@ -121,7 +141,6 @@ struct ContentView: View {
                         .foregroundStyle(model.showDetailPane ? Theme.accent : .primary)
                 }
                 .help(model.showDetailPane ? "Detay panelini gizle (⌘I)" : "Detay panelini göster (⌘I)")
-                .keyboardShortcut("i", modifiers: [.command])
             }
         }
         // A link dragged from the browser (or a .webloc) is saved like ⌘N.
@@ -158,6 +177,17 @@ struct ContentView: View {
         } message: {
             Text("Bu işlem geri alınamaz.")
         }
+    }
+}
+
+extension ContentView {
+    /// Maps the persisted boolean to the split-view enum so the toolbar,
+    /// the View menu, and a divider drag all write the same state.
+    private var columnVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { model.sidebarVisible ? .all : .detailOnly },
+            set: { model.sidebarVisible = $0 != .detailOnly }
+        )
     }
 }
 

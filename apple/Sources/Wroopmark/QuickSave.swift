@@ -158,6 +158,7 @@ private struct Banner: View {
 struct QuickAddMenu: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @AppStorage("quickAddFolder") private var folderID = 0
     @State private var link = ""
     @State private var tags = ""
@@ -213,15 +214,22 @@ struct QuickAddMenu: View {
                     Label("wroopmark'ı aç", systemImage: "macwindow")
                 }
                 Spacer()
+                Button {
+                    closeMenuPanel()
+                    openSettings()
+                } label: {
+                    Label("Ayarlar", systemImage: "gearshape")
+                }
+                .help("Ayarlar (⌘,)")
                 Button { NSApp.terminate(nil) } label: {
                     Label("Çık", systemImage: "power")
                 }
             }
             .buttonStyle(.bordered)
-            .controlSize(.regular)
+            .controlSize(.small)
         }
         .padding(Theme.Spacing.lg)
-        .frame(width: 340)
+        .frame(width: 380)
         .task {
             if link.isEmpty, let c = QuickSave.clipboardURL() { link = c }
             await model.loadRecent()
@@ -242,9 +250,13 @@ struct QuickAddMenu: View {
         }
     }
 
-    private func openMain() {
+    private func closeMenuPanel() {
         // The menu bar panel is the key window while it is open.
         NSApp.windows.first { $0.isKeyWindow && $0.className.contains("MenuBarExtra") }?.orderOut(nil)
+    }
+
+    private func openMain() {
+        closeMenuPanel()
         NSApp.activate(ignoringOtherApps: true)
         if !NSApp.windows.contains(where: { $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }) {
             openWindow(id: "main")

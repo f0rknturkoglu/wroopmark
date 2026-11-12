@@ -130,6 +130,11 @@ final class AppModel {
     var showDetailPane: Bool {
         didSet { defaults.set(showDetailPane, forKey: "show_detail_pane") }
     }
+    /// The sidebar is user-hideable; the View menu and the toolbar share this
+    /// so both stay in sync and the choice survives relaunches.
+    var sidebarVisible: Bool {
+        didSet { defaults.set(sidebarVisible, forKey: "sidebar_visible") }
+    }
     var selection: Set<String> = []
     /// Link pool: the selected link and the posts that contain it.
     var selectedLink: LinkRow?
@@ -272,6 +277,7 @@ final class AppModel {
         self.enableSystemIntegrations = enableSystemIntegrations
         self.sort = SortOrder(rawValue: defaults.string(forKey: "sort") ?? "") ?? .relevance
         self.showDetailPane = defaults.object(forKey: "show_detail_pane") as? Bool ?? true
+        self.sidebarVisible = defaults.object(forKey: "sidebar_visible") as? Bool ?? true
         self.ocrEnabled = defaults.bool(forKey: "ocr")
         self.layout = LibraryLayout(rawValue: defaults.string(forKey: "layout") ?? "") ?? .grid
         self.backupFolder = defaults.string(forKey: "backupFolder")

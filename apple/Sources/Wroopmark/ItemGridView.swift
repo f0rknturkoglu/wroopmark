@@ -7,23 +7,16 @@ struct ItemGridView: View {
     @State private var anchor: String?
     @State private var columnCount = 3
 
-    private struct GridRowSlice: Identifiable {
-        let index: Int
-        let items: [Item]
-        var id: String { items.first?.id ?? "\(index)" }
+    /// Card columns from the width the scroll view really has. `LazyVGrid`
+    /// alone caches the column set from an earlier (inspector-less) layout,
+    /// so the column count is state and the grid is rebuilt when it changes.
+    private var gridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.md), count: columnCount)
     }
 
-    private func rows(cols: Int) -> [GridRowSlice] {
-        let strideStep = max(1, cols)
-        return stride(from: 0, to: model.items.count, by: strideStep).map { start in
-            let end = min(start + strideStep, model.items.count)
-            return GridRowSlice(index: start / strideStep, items: Array(model.items[start..<end]))
-        }
-    }
-
-    private nonisolated static func columnsForWidth(_ width: CGFloat) -> Int {
-        let innerWidth = max(260, width - Theme.Spacing.lg * 2)
-        return max(1, Int((innerWidth + Theme.Spacing.md) / (260 + Theme.Spacing.md)))
+    private nonisolated static func columns(forWidth width: CGFloat) -> Int {
+        let available = max(Theme.Layout.cardMinWidth, width - Theme.Spacing.lg * 2)
+        return max(1, Int((available + Theme.Spacing.md) / (Theme.Layout.cardMinWidth + Theme.Spacing.md)))
     }
 
     var body: some View {
@@ -31,12 +24,16 @@ struct ItemGridView: View {
             VStack(alignment: .leading, spacing: 0) {
                 switch model.layout {
                 case .grid:
-                    let cols = max(1, columnCount)
-                    LazyVStack(spacing: Theme.Spacing.md) {
-                        ForEach(rows(cols: cols)) { row in
-                            gridRowView(row, cols: cols)
+                    LazyVGrid(columns: gridColumns, alignment: .leading, spacing: Theme.Spacing.md) {
+                        ForEach(model.items) { item in
+                            let selected = model.selection.contains(item.id)
+                            ItemCard(item: item, selected: selected)
+                                .equatable()
+                                .modifier(Selectable(item: item, selected: selected, owner: self))
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(columnCount)
                     .padding(Theme.Spacing.lg)
                 case .list:
                     LazyVStack(spacing: Theme.Spacing.xs) {
@@ -62,11 +59,13 @@ struct ItemGridView: View {
                     .padding(Theme.Spacing.lg)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .defaultScrollAnchor(.top)
         .onGeometryChange(for: Int.self) { proxy in
-            Self.columnsForWidth(proxy.size.width)
-        } action: { cols in
-            if columnCount != cols { columnCount = cols }
+            Self.columns(forWidth: proxy.size.width)
+        } action: { count in
+            if count != columnCount { columnCount = count }
         }
         .safeAreaInset(edge: .top, spacing: 0) { TagStrip() }
         .overlay {
@@ -95,27 +94,6 @@ struct ItemGridView: View {
                 } else {
                     ContentUnavailableView.search(text: model.query)
                         .padding(Theme.Spacing.lg)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func gridRowView(_ row: GridRowSlice, cols: Int) -> some View {
-        let trailingPlaceholders = max(0, cols - row.items.count)
-        Grid(alignment: .topLeading, horizontalSpacing: Theme.Spacing.md, verticalSpacing: 0) {
-            GridRow {
-                ForEach(row.items) { item in
-                    let selected = model.selection.contains(item.id)
-                    ItemCard(item: item, selected: selected)
-                        .equatable()
-                        .modifier(Selectable(item: item, selected: selected, owner: self))
-                }
-                ForEach(0..<trailingPlaceholders, id: \.self) { _ in
-                    Color.clear
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 0)
-                        .accessibilityHidden(true)
                 }
             }
         }
@@ -269,22 +247,12 @@ struct TagStrip: View {
                 Text(scopeTitle)
                     .font(.subheadline.weight(.semibold))
                 if model.total > 0 {
-                    Text(model.total.formatted())
-                        .font(.caption.weight(.medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, Theme.Spacing.sm)
-                        .padding(.vertical, Theme.Spacing.xs)
-                        .background(Theme.Stroke.subtleFill, in: Capsule())
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
-                        }
+                    CountPill(value: model.total.formatted())
                 }
             }
 
             Divider()
-                .frame(height: 16)
+                .frame(height: 18)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.Spacing.sm) {
@@ -338,13 +306,9 @@ struct TagStrip: View {
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.vertical, Theme.Spacing.sm)
-        .background(.background.secondary, in: .rect(cornerRadius: Theme.Radius.md))
-        .overlay {
-            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, Theme.Spacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background)
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 
@@ -359,26 +323,27 @@ private struct TagStripActionCapsule: View {
         Button(action: action) {
             Label(title, systemImage: symbol)
                 .monospacedDigit()
+                .padding(.horizontal, Theme.Spacing.sm)
+                .padding(.vertical, Theme.Spacing.xs)
+                .foregroundStyle(prominent ? .white : Theme.accent)
+                .background(
+                    prominent
+                        ? (hovering ? Theme.accent.opacity(0.9) : Theme.accent)
+                        : Theme.accent.opacity(hovering ? 0.18 : 0.12),
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            prominent ? Color.white.opacity(0.16) : Theme.accent.opacity(hovering ? 0.36 : 0.18),
+                            lineWidth: Theme.Stroke.hairlineWidth
+                        )
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .controlSize(.small)
         .font(.caption.weight(prominent ? .semibold : .medium))
-        .foregroundStyle(prominent ? .white : Theme.accent)
-        .padding(.horizontal, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.xs)
-        .background(
-            prominent
-                ? (hovering ? Theme.accent.opacity(0.9) : Theme.accent)
-                : Theme.accent.opacity(hovering ? 0.18 : 0.12),
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .strokeBorder(
-                    prominent ? Color.white.opacity(0.16) : Theme.accent.opacity(hovering ? 0.36 : 0.18),
-                    lineWidth: Theme.Stroke.hairlineWidth
-                )
-        }
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
     }
@@ -409,6 +374,7 @@ struct ItemCard: View {
     private var hostFallback: String {
         URL(string: item.url)?.host() ?? platform.label
     }
+    private var hasCover: Bool { item.cover?.file != nil }
 
     var body: some View {
         cardContent
@@ -440,7 +406,7 @@ struct ItemCard: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             AuthorLine(item: item)
 
-            if let cover = item.cover, let file = cover.file {
+            if hasCover, let cover = item.cover, let file = cover.file {
                 // Framed concentric media slot inside 16pt card padding -> 8pt radius.
                 Color.clear
                     .frame(maxWidth: .infinity)
@@ -481,7 +447,7 @@ struct ItemCard: View {
                     Spacer(minLength: 0)
                 }
                 .padding(Theme.Spacing.md)
-                .frame(maxWidth: .infinity, minHeight: slotHeight, maxHeight: slotHeight, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: slotHeight, maxHeight: .infinity, alignment: .topLeading)
                 .background(Theme.Stroke.subtleFill, in: .rect(cornerRadius: innerRadius))
                 .overlay {
                     RoundedRectangle(cornerRadius: innerRadius, style: .continuous)
@@ -499,7 +465,10 @@ struct ItemCard: View {
                 }
             }
 
-            Spacer(minLength: 0)
+            // A cover card spends its flexible space between the text and the
+            // metadata; a text-only card lets its editorial block fill it, so
+            // the card never looks half empty.
+            if hasCover { Spacer(minLength: 0) }
 
             HStack(alignment: .center, spacing: Theme.Spacing.sm) {
                 if !item.tags.isEmpty {

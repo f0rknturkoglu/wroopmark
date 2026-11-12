@@ -83,10 +83,13 @@ struct LinkPoolView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: Theme.Spacing.sm) {
+                    titleBlock
+                    Divider().frame(height: 18)
                     addBar
                     actionButtons
                 }
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    titleBlock
                     addBar
                     HStack(spacing: Theme.Spacing.sm) {
                         actionButtons
@@ -96,7 +99,7 @@ struct LinkPoolView: View {
             }
             .controlSize(.regular)
             .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm)
             .background(.background)
             .overlay(alignment: .bottom) { Divider() }
         }
@@ -143,6 +146,20 @@ struct LinkPoolView: View {
         .onAppear {
             selectedID = model.selectedLink?.id
         }
+    }
+
+    /// The pool needs the same scope header the grid and gallery get from
+    /// their top bar; otherwise the only "Link havuzu" cue is in the sidebar.
+    private var titleBlock: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Text("Link havuzu")
+                .font(.subheadline.weight(.semibold))
+            let total = model.linksTotal > 0 ? model.linksTotal : model.links.count
+            if total > 0 {
+                CountPill(value: total.formatted())
+            }
+        }
+        .fixedSize()
     }
 
     private var addBar: some View {
@@ -378,6 +395,8 @@ struct LinkDetailView: View {
                 }
             }
             .padding(Theme.Spacing.lg)
+            .frame(maxWidth: Theme.Layout.readingWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
     }
 }

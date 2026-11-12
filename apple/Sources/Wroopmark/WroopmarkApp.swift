@@ -49,9 +49,30 @@ struct WroopmarkApp: App {
                     if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.reveal(id: id) }
                 }
         }
-        .defaultSize(width: 1360, height: 860)
+        .defaultSize(width: 1440, height: 900)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(after: .sidebar) {
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { model.sidebarVisible.toggle() }
+                } label: {
+                    Label(
+                        model.sidebarVisible ? "Kenar Çubuğunu Gizle" : "Kenar Çubuğunu Göster",
+                        systemImage: "sidebar.left"
+                    )
+                }
+                .keyboardShortcut("s", modifiers: [.control, .command])
+
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { model.showDetailPane.toggle() }
+                } label: {
+                    Label(
+                        model.showDetailPane ? "Detay panelini gizle" : "Detay panelini göster",
+                        systemImage: "sidebar.trailing"
+                    )
+                }
+                .keyboardShortcut("i", modifiers: .command)
+            }
             CommandGroup(replacing: .newItem) {
                 Button { model.showAdd = true } label: {
                     Label("Bağlantı ekle…", systemImage: "plus")

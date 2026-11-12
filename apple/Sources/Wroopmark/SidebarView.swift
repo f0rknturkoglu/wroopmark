@@ -17,16 +17,15 @@ struct SidebarView: View {
             Section("Kütüphane") {
                 row("Tümü", "tray.full", model.stats?.items).tag(Scope.all)
                 row("Etiketsiz", "tag.slash", nil).tag(Scope.untagged)
-                DisclosureGroup(isExpanded: $linkPoolExpanded) {
-                    row("Tümü", "link", model.stats?.links)
-                        .tag(Scope.links(nil))
+                linkPoolRow
+                    .tag(Scope.links(nil))
+                    .help("Bütün linkler, kategorilere ayrılmış")
+                if linkPoolExpanded {
                     ForEach(LinkCategory.allCases) { cat in
                         row(cat.label, image: cat.iconImage, model.linkCategoryCount(cat))
                             .tag(Scope.links(cat))
+                            .padding(.leading, Theme.Spacing.lg)
                     }
-                } label: {
-                    row("Link havuzu", "link", model.stats?.links)
-                        .tag(Scope.links(nil))
                 }
                 row("Ayıkla", "arrow.left.arrow.right.square", nil).tag(Scope.triage)
                     .help("Kayıtları tek tek gözden geçir: ← sil, → sakla")
@@ -64,28 +63,13 @@ struct SidebarView: View {
                         showNewFolderSheet = true
                     } label: {
                         Label("Klasör oluştur…", systemImage: "folder.badge.plus")
-                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .padding(.vertical, Theme.Spacing.xs)
-                }
-            } header: {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Text("Klasörler")
-                    Spacer()
-                    Button {
-                        showNewFolderSheet = true
-                    } label: {
-                        Label("Yeni klasör ekle", systemImage: "plus")
-                            .labelStyle(.iconOnly)
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .accessibilityLabel("Yeni klasör ekle")
+                    .buttonStyle(.plain)
                     .help("Yeni klasör ekle")
                 }
+            } header: {
+                foldersHeader
             }
             if !model.savedSearches.isEmpty {
                 Section("Kayıtlı aramalar") {
@@ -137,67 +121,10 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .tint(Theme.accent)
         .contentMargins(.bottom, Theme.Spacing.lg, for: .scrollContent)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Button {
-                    model.showDownloads.toggle()
-                } label: {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: model.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle")
-                            .frame(width: 16, height: 16)
-                            .foregroundStyle(model.isDownloading ? Theme.accent : .secondary)
-                        Text(model.isDownloading ? "İndirmeler sürüyor…" : "İndirmeler")
-                            .font(.callout.weight(.medium))
-                            .foregroundStyle(model.isDownloading ? Theme.accent : .primary)
-                        Spacer(minLength: Theme.Spacing.sm)
-                        if model.activeOrQueuedDownloadsCount > 0 {
-                            Text("\(model.activeOrQueuedDownloadsCount)")
-                                .font(.caption.bold())
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, Theme.Spacing.sm)
-                                .padding(.vertical, Theme.Spacing.xs)
-                                .background(Theme.accent, in: Capsule())
-                                .monospacedDigit()
-                        }
-                    }
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .background(
-                        hoveringDownloads ? Theme.Stroke.subtleHoverFill : Theme.Stroke.subtleFill,
-                        in: Capsule()
-                    )
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(
-                                hoveringDownloads ? Theme.Stroke.surfaceHoverBorder : Theme.Stroke.surfaceBorder,
-                                lineWidth: Theme.Stroke.hairlineWidth
-                            )
-                    }
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .controlSize(.small)
-                .onHover { hoveringDownloads = $0 }
-                .animation(.easeOut(duration: 0.12), value: hoveringDownloads)
-                .help("İndirme paneli (⌘J)")
-
-                if let s = model.stats, s.mediaPending > 0 {
-                    statusLine("\(s.mediaPending) kaydın medyası iniyor", symbol: "arrow.down.circle")
-                }
-                if model.isFetchingVideos, let n = model.stats?.videosMissing, n > 0 {
-                    statusLine("\(n) video iniyor", symbol: "film")
-                }
-                if model.isReadingText, let n = model.stats?.ocrPending, n > 0 {
-                    statusLine("\(n) kayıtta yazı okunuyor", symbol: "text.viewfinder")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(Theme.Spacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.background)
-            .overlay(alignment: .top) { Divider() }
+            bottomBar
         }
         .navigationTitle("wroopmark")
         .sheet(isPresented: $showNewFolderSheet) {
@@ -275,6 +202,113 @@ struct SidebarView: View {
         }
     }
 
+    /// "Link havuzu" is both a destination and a disclosure group. A plain
+    /// DisclosureGroup cannot carry a List selection tag, so the row owns the
+    /// tag and the chevron toggles the children without adding a duplicate
+    /// "Tümü" row underneath.
+    private var linkPoolRow: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Label("Link havuzu", systemImage: "link")
+            Spacer(minLength: Theme.Spacing.sm)
+            if let count = model.stats?.links {
+                sidebarCount(count)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .rotationEffect(.degrees(linkPoolExpanded ? 90 : 0))
+                .frame(width: 12)
+                .accessibilityHidden(true)
+        }
+        .contentShape(.rect)
+        .simultaneousGesture(TapGesture().onEnded {
+            withAnimation(.snappy(duration: 0.18)) { linkPoolExpanded.toggle() }
+        })
+        .accessibilityHint(linkPoolExpanded ? "Kategorileri gizler" : "Kategorileri gösterir")
+    }
+
+    private var foldersHeader: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Text("Klasörler")
+            Spacer()
+            Button {
+                showNewFolderSheet = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 16, height: 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Yeni klasör ekle")
+            .help("Yeni klasör ekle")
+        }
+    }
+
+    private var bottomBar: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Button {
+                model.showDownloads.toggle()
+            } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: model.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle")
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(model.isDownloading ? Theme.accent : .secondary)
+                    Text(model.isDownloading ? "İndirmeler sürüyor…" : "İndirmeler")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(model.isDownloading ? Theme.accent : .primary)
+                    Spacer(minLength: Theme.Spacing.sm)
+                    if model.activeOrQueuedDownloadsCount > 0 {
+                        Text("\(model.activeOrQueuedDownloadsCount)")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, Theme.Spacing.sm)
+                            .padding(.vertical, Theme.Spacing.xs)
+                            .background(Theme.accent, in: Capsule())
+                            .monospacedDigit()
+                    }
+                }
+                .padding(.vertical, Theme.Spacing.sm)
+                .padding(.horizontal, Theme.Spacing.md)
+                .background(
+                    hoveringDownloads ? Theme.Stroke.subtleHoverFill : Theme.Stroke.subtleFill,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            hoveringDownloads ? Theme.Stroke.surfaceHoverBorder : Theme.Stroke.surfaceBorder,
+                            lineWidth: Theme.Stroke.hairlineWidth
+                        )
+                }
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .controlSize(.small)
+            .onHover { hoveringDownloads = $0 }
+            .animation(.easeOut(duration: 0.12), value: hoveringDownloads)
+            .help("İndirme paneli (⌘J)")
+
+            if let s = model.stats, s.mediaPending > 0 {
+                statusLine("\(s.mediaPending) kaydın medyası iniyor", symbol: "arrow.down.circle")
+            }
+            if model.isFetchingVideos, let n = model.stats?.videosMissing, n > 0 {
+                statusLine("\(n) video iniyor", symbol: "film")
+            }
+            if model.isReadingText, let n = model.stats?.ocrPending, n > 0 {
+                statusLine("\(n) kayıtta yazı okunuyor", symbol: "text.viewfinder")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, Theme.Spacing.sm)
+        .padding(.vertical, Theme.Spacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
+    }
+
     private func statusLine(_ text: String, symbol: String) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: symbol)
@@ -283,19 +317,16 @@ struct SidebarView: View {
                 .monospacedDigit()
                 .lineLimit(1)
         }
-        .padding(.horizontal, Theme.Spacing.xs)
+        .padding(.horizontal, Theme.Spacing.md)
     }
 
     private func row(_ title: String, _ symbol: String, _ count: Int?) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
             Label(title, systemImage: symbol)
-                .help(title)
+                .lineLimit(1)
             Spacer(minLength: Theme.Spacing.sm)
             if let count {
-                Text(count.formatted())
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+                sidebarCount(count)
             }
         }
     }
@@ -304,6 +335,7 @@ struct SidebarView: View {
         HStack(spacing: Theme.Spacing.sm) {
             Label {
                 Text(title)
+                    .lineLimit(1)
             } icon: {
                 Image(nsImage: image)
                     .renderingMode(.template)
@@ -311,14 +343,19 @@ struct SidebarView: View {
                     .scaledToFit()
                     .frame(width: 16, height: 16)
             }
-            .help(title)
             Spacer(minLength: Theme.Spacing.sm)
             if let count {
-                Text(count.formatted())
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+                sidebarCount(count)
             }
         }
+    }
+
+    /// Counts share one type size and one trailing edge; mixing `.callout`
+    /// with the sidebars's body text made rows look uneven.
+    private func sidebarCount(_ count: Int) -> some View {
+        Text(count.formatted())
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
     }
 }

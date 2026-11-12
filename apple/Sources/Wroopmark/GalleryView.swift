@@ -36,53 +36,60 @@ struct GalleryView: View {
 
     var body: some View {
         let entries = displayEntries
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
-                ForEach(entries) { e in
-                    tile(e)
-                        .onAppear {
-                            if e.id == entries.last?.id { Task { await model.loadMore() } }
-                        }
+        // The bar sits above the scroll view instead of in a safe-area inset:
+        // an inset let the first row slide under the bar by its top padding.
+        VStack(spacing: 0) {
+            bar(count: entries.count)
+            // The gap is outside the scroll view: the gallery scroll view
+            // otherwise starts at the first lazy item and clips its top.
+            Color.clear.frame(height: Theme.Spacing.lg)
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
+                    ForEach(entries) { e in
+                        tile(e)
+                            .onAppear {
+                                if e.id == entries.last?.id { Task { await model.loadMore() } }
+                            }
+                    }
                 }
+                .padding(Theme.Spacing.lg)
             }
-            .padding(Theme.Spacing.lg)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) { bar(count: entries.count) }
-        .overlay {
-            if entries.isEmpty && !model.isLoading {
-                if let err = model.gridError {
-                    ContentUnavailableView {
-                        Label("Galeri yüklenemedi", systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(err)
-                    } actions: {
-                        Button {
-                            Task { await model.reload() }
-                        } label: {
-                            Label("Tekrar Dene", systemImage: "arrow.clockwise")
+            .overlay {
+                if entries.isEmpty && !model.isLoading {
+                    if let err = model.gridError {
+                        ContentUnavailableView {
+                            Label("Galeri yüklenemedi", systemImage: "exclamationmark.triangle")
+                        } description: {
+                            Text(err)
+                        } actions: {
+                            Button {
+                                Task { await model.reload() }
+                            } label: {
+                                Label("Tekrar Dene", systemImage: "arrow.clockwise")
+                            }
+                            .controlSize(.regular)
                         }
-                        .controlSize(.regular)
-                    }
-                    .padding(Theme.Spacing.lg)
-                } else if model.filters.isEmpty && model.query.isEmpty {
-                    ContentUnavailableView(
-                        videos ? "Video yok" : "Fotoğraf yok",
-                        systemImage: videos ? "play.rectangle" : "photo.on.rectangle"
-                    )
-                    .padding(Theme.Spacing.lg)
-                } else {
-                    ContentUnavailableView {
-                        Label("Eşleşen \(videos ? "video" : "fotoğraf") yok", systemImage: "line.3.horizontal.decrease.circle")
-                    } actions: {
-                        Button {
-                            model.filters = AdvancedFilters()
-                            model.query = ""
-                        } label: {
-                            Label("Filtreleri temizle", systemImage: "xmark.circle")
+                        .padding(Theme.Spacing.lg)
+                    } else if model.filters.isEmpty && model.query.isEmpty {
+                        ContentUnavailableView(
+                            videos ? "Video yok" : "Fotoğraf yok",
+                            systemImage: videos ? "play.rectangle" : "photo.on.rectangle"
+                        )
+                        .padding(Theme.Spacing.lg)
+                    } else {
+                        ContentUnavailableView {
+                            Label("Eşleşen \(videos ? "video" : "fotoğraf") yok", systemImage: "line.3.horizontal.decrease.circle")
+                        } actions: {
+                            Button {
+                                model.filters = AdvancedFilters()
+                                model.query = ""
+                            } label: {
+                                Label("Filtreleri temizle", systemImage: "xmark.circle")
+                            }
+                            .controlSize(.regular)
                         }
-                        .controlSize(.regular)
+                        .padding(Theme.Spacing.lg)
                     }
-                    .padding(Theme.Spacing.lg)
                 }
             }
         }
@@ -101,17 +108,7 @@ struct GalleryView: View {
                 .font(.subheadline.weight(.semibold))
             if count > 0 {
                 // Posts are paged in, so this grows while scrolling.
-                Text(model.reachedEnd ? count.formatted() : "\(count.formatted())+")
-                    .font(.caption.weight(.medium))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.xs)
-                    .background(Theme.Stroke.subtleFill, in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
-                    }
+                CountPill(value: model.reachedEnd ? count.formatted() : "\(count.formatted())+")
             }
             Spacer()
             let others = model.filters.activeCount - (model.filters.folder == .any ? 0 : 1)

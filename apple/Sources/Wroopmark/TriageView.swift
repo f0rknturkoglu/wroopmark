@@ -312,36 +312,11 @@ private struct TriageCard: View {
     let item: Item
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                AuthorLine(item: item, showHandle: true)
-                if let vm = (item.media.first(where: { $0.isVideo }) ?? item.quote?.item.media.first(where: { $0.isVideo })), let vf = vm.videoFile {
-                    // Reviewing is quicker when the clip starts by itself.
-                    InlineVideoPlayer(file: vf, alt: vm.alt, aspect: vm.aspect, maxHeight: 420, autoplay: true)
-                } else if !item.allMedia.isEmpty {
-                    let own = !item.media.isEmpty
-                    MediaGallery(media: own ? item.media : item.quote?.item.media ?? [], stacked: own && item.isPhotoCarousel) {
-                        model.openViewer(owner: item, fromQuote: !own, index: $0)
-                    }
-                    .frame(maxHeight: 460)
-                }
-                if let title = item.title, !title.isEmpty {
-                    Text(title)
-                        .font(.headline)
-                }
-                if !item.text.isEmpty {
-                    Text(item.text)
-                        .font(.body)
-                        .lineSpacing(4)
-                        .textSelection(.enabled)
-                }
-                if let quote = item.quote?.item, !item.media.isEmpty || !quote.text.isEmpty {
-                    QuoteSnippet(item: quote)
-                }
-                if !item.tags.isEmpty { CardTags(tags: item.tags) }
-            }
-            .padding(Theme.Spacing.lg)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        // A short post should produce a short card, not a full-height empty
+        // panel; only posts taller than the window get their own scroller.
+        ViewThatFits(in: .vertical) {
+            card
+            ScrollView { card }
         }
         .frame(maxWidth: 640)
         .background(.background.secondary, in: .rect(cornerRadius: Theme.Radius.lg))
@@ -351,5 +326,38 @@ private struct TriageCard: View {
             RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
         }
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            AuthorLine(item: item, showHandle: true)
+            if let vm = (item.media.first(where: { $0.isVideo }) ?? item.quote?.item.media.first(where: { $0.isVideo })), let vf = vm.videoFile {
+                // Reviewing is quicker when the clip starts by itself.
+                InlineVideoPlayer(file: vf, alt: vm.alt, aspect: vm.aspect, maxHeight: 420, autoplay: true)
+            } else if !item.allMedia.isEmpty {
+                let own = !item.media.isEmpty
+                MediaGallery(media: own ? item.media : item.quote?.item.media ?? [], stacked: own && item.isPhotoCarousel) {
+                    model.openViewer(owner: item, fromQuote: !own, index: $0)
+                }
+                .frame(maxHeight: 460)
+            }
+            if let title = item.title, !title.isEmpty {
+                Text(title)
+                    .font(.headline)
+            }
+            if !item.text.isEmpty {
+                Text(item.text)
+                    .font(.body)
+                    .lineSpacing(4)
+                    .textSelection(.enabled)
+            }
+            if let quote = item.quote?.item, !item.media.isEmpty || !quote.text.isEmpty {
+                QuoteSnippet(item: quote)
+            }
+            if !item.tags.isEmpty { CardTags(tags: item.tags) }
+        }
+        .padding(Theme.Spacing.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: 160, alignment: .topLeading)
     }
 }
