@@ -1449,7 +1449,12 @@ enum OCRHelper {
         try? input.fileHandleForWriting.close()
 
         let timeoutSeconds = min(perFileTimeoutSeconds * Double(files.count), 300.0)
-        let lines = Mutex<[String]>([])
+        // A class around the Mutex: a closure may share a reference to it,
+        // not to a noncopyable local.
+        final class Lines: Sendable {
+            let store = Mutex<[String]>([])
+        }
+        let lines = Lines()
         // Only Sendable values go into the reader task (`Pipe` is not).
         let reader = output.fileHandleForReading
         let expected = files.count
@@ -1461,7 +1466,7 @@ enum OCRHelper {
                         for try await line in reader.bytes.lines {
                             if Task.isCancelled { break }
                             let parsed = (try? JSONDecoder().decode(String.self, from: Data(line.utf8))) ?? ""
-                            let count = lines.withLock { store -> Int in
+                            let count = lines.store.withLock { store -> Int in
                                 store.append(parsed)
                                 return store.count
                             }
@@ -1478,7 +1483,7 @@ enum OCRHelper {
                 if p.isRunning { p.terminate() }
                 group.cancelAll()
             }
-            return lines.withLock { $0 }
+            return lines.store.withLock { $0 }
         } onCancel: {
             if p.isRunning { p.terminate() }
         }
