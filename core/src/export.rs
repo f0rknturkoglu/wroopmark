@@ -142,6 +142,12 @@ pub fn markdown(item: &Item, folder: Option<&str>) -> (String, Vec<String>) {
         s.push_str(item.text.trim());
         s.push_str("\n\n");
     }
+    for t in &item.thread {
+        if !t.text.trim().is_empty() {
+            s.push_str(t.text.trim());
+            s.push_str("\n\n");
+        }
+    }
     let mut files = vec![];
     for m in &item.media {
         if let Some(v) = m.video_file.as_deref() {

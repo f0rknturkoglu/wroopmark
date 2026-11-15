@@ -25,6 +25,10 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
     let aiTags: [String]
     /// Only the link is known yet (archive import); details come later.
     let stub: Bool
+    /// The author's own follow-up posts (X thread), oldest first.
+    let thread: [Item]
+    /// The saved copy of the web page (`<hash>.webarchive`).
+    let snapshot: String?
 
     /// Boxed so `Item` can contain an `Item`. Immutable and thread-safe.
     final class Quote: Decodable, Sendable {
@@ -34,7 +38,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, platform, url, authorHandle, authorName, title, text, extra, ocr, createdAt, savedAt, media, links, quote, tags, note
-        case summary, aiTags, stub
+        case summary, aiTags, stub, thread, snapshot
         case folderId = "folder_id"
     }
 
@@ -60,6 +64,8 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         summary = try c.decodeIfPresent(String.self, forKey: .summary)
         aiTags = try c.decodeIfPresent([String].self, forKey: .aiTags) ?? []
         stub = try c.decodeIfPresent(Bool.self, forKey: .stub) ?? false
+        thread = try c.decodeIfPresent([Item].self, forKey: .thread) ?? []
+        snapshot = try c.decodeIfPresent(String.self, forKey: .snapshot)
     }
 
     init(
@@ -82,7 +88,9 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         folderId: Int64?,
         summary: String? = nil,
         aiTags: [String] = [],
-        stub: Bool = false
+        stub: Bool = false,
+        thread: [Item] = [],
+        snapshot: String? = nil
     ) {
         self.id = id
         self.platform = platform
@@ -104,6 +112,8 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         self.summary = summary
         self.aiTags = aiTags
         self.stub = stub
+        self.thread = thread
+        self.snapshot = snapshot
     }
 
     func withFolder(_ newFolderId: Int64?) -> Item {
@@ -127,7 +137,9 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
             folderId: newFolderId,
             summary: summary,
             aiTags: aiTags,
-            stub: stub
+            stub: stub,
+            thread: thread,
+            snapshot: snapshot
         )
     }
 
@@ -137,6 +149,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
             && a.title == b.title && a.ocr == b.ocr && a.extra == b.extra && a.savedAt == b.savedAt
             && a.links == b.links && a.quote?.item == b.quote?.item && a.folderId == b.folderId
             && a.summary == b.summary && a.aiTags == b.aiTags && a.stub == b.stub
+            && a.thread.map(\.id) == b.thread.map(\.id) && a.snapshot == b.snapshot
     }
 
     func hash(into h: inout Hasher) { h.combine(id) }
@@ -310,7 +323,7 @@ struct VideoTool: Decodable, Hashable, Sendable {
 }
 
 enum Platform: String, CaseIterable, Identifiable, Sendable {
-    case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, local, web
+    case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, bluesky, local, web
 
     var id: String { rawValue }
 
@@ -326,6 +339,7 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         case .github: "GitHub"
         case .hackernews: "Hacker News"
         case .arxiv: "arXiv"
+        case .bluesky: "Bluesky"
         case .local: "Dosya"
         case .web: "Web"
         }
@@ -343,6 +357,7 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         case .github: "chevron.left.forwardslash.chevron.right"
         case .hackernews: "y.square.fill"
         case .arxiv: "doc.text.fill"
+        case .bluesky: "cloud.fill"
         case .local: "externaldrive.fill"
         case .web: "globe"
         }
@@ -508,6 +523,10 @@ struct AIStatus: Decodable, Equatable, Sendable {
         let pending: Int
         let failed: Int
     }
+    struct Snapshots: Decodable, Equatable, Sendable {
+        let done: Int
+        let pending: Int
+    }
     let embed: Bool?
     let embedModel: String?
     let embedError: String?
@@ -515,6 +534,7 @@ struct AIStatus: Decodable, Equatable, Sendable {
     let llm: String?
     let vectors: Progress?
     let stubs: Stubs?
+    let snapshots: Snapshots?
     let helper: String?
     let error: String?
 

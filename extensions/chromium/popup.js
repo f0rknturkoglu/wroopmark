@@ -130,6 +130,20 @@ async function setupSiteImport() {
         setMsg($("collectMsg"), "Profiline gidip Kaydedilenler sekmesini aç ve kaydır; gönderiler burada birikir.");
       }
     };
+  } else if (host === "youtube.com" || host === "m.youtube.com") {
+    row.style.display = "";
+    btn.textContent = "⏰ Daha Sonra İzle'yi aç";
+    btn.onclick = async () => {
+      await chrome.tabs.update(tab.id, { url: "https://www.youtube.com/playlist?list=WL" });
+      setMsg($("collectMsg"), "Listeyi sonuna kadar kaydır (ya da Otomatik Kaydır), sonra Aktar. Beğendiğin videolar: list=LL.");
+    };
+  } else if (host === "bsky.app") {
+    row.style.display = "";
+    btn.textContent = "🔖 Bluesky kaydedilenleri aç";
+    btn.onclick = async () => {
+      await chrome.tabs.update(tab.id, { url: "https://bsky.app/saved" });
+      setMsg($("collectMsg"), "Kaydedilenler'de aşağı kaydır, sonra Aktar. Beğenilerin profilindeki Beğeniler sekmesinden gelir.");
+    };
   }
 }
 
@@ -152,6 +166,8 @@ async function syncCollected() {
     if (x > 0) parts.push(`${x} X`);
     if (tiktok > 0) parts.push(`${tiktok} TikTok`);
     if (r.data.instagram > 0) parts.push(`${r.data.instagram} Instagram`);
+    if (r.data.youtube > 0) parts.push(`${r.data.youtube} YouTube`);
+    if (r.data.bluesky > 0) parts.push(`${r.data.bluesky} Bluesky`);
     if (pages > 0) parts.push(`${pages} sayfa/link`);
     $("collectedSummary").textContent = `Kuyrukta: ${parts.join(" · ")}. Tek tıkla aktarabilirsiniz.`;
   } else {

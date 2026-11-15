@@ -21,6 +21,7 @@
 pub mod ai;
 pub mod api;
 pub mod archive;
+pub mod bluesky;
 pub mod db;
 pub mod export;
 pub mod external;
@@ -36,5 +37,6 @@ pub mod reddit;
 pub mod text;
 pub mod tiktok;
 pub mod x;
+pub mod youtube;
 
 pub use api::Library;

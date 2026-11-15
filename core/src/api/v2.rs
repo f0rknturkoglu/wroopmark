@@ -546,6 +546,8 @@ impl Library {
         if let Some(obj) = status.as_object_mut() {
             obj.insert("vectors".into(), json!({"done": done, "total": total}));
             obj.insert("stubs".into(), serde_json::to_value(stubs)?);
+            let (copies, pending) = store.snapshot_count()?;
+            obj.insert("snapshots".into(), json!({"done": copies, "pending": pending}));
             obj.insert("helper".into(), json!(crate::ai::Helper::path().map(|p| p.display().to_string())));
         }
         Ok(status)
@@ -770,6 +772,51 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             S::ok(lib.related(&a.id, a.limit)?)
         }
         "summarize" => S::ok(lib.summarize(&req.parse::<Id>()?.id)?),
+        // A conversation page (X `TweetDetail`): the author's own thread is
+        // added to whichever of its posts the library has. Others are ignored.
+        "import_x_thread" => {
+            let a: ImportPayload = req.parse()?;
+            let payload = match a.payload {
+                Value::String(s) => serde_json::from_str(&s).map_err(CoreError::InvalidPayloadJson)?,
+                v => v,
+            };
+            let mut updated = vec![];
+            for chain in crate::x::self_threads(&payload) {
+                let ids: Vec<String> = chain.iter().map(|i| i.id.clone()).collect();
+                let have = lib.lock_store()?.existing_ids(&ids)?;
+                // The first saved post of the run holds the rest.
+                let Some(owner) = ids.iter().find(|i| have.contains(*i)) else { continue };
+                let rest: Vec<Item> = chain.iter().filter(|i| &i.id != owner).cloned().collect();
+                if lib.lock_store()?.set_thread(owner, rest)? {
+                    updated.push(owner.clone());
+                }
+            }
+            if !updated.is_empty() {
+                lib.kick_media();
+            }
+            S::ok(updated)
+        }
+        "snapshot_pending" => {
+            let rows = lib.lock_store()?.snapshot_pending(req.parse::<Limit>()?.limit.clamp(1, 50))?;
+            S::ok(rows.into_iter().map(|(id, url)| json!({"id": id, "url": url})).collect::<Vec<_>>())
+        }
+        "set_snapshot" => {
+            #[derive(Deserialize)]
+            struct SetSnapshot {
+                id: String,
+                path: String,
+                text: Option<String>,
+            }
+            let a: SetSnapshot = req.parse()?;
+            let bytes = std::fs::read(&a.path).map_err(|source| CoreError::IoPath { path: a.path.clone(), source })?;
+            let name = lib.media.put(&bytes, "webarchive")?;
+            lib.lock_store()?.set_snapshot(&a.id, &name, a.text.as_deref())?;
+            S::ok(name)
+        }
+        "snapshot_failed" => {
+            lib.lock_store()?.snapshot_failed(&req.parse::<Id>()?.id)?;
+            S::ok(true)
+        }
         "ai_status" => S::ok(lib.ai_status()?),
         "clear_vectors" => {
             lib.lock_store()?.clear_vectors()?;
@@ -785,5 +832,56 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             S::ok(true)
         }
         other => Err(CoreError::UnknownCmd(other.to_string())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tweet(id: &str, who: &str, text: &str, reply: Option<&str>, img: Option<&str>) -> Value {
+        let mut legacy = json!({"id_str": id, "full_text": text, "created_at": format!("Wed Oct 10 20:19:{id:0>2} +0000 2018")});
+        if let (Some(r), Some(o)) = (reply, legacy.as_object_mut()) {
+            o.insert("in_reply_to_status_id_str".into(), json!(r));
+        }
+        if let (Some(u), Some(o)) = (img, legacy.as_object_mut()) {
+            o.insert("extended_entities".into(), json!({"media": [{"type": "photo", "media_url_https": u}]}));
+        }
+        json!({"content": {"itemContent": {"tweet_results": {"result": {
+            "rest_id": id, "core": {"user_results": {"result": {"core": {"screen_name": who}}}}, "legacy": legacy}}}}})
+    }
+
+    #[test]
+    fn threads_join_the_saved_post_and_survive_reimport() {
+        let dir = std::env::temp_dir().join(format!("wm-thread-{}", std::process::id()));
+        let lib = Library::open(&dir).unwrap_or_else(|_| std::process::abort());
+        let first = json!({"data": {"x": [tweet("11", "ali", "zincir başı", None, None)]}});
+        handle_value(&lib, json!({"cmd": "import_x", "payload": first.clone()}));
+        let detail = json!({"data": {"instructions": [{"entries": [
+            tweet("11", "ali", "zincir başı", None, None),
+            tweet("12", "ali", "ikinci kısım", Some("11"), Some("https://pbs.twimg.com/media/b.jpg")),
+            tweet("13", "veli", "araya giren", Some("12"), None),
+            tweet("14", "ali", "üçüncü kısım", Some("12"), None),
+        ]}]}});
+        let r = handle_value(&lib, json!({"cmd": "import_x_thread", "payload": detail}));
+        assert_eq!(r.pointer("/data/0"), Some(&json!("x:11")), "{r}");
+        let get = |lib: &Arc<Library>| handle_value(lib, json!({"cmd": "get", "id": "x:11"}));
+        let item = get(&lib);
+        let texts: Vec<&str> = item
+            .pointer("/data/thread")
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(|t| t.get("text").and_then(Value::as_str)).collect())
+            .unwrap_or_default();
+        assert_eq!(texts, vec!["ikinci kısım", "üçüncü kısım"]);
+        assert_eq!(item.pointer("/data/media").and_then(Value::as_array).map(Vec::len), Some(1));
+        // The bookmark list brings the first post again: the thread stays.
+        handle_value(&lib, json!({"cmd": "import_x", "payload": first}));
+        let again = get(&lib);
+        assert_eq!(again.pointer("/data/thread").and_then(Value::as_array).map(Vec::len), Some(2));
+        assert_eq!(again.pointer("/data/media").and_then(Value::as_array).map(Vec::len), Some(1));
+        let found = handle_value(&lib, json!({"cmd": "search", "q": "üçüncü"}));
+        assert_eq!(found.pointer("/data/total"), Some(&json!(1)));
+        lib.shutdown();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -231,6 +231,9 @@ pub fn embed_text(item: &Item) -> String {
     if let Some(q) = item.quote.as_deref() {
         parts.push(&q.text);
     }
+    for t in &item.thread {
+        parts.push(&t.text);
+    }
     if let Some(n) = item.note.as_deref() {
         parts.push(n);
     }

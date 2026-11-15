@@ -71,6 +71,22 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
   oluşan her kayıt (`save_into`) ve dolan her stub kurallardan geçer; sorgu motoru
   aynısı (`Query` + `id:` kısıtı). Klasör yalnızca klasörsüz kayda konur.
 
+## Sayfa kopyaları (v0.4)
+
+Web sayfası kayıtları (`web`, `github`, `arxiv`, `hackernews`) uygulamada görünmez bir
+`WKWebView`'da (çerezsiz, kalıcı veri yok) açılır, kaydırılıp tembel görseller
+yüklendikten sonra `createWebArchiveData` ile `.webarchive` olur; medya deposunda
+`items.snapshot`. WebKit'in okuduğu metin (betikler çalışmış hâli) mevcut makale
+metninden uzunsa `extra`'ya yazılır. Tek tek, iki saniye arayla; başaramayan 3 kez
+denenir, 40 MB üstü saklanmaz. Görüntüleyici betikleri kapalı açar: arşivdeki sayfa
+siteye istek atmaz.
+
+## Kısayollar (App Intents)
+
+`apple/Sources/Wroopmark/AppIntents.swift`. SwiftPM `Metadata.appintents` üretmez;
+`build-mac.sh` derleyicinin `.swiftconstvalues` dosyalarından
+`appintentsmetadataprocessor` ile üretip `Contents/Resources`'a koyar (Xcode gerekir).
+
 ## Cihazdaki zeka (v0.3)
 
 Modeller sistemin kendisi: NaturalLanguage `NLContextualEmbedding` (Latin alfabesi,
@@ -97,7 +113,8 @@ onu gerektiğinde başlatır, bir dakika boşta kalınca kendisi kapanır. Uygul
 
 `wroopmark mcp`: CLI ikilisinin stdio üzerinde JSON-RPC (MCP 2025-06-18) modu
 (`mcp.rs`). Her araç `api.rs`'deki bir komuta denk gelir; `--read-only` yazanları
-listeden çıkarır. Ajan bağlanınca açılır, boru kapanınca çıkar.
+listeden çıkarır. Kayıtlar ayrıca `wroopmark://item/{id}` kaynak şablonuyla Markdown
+olarak okunur (`resources/read`). Ajan bağlanınca açılır, boru kapanınca çıkar.
 
 ## Veri alma
 
@@ -108,6 +125,9 @@ listeden çıkarır. Ajan bağlanınca açılır, boru kapanınca çıkar.
 | TikTok | Eklenti: Kaydedilenler / Beğenilenler listeleri (sayfanın kendi API yanıtları); fotoğraf gönderilerinin tüm görselleri |
 | Instagram | Eklenti: Kaydedilenler sayfasının kendi API yanıtları (REST ya da GraphQL); kaydet düğmesine basınca o gönderi |
 | Reddit | Eklenti: `/user/<ad>/saved.json` kullanıcının kendi oturumuyla, 100'er 100'er (gönderi + yorum) |
+| X zincirleri | Eklenti: tweet sayfasının `TweetDetail` cevabı çekirdeğe gider (`import_x_thread`); aynı yazarın birbirine yanıt veren tweet'leri (`in_reply_to_status_id`) bulunur, zincirin arşivdeki ilk kaydına `thread` olarak eklenir. Görselleri kaydın `media`'sına katılır (iner, kopya taramasına girer); yer imi listesi kaydı yeniden getirse de zincir korunur. |
+| YouTube | Eklenti: yalnızca Daha Sonra İzle (`WL`) ve Beğenilenler (`LL`): sayfadaki `ytInitialData` + `youtubei/v1/browse` devamları, `playlistVideoRenderer`'lar sadeleştirilip kuyruğa (`youtube.rs`). Video inmez, kapak iner. |
+| Bluesky | Eklenti: `app.bsky.bookmark.getBookmarks` ve `getActorLikes` cevaplarındaki `postView`'lar (`bluesky.rs`): görseller, video (HLS, yt-dlp ile), alıntı, linkler. Yanıt bağlamı (`reply.parent`) alınmaz. |
 | Pinterest / Facebook / web | Sayfanın `og:` etiketleri + makale metni |
 | Toplu | `bookmarks.html`, TikTok / Instagram / X veri paketleri (zip, klasör ya da tek dosya; zip sistemin `ditto`'suyla açılır), Pocket / Raindrop / Reddit CSV (`archive.rs`). Çoğu yalnızca link + tarih verir: kayıt doğru id'yle *stub* olarak girer (`items.stub = 1`), metin / yazar / medya arka planda `fetcher.capture` ile tek tek, acele etmeden gelir (en çok 3 deneme). Zaten olan kayda yalnızca etiket eklenir, içeriği ezilmez. İzleme / tarama geçmişi alınmaz. |
 | Diskteki dosyalar | Video ve görseller medya deposuna kopyalanır (`localfile.rs`). Adında TikTok numarası (19 hane) ya da yt-dlp `[id]`'si olan video o gönderiye bağlanır: kayıt varsa videosu olur, yoksa stub açılır. Diğerleri `local:<içerik hash>` kayıt (aynı dosya iki kez girmez). Kapağı olmayan videolara uygulama AVFoundation ile kapak çizer (`posterless` / `set_poster`). |
@@ -178,7 +198,7 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
 - Foundation Models ile özet ve etiket önerisi (ayıkla ekranında), "Benzerleri".
 - Kopyalar: aynı link, aynı medya, neredeyse aynı metin.
 
-**v0.4: Kalıcılık**
+**v0.4: Kalıcılık** ✅
 - Web sayfasının tam kopyası: görünmez `WKWebView` → webarchive / PDF + okuma
   görünümü metni (Monolith gibi harici araç yok).
 - X zincirleri: zincir açılınca aynı yazarın devam tweet'leri tek kayıtta.

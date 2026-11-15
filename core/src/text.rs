@@ -198,6 +198,7 @@ fn platform_post_id(platform: Platform, url: &Url) -> Option<String> {
             Some(format!("{owner}_{repo}"))
         }
         Platform::Hackernews => url.query_pairs().find(|(k, _)| k == "id").map(|(_, v)| v.into_owned()),
+        Platform::Bluesky => segs.iter().position(|s| *s == "post").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
         Platform::Arxiv => segs.iter().position(|s| *s == "abs" || *s == "pdf").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
         Platform::Web | Platform::Local => None,
     }

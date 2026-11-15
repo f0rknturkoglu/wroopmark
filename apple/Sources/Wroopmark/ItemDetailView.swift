@@ -4,7 +4,13 @@ struct ItemDetailView: View {
     @Environment(AppModel.self) private var model
     let item: Item
     @State private var note = ""
+    @State private var showPageCopy = false
     @FocusState private var noteFocused: Bool
+
+    /// Pictures of the thread's posts are kept in `media` after the first
+    /// post's own; they show with their post, not at the top.
+    private var threadURLs: Set<String> { Set(liveItem.thread.flatMap { $0.media.map(\.url) }) }
+    private var ownMedia: [Media] { liveItem.media.filter { !threadURLs.contains($0.url) } }
 
     private var liveItem: Item {
         model.items.first(where: { $0.id == item.id }) ?? item
@@ -97,10 +103,23 @@ struct ItemDetailView: View {
                 // the lightbox. A live AppKit player in this scrolling column
                 // makes SwiftUI drop clicks on every control below it (tags,
                 // note, folder), and would start a player on every selection.
-                if !liveItem.media.isEmpty {
-                    MediaGallery(media: liveItem.media, stacked: liveItem.isPhotoCarousel) {
+                if !ownMedia.isEmpty {
+                    MediaGallery(media: ownMedia, stacked: liveItem.isPhotoCarousel) {
                         model.openViewer(owner: liveItem, fromQuote: false, index: $0)
                     }
+                }
+                if !liveItem.thread.isEmpty {
+                    ThreadSection(item: liveItem)
+                }
+                if liveItem.snapshot != nil {
+                    Button {
+                        showPageCopy = true
+                    } label: {
+                        Label("Sayfanın kopyası", systemImage: "doc.richtext")
+                    }
+                    .controlSize(.small)
+                    .help("Sayfanın kaydedildiği hâli; site değişse ya da kapansa da açılır")
+                    .sheet(isPresented: $showPageCopy) { PageCopyView(item: liveItem).environment(model) }
                 }
                 if let quote = liveItem.quote?.item {
                     QuoteCard(item: quote) { model.openViewer(owner: liveItem, fromQuote: true, index: $0) }

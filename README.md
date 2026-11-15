@@ -14,8 +14,9 @@
 
 ---
 
-Sosyal medyada kaydettiklerin (X yer imleri, TikTok favorileri, Instagram ve
-Reddit kaydedilenleri, herhangi bir web sayfası) tek yerde, **çevrimdışı**
+Sosyal medyada kaydettiklerin (X yer imleri, TikTok favorileri, Instagram,
+Reddit ve Bluesky kaydedilenleri, YouTube "Daha Sonra İzle", herhangi bir web
+sayfası) tek yerde, **çevrimdışı**
 ve aranabilir. Metin, görseller, videolar ve linkler Mac'ine iner; gönderi
 kaynağından silinse de arşivde kalır.
 
@@ -25,7 +26,9 @@ Chromium/Safari eklentisi; hepsi tek bir yerel kütüphaneyi kullanır.
 ## Neler yapar
 
 **Arşiv**
-- X, TikTok, Instagram, Reddit ve her web sayfası tek bir kayıt biçiminde.
+- X, TikTok, Instagram, Reddit, Bluesky, YouTube ve her web sayfası tek bir kayıt biçiminde.
+- X zincirleri: zinciri bir kez açınca yazarın devam tweet'leri görselleriyle aynı kayda eklenir.
+- Web sayfalarının kaydedildiği hâli saklanır (site değişse, kapansa da açılır) + okuma görünümü.
 - Medya bir kez iner (aynı görsel iki gönderide olsa da); TikTok videoları
   yt-dlp ile arka planda.
 - Görsellerdeki yazı cihazda okunur (Apple Vision), ekran görüntüleri de aranır.
@@ -56,6 +59,7 @@ Chromium/Safari eklentisi; hepsi tek bir yerel kütüphaneyi kullanır.
 
 **Ajanlar**
 - MCP sunucusu: Claude, Cursor gibi ajanlar arşivinde arar, kayıtları okur, etiketler.
+- Kısayollar, Siri ve Apple Intelligence: "wroopmark'ta ara", "wroopmark'a kaydet", "wroopmark'ta bul".
 
 **Hızlı kayıt**
 - Menü çubuğundan link kaydet; her uygulamada ⌃⌥⌘S panodaki linki kaydeder.
@@ -129,6 +133,9 @@ Kütüphane: `~/Library/Application Support/wroopmark/` (veritabanı + `media/`)
 | X yer imleri | Eklenti açıkken `x.com/i/bookmarks`'ı kaydır (ya da popup → Otomatik Kaydır), popup → Aktar. Yer imine eklediğin tweet de kuyruğa girer. |
 | TikTok | Profil → Favoriler / Beğenilenler'i kaydır, popup → Aktar. Videolar yt-dlp ile ya da sayfanın içinden iner. |
 | Instagram | Profil → Kaydedilenler'i kaydır (popup'taki düğme oraya götürür), popup → Aktar. |
+| X zincirleri | Kaydettiğin bir tweet'in zincirini x.com'da aç; yazarın devam tweet'leri (görselleriyle) o kayda eklenir. Ayrıca bir şey yapman gerekmez. |
+| YouTube | youtube.com'da popup → **Daha Sonra İzle'yi aç**, listeyi kaydır, popup → Aktar. Beğendiğin videolar için `playlist?list=LL`. Videolar inmez; kapak, başlık, kanal kalır. |
+| Bluesky | bsky.app'te popup → **Bluesky kaydedilenleri aç**, kaydır, popup → Aktar. Profilindeki Beğeniler sekmesi de aynı şekilde. |
 | Reddit | reddit.com'da popup → **Reddit kaydedilenlerini aktar** (tüm gönderi ve yorumlar). Videolar sessiz iner: Reddit'in verdiği tek dosyada ses yok. |
 | Herhangi bir sayfa | Popup → Kaydet (etiket, not, klasör), ⌥⇧S, ya da sağ tık → wroopmark'a kaydet / klasöre kaydet. |
 | Uygulamadan | ⌘N, linki pencereye sürükle-bırak, menü çubuğu simgesi, her yerde ⌃⌥⌘S (panodaki link). |
@@ -175,6 +182,20 @@ yalnızca anlam vektörleri kullanılır.
 | ⌃⌥⌘S | Her yerde: panodaki linki kaydet |
 | ⌥⇧S / ⌥⇧W | Tarayıcıda: sayfayı kaydet / popup (`chrome://extensions/shortcuts`) |
 
+### Sayfa kopyaları
+
+Kaydettiğin her web sayfası (makale, GitHub, arXiv…) görünmez bir tarayıcıda açılıp
+`.webarchive` olarak saklanır; detaydaki **Sayfanın kopyası** onu kaydedildiği hâliyle
+açar, **Okuma** sekmesi yalnızca metni gösterir. Sayfadaki metin aramaya da girer.
+Ayarlar → Medya'dan kapatılabilir.
+
+### Kısayollar ve Siri
+
+Kısayollar uygulamasında wroopmark eylemleri: **wroopmark'ta Ara** (uygulamada açar),
+**wroopmark'a Kaydet** (bağlantı + etiketler, paylaşım menüsünden de), **wroopmark'ta Bul**
+(sonuçları başka kısayollara verir; anlamına göre de arayabilir). Siri'ye
+"wroopmark'ta ara" demek de olur.
+
 ### Kurallar
 
 Ayarlar → Kurallar: bir arama yaz (`site:github.com`, `from:@karpathy`,
@@ -200,7 +221,8 @@ Claude Desktop / Cursor için `command`: aynı yol, `args`: `["mcp"]` (yalnızca
 `["mcp", "--read-only"]`). Araçlar: `search` (süzgeçler + anlamsal), `get_item`
 (tam metin, görseldeki yazı, medya dosya yolları), `related`, `search_links`,
 `list_tags`, `list_folders`, `stats`, `save_url`, `tag_items`, `move_to_folder`,
-`set_note`. Sunucu ajanla birlikte açılıp kapanır.
+`set_note`. Her kayıt ayrıca `wroopmark://item/<id>` kaynağı olarak Markdown biçiminde
+okunabilir. Sunucu ajanla birlikte açılıp kapanır.
 
 ### Yedek ve geri yükleme
 

@@ -22,7 +22,7 @@ pub fn is_name(name: &str) -> bool {
     let Some((hash, ext)) = name.split_once('.') else { return false };
     hash.len() == 32
         && hash.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
-        && (1..=5).contains(&ext.len())
+        && (1..=10).contains(&ext.len())
         && ext.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
 }
 

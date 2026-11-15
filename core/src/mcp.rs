@@ -209,6 +209,9 @@ impl Ctx<'_> {
         if let Some(obj) = out.as_object_mut() {
             obj.insert("text".into(), it.get("text").cloned().unwrap_or(Value::Null));
             obj.insert("media".into(), Value::Array(media));
+            if let Some(t) = it.get("thread").and_then(Value::as_array).filter(|t| !t.is_empty()) {
+                obj.insert("thread".into(), Value::Array(t.iter().map(|p| json!({"id": p.get("id"), "text": p.get("text")})).collect()));
+            }
             for key in ["ocr", "links", "ai_tags"] {
                 if let Some(v) = it.get(key).filter(|v| !v.is_null()) {
                     obj.insert(key.into(), v.clone());
@@ -280,6 +283,25 @@ impl Ctx<'_> {
     }
 }
 
+/// `wroopmark://item/<id>` as Markdown, media links pointing at the files.
+fn read_resource(lib: &Arc<Library>, uri: &str) -> Result<Value, Value> {
+    let Some(id) = uri.strip_prefix("wroopmark://item/") else {
+        return Err(json!({"code": -32602, "message": "beklenen: wroopmark://item/<id>"}));
+    };
+    let mut ctx = Ctx { lib, folders: None };
+    let v = ctx.call(json!({"cmd": "get", "id": id})).ok().filter(|v| !v.is_null());
+    let Some(v) = v else {
+        return Err(json!({"code": -32002, "message": format!("kayıt yok: {id}")}));
+    };
+    let folder = ctx.folder_name(v.get("folder_id").and_then(Value::as_i64));
+    let item: crate::model::Item = serde_json::from_value(v).unwrap_or_default();
+    let (mut md, files) = crate::export::markdown(&item, folder.as_str());
+    for f in files {
+        md = md.replace(&format!("media/{f}"), &lib.media.path(&f).display().to_string());
+    }
+    Ok(json!({"contents": [{"uri": uri, "mimeType": "text/markdown", "text": md}]}))
+}
+
 /// Answers one JSON-RPC message; `None` for notifications.
 pub fn respond(lib: &Arc<Library>, msg: &Value, read_only: bool) -> Option<Value> {
     let id = msg.get("id").cloned()?;
@@ -288,12 +310,42 @@ pub fn respond(lib: &Arc<Library>, msg: &Value, read_only: bool) -> Option<Value
     let result = match method {
         "initialize" => Ok(json!({
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or(PROTOCOL),
-            "capabilities": {"tools": {"listChanged": false}},
+            "capabilities": {"tools": {"listChanged": false}, "resources": {"listChanged": false}},
             "serverInfo": {"name": "wroopmark", "title": "wroopmark", "version": VERSION},
             "instructions": INSTRUCTIONS,
         })),
         "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({"tools": tools(read_only)})),
+        // Items as readable notes: `wroopmark://item/<id>` (the same links the
+        // app, Spotlight and exports use).
+        "resources/templates/list" => Ok(json!({"resourceTemplates": [{
+            "uriTemplate": "wroopmark://item/{id}",
+            "name": "item",
+            "title": "wroopmark kaydı",
+            "description": "One saved item as Markdown: text, thread, tags, note, links and local media paths.",
+            "mimeType": "text/markdown"
+        }]})),
+        "resources/list" => {
+            let ctx = Ctx { lib, folders: None };
+            let recent = ctx.call(json!({"cmd": "search", "q": "", "sort": "saved", "limit": 25})).unwrap_or(Value::Null);
+            let list: Vec<Value> = recent
+                .get("items")
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|i| {
+                            let id = i.get("id")?.as_str()?;
+                            let item: crate::model::Item = serde_json::from_value(i.clone()).ok()?;
+                            Some(
+                                json!({"uri": format!("wroopmark://item/{id}"), "name": crate::export::title_of(&item), "mimeType": "text/markdown"}),
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            Ok(json!({"resources": list}))
+        }
+        "resources/read" => read_resource(lib, params.get("uri").and_then(Value::as_str).unwrap_or("")),
         "tools/call" => {
             let name = params.get("name").and_then(Value::as_str).unwrap_or("");
             let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
@@ -374,6 +426,14 @@ mod tests {
             true,
         );
         assert_eq!(r.as_ref().and_then(|r| r.pointer("/result/isError")), Some(&json!(true)));
+        let r = respond(&lib, &json!({"jsonrpc": "2.0", "id": 5, "method": "resources/read", "params": {"uri": "wroopmark://item/web:yok"}}), true);
+        assert!(r.as_ref().and_then(|r| r.get("error")).is_some());
+        let id = handle_value(&lib, json!({"cmd": "search", "q": "istanbul"}));
+        let id = id.pointer("/data/items/0/id").and_then(Value::as_str).unwrap_or("").to_string();
+        let r =
+            respond(&lib, &json!({"jsonrpc": "2.0", "id": 6, "method": "resources/read", "params": {"uri": format!("wroopmark://item/{id}")}}), true);
+        let md = r.as_ref().and_then(|r| r.pointer("/result/contents/0/text")).and_then(Value::as_str).unwrap_or("");
+        assert!(md.contains("Istanbul notları"), "{md}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   mac:
-    runs-on: macos-15
+    # The app needs the macOS 26 SDK (Foundation Models, Liquid Glass).
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

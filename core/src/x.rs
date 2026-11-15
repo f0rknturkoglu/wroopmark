@@ -160,6 +160,8 @@ fn parse_tweet_depth(result: &Value, depth: u8) -> Option<Item> {
         video_tries: 0,
         summary: None,
         ai_tags: vec![],
+        thread: vec![],
+        snapshot: None,
         stub: false,
         raw: (depth == 0).then(|| t.clone()),
     })
@@ -241,6 +243,62 @@ pub fn parse_timeline(v: &Value) -> Vec<Item> {
             out.extend(parse_tweet(r));
         } else if v.get("legacy").is_some() || v.get("tweet").is_some() {
             out.extend(parse_tweet(v));
+        }
+    }
+    out
+}
+
+/// The tweet this one answers, from its raw payload.
+fn reply_to(item: &Item) -> Option<String> {
+    item.raw.as_ref()?.pointer("/legacy/in_reply_to_status_id_str")?.as_str().map(str::to_string)
+}
+
+/// Self-threads in a conversation (`TweetDetail`) response: for every tweet
+/// in it, the run of posts by the same author that answer one another,
+/// oldest first. Keyed by each member's id, so whichever post of the thread
+/// is in the library finds the rest.
+pub fn self_threads(v: &serde_json::Value) -> Vec<Vec<Item>> {
+    let items = parse_timeline(v);
+    let by_id: std::collections::HashMap<&str, &Item> = items.iter().map(|i| (i.id.as_str(), i)).collect();
+    let same_author = |a: &Item, b: &Item| {
+        a.author_handle.is_some() && a.author_handle.as_deref().map(str::to_lowercase) == b.author_handle.as_deref().map(str::to_lowercase)
+    };
+    let mut done: HashSet<&str> = HashSet::new();
+    let mut out = vec![];
+    for start in &items {
+        if done.contains(start.id.as_str()) {
+            continue;
+        }
+        // Up to the first post of the run…
+        let mut first = start;
+        while let Some(parent) = reply_to(first).and_then(|p| by_id.get(format!("x:{p}").as_str()).copied()) {
+            if !same_author(parent, first) || done.contains(parent.id.as_str()) {
+                break;
+            }
+            first = parent;
+        }
+        // …then down, always taking the author's earliest answer.
+        let mut chain = vec![first];
+        let mut cur = first;
+        loop {
+            let tid = cur.id.trim_start_matches("x:");
+            let next = items
+                .iter()
+                .filter(|c| reply_to(c).as_deref() == Some(tid) && same_author(c, cur) && !chain.iter().any(|x| x.id == c.id))
+                .min_by_key(|c| c.created_at.unwrap_or(i64::MAX));
+            match next {
+                Some(n) => {
+                    chain.push(n);
+                    cur = n;
+                }
+                None => break,
+            }
+        }
+        for c in &chain {
+            done.insert(c.id.as_str());
+        }
+        if chain.len() > 1 {
+            out.push(chain.into_iter().cloned().collect());
         }
     }
     out

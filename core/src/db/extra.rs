@@ -277,7 +277,7 @@ impl Store {
         let rows = stmt
             .query_map([limit], |r| {
                 let (pk, mut item) = read_item(r)?;
-                item.ocr = r.get(19)?;
+                item.ocr = r.get(21)?;
                 Ok((pk, item))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -397,6 +397,77 @@ impl Store {
             }
         }
         Ok(out)
+    }
+
+    // --- Threads ----------------------------------------------------------------
+
+    /// Stores an X post's thread (the other posts, oldest first). Their
+    /// media joins the item's own and is queued for download.
+    pub fn set_thread(&mut self, id: &str, thread: Vec<Item>) -> Result<bool> {
+        let Some(mut item) = self.get(id)? else { return Ok(false) };
+        let mut thread = thread;
+        for t in &mut thread {
+            t.raw = None;
+            t.thread.clear();
+        }
+        if thread.len() <= item.thread.len() {
+            return Ok(false);
+        }
+        item.thread = thread;
+        super::merge_thread_media(&mut item);
+        let (img, vid, pending) = media_flags(&item);
+        let tx = self.write()?;
+        let pk = pk_of(&tx, id)?;
+        tx.execute(
+            "UPDATE items SET thread = ?2, media = ?3, has_image = ?4, has_video = ?5, media_pending = ?6, updated_at = ?7 WHERE pk = ?1",
+            params![pk, serde_json::to_string(&item.thread)?, serde_json::to_string(&item.media)?, img, vid, pending, now()],
+        )?;
+        reindex_item(&tx, pk)?;
+        tx.commit()?;
+        Ok(true)
+    }
+
+    // --- Page copies ------------------------------------------------------------
+
+    /// Saved web pages (not posts) with no copy yet, newest first.
+    pub fn snapshot_pending(&self, limit: i64) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, url FROM items WHERE snapshot IS NULL AND snapshot_tries < 3 AND stub = 0
+               AND platform IN ('web', 'github', 'arxiv', 'hackernews') AND url LIKE 'http%'
+             ORDER BY saved_at DESC LIMIT ?1",
+        )?;
+        Ok(stmt.query_map([limit], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn snapshot_count(&self) -> Result<(i64, i64)> {
+        Ok(self.conn.query_row(
+            "SELECT count(*) FILTER (WHERE snapshot IS NOT NULL), count(*) FILTER (WHERE snapshot IS NULL AND snapshot_tries < 3 AND stub = 0)
+               FROM items WHERE platform IN ('web', 'github', 'arxiv', 'hackernews') AND url LIKE 'http%'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?)
+    }
+
+    /// Records the copy; `text` (the page as read by WebKit, scripts run)
+    /// replaces the article text when it is longer.
+    pub fn set_snapshot(&mut self, id: &str, file: &str, text: Option<&str>) -> Result<()> {
+        let tx = self.write()?;
+        let pk = pk_of(&tx, id)?;
+        tx.execute("UPDATE items SET snapshot = ?2 WHERE pk = ?1", params![pk, file])?;
+        if let Some(t) = text.map(str::trim).filter(|t| t.len() > 200) {
+            tx.execute(
+                "UPDATE items SET extra = ?2 WHERE pk = ?1 AND length(coalesce(extra, '')) < length(?2)",
+                params![pk, t.chars().take(60_000).collect::<String>()],
+            )?;
+            reindex_item(&tx, pk)?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn snapshot_failed(&mut self, id: &str) -> Result<()> {
+        self.conn.execute("UPDATE items SET snapshot_tries = snapshot_tries + 1 WHERE id = ?1", [id])?;
+        Ok(())
     }
 
     // --- On-device summary -----------------------------------------------------

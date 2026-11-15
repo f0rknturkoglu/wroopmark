@@ -75,6 +75,29 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Shortcuts / Siri / Apple Intelligence find the app's intents through
+# Metadata.appintents, which Xcode makes from the compiler's constant-value
+# files; SwiftPM does not, so it is made here. Skipped without Xcode.
+if xcrun --find appintentsmetadataprocessor >/dev/null 2>&1; then
+  echo "==> App Intents"
+  OBJ="$(dirname "$(dirname "$(dirname "$BIN")")")/Intermediates.noindex/Wroopmark.build/Release/Wroopmark-p.build/Objects-normal/$(uname -m)"
+  LISTS="$(mktemp -d)"
+  ls "$APP_PKG"/Sources/Wroopmark/*.swift > "$LISTS/sources"
+  ls "$OBJ"/*.swiftconstvalues > "$LISTS/consts" 2>/dev/null || true
+  if [ -s "$LISTS/consts" ]; then
+    xcrun appintentsmetadataprocessor --output "$APP/Contents/Resources" \
+      --toolchain-dir "$(dirname "$(dirname "$(dirname "$(xcrun --find swift)")")")" \
+      --module-name Wroopmark --sdk-root "$(xcrun --show-sdk-path)" \
+      --xcode-version "$(xcodebuild -version | awk '/Build version/ { print $3 }')" \
+      --platform-family macOS --deployment-target "$MACOSX_DEPLOYMENT_TARGET" \
+      --target-triple "$(uname -m)-apple-macos$MACOSX_DEPLOYMENT_TARGET" \
+      --source-file-list "$LISTS/sources" --swift-const-vals-list "$LISTS/consts" \
+      --no-app-shortcuts-localization --quiet-warnings >/dev/null 2>&1 \
+      || echo "    (App Intents metadata üretilemedi; Kısayollar'da görünmez)"
+  fi
+  rm -rf "$LISTS"
+fi
+
 echo "==> OCR helper"
 # Vision in a short-lived process: the app stays light after a scan.
 xcrun swiftc -O -target "$(uname -m)-apple-macos${MACOSX_DEPLOYMENT_TARGET}" \

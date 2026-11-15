@@ -216,3 +216,47 @@ private struct DuplicateGroupCard: View {
         }
     }
 }
+
+/// The rest of an X thread, each post with its own pictures.
+struct ThreadSection: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            Label("Zincir · \(item.thread.count + 1) gönderi", systemImage: "text.line.first.and.arrowtriangle.forward")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ForEach(Array(item.thread.enumerated()), id: \.element.id) { n, part in
+                HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+                    Text("\(n + 2)")
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, alignment: .trailing)
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        if !part.text.isEmpty {
+                            Text(part.text)
+                                .font(.body)
+                                .lineSpacing(4)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        let urls = Set(part.media.map(\.url))
+                        let mine = item.media.filter { urls.contains($0.url) }
+                        if !mine.isEmpty {
+                            MediaGallery(media: mine, stacked: false) { i in
+                                let target = mine.indices.contains(i) ? mine[i].url : nil
+                                let global = item.media.firstIndex { $0.url == target } ?? 0
+                                model.openViewer(owner: item, fromQuote: false, index: global)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.leading, Theme.Spacing.xs)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Theme.accent.opacity(0.35)).frame(width: 2).padding(.vertical, 28)
+        }
+    }
+}

@@ -70,6 +70,10 @@ function defaultCollected() {
     tiktok_ids: [],
     ig_payloads: [],
     ig_codes: [],
+    yt_payloads: [],
+    yt_ids: [],
+    bsky_payloads: [],
+    bsky_ids: [],
     page_items: [],
     page_urls: [],
   };
@@ -92,7 +96,14 @@ async function clearCollected() {
 }
 
 function getTotalCollectedCount(c) {
-  return (c.x_ids?.length || 0) + (c.tiktok_ids?.length || 0) + (c.ig_codes?.length || 0) + (c.page_items?.length || 0);
+  return (
+    (c.x_ids?.length || 0) +
+    (c.tiktok_ids?.length || 0) +
+    (c.ig_codes?.length || 0) +
+    (c.yt_ids?.length || 0) +
+    (c.bsky_ids?.length || 0) +
+    (c.page_items?.length || 0)
+  );
 }
 
 async function updateBadge(collected) {
@@ -188,6 +199,36 @@ async function handleCapture({ kind, payload }, tabId) {
     return;
   }
 
+  // Not queued: it only completes posts already in the library.
+  if (kind === "x_thread") {
+    const r = await call("import_x_thread", { payload });
+    if (r.ok && r.data?.length) log(`X: zincir eklendi: ${r.data.join(", ")}`);
+    return;
+  }
+
+  if (kind === "youtube_list") {
+    c.yt_ids ||= [];
+    c.yt_payloads ||= [];
+    const fresh = (payload?.items || []).filter((v) => v?.videoId && !c.yt_ids.includes(v.videoId));
+    for (const v of fresh) c.yt_ids.push(v.videoId);
+    if (fresh.length) c.yt_payloads.push({ tag: payload.tag, items: fresh });
+    await setCollected(c);
+    log(`YouTube: ${payload?.items?.length || 0} video görüldü (+${fresh.length} yeni, kuyrukta: ${c.yt_ids.length})`);
+    return;
+  }
+
+  if (kind === "bluesky_list") {
+    c.bsky_ids ||= [];
+    c.bsky_payloads ||= [];
+    const posts = (payload?.payload?.bookmarks || payload?.payload?.feed || []).map((b) => b?.item?.uri || b?.post?.uri || b?.subject?.uri).filter(Boolean);
+    const fresh = posts.filter((u) => !c.bsky_ids.includes(u));
+    c.bsky_ids.push(...fresh);
+    if (fresh.length) c.bsky_payloads.push(payload);
+    await setCollected(c);
+    log(`Bluesky: ${posts.length} gönderi görüldü (+${fresh.length} yeni, kuyrukta: ${c.bsky_ids.length})`);
+    return;
+  }
+
   if (kind === "x_url") {
     const url = `https://x.com/i/status/${payload}`;
     if (!c.page_urls.includes(url)) {
@@ -267,7 +308,25 @@ async function importCollected() {
     }
   }
 
-  // 4. Import generic page items
+  // 4. YouTube lists and Bluesky saved posts / likes
+  for (const p of c.yt_payloads || []) {
+    const report = await call("import_youtube", { payload: { items: p.items }, tags: [p.tag] });
+    if (report.ok) {
+      totalNew += report.data?.new || 0;
+      totalUpdated += report.data?.updated || 0;
+      if (report.data?.ids) importedIds.push(...report.data.ids);
+    }
+  }
+  for (const p of c.bsky_payloads || []) {
+    const report = await call("import_bluesky", { payload: p.payload, tags: [p.tag] });
+    if (report.ok) {
+      totalNew += report.data?.new || 0;
+      totalUpdated += report.data?.updated || 0;
+      if (report.data?.ids) importedIds.push(...report.data.ids);
+    }
+  }
+
+  // 5. Import generic page items
   if (c.page_items.length > 0) {
     const report = await call("import_items", { items: c.page_items });
     if (report.ok) {
@@ -1028,6 +1087,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
             x: c.x_ids?.length || 0,
             tiktok: c.tiktok_ids?.length || 0,
             instagram: c.ig_codes?.length || 0,
+            youtube: c.yt_ids?.length || 0,
+            bluesky: c.bsky_ids?.length || 0,
             pages: c.page_items?.length || 0,
           },
         });

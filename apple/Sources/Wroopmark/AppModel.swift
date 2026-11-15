@@ -249,6 +249,14 @@ final class AppModel {
         }
     }
     var aiStatus: AIStatus?
+    /// Keep a copy of every saved web page (WebKit, see PageCopies.swift).
+    var pageCopies: Bool {
+        didSet {
+            defaults.set(pageCopies, forKey: "pageCopies")
+            if pageCopies { startPageCopies() } else { pageCopyTask?.cancel(); pageCopyTask = nil }
+        }
+    }
+    var pageCopyTask: Task<Void, Never>?
     var embedTask: Task<Void, Never>?
     var embedPausedUntil: Date?
     var posterTask: Task<Void, Never>?
@@ -321,6 +329,7 @@ final class AppModel {
         self.spotlightEnabled = defaults.object(forKey: "spotlight") as? Bool ?? true
         self.semanticSearch = defaults.bool(forKey: "semanticSearch")
         self.aiIndexing = defaults.object(forKey: "aiIndexing") as? Bool ?? true
+        self.pageCopies = defaults.object(forKey: "pageCopies") as? Bool ?? true
     }
 
     isolated deinit {
@@ -378,6 +387,7 @@ final class AppModel {
         startBackupSchedule()
         startEmbedding()
         startPosters()
+        if enableSystemIntegrations { startPageCopies() }
         Task { await loadAIStatus() }
         if enableSystemIntegrations {
             Spotlight.reindex(core: core)
@@ -408,6 +418,7 @@ final class AppModel {
         backupScheduleTask?.cancel()
         embedTask?.cancel()
         posterTask?.cancel()
+        pageCopyTask?.cancel()
     }
 
     // MARK: Loading
@@ -815,6 +826,7 @@ final class AppModel {
                         await self.refreshMeta(force: true)
                         self.startEmbedding()
                         self.startPosters()
+                        if self.enableSystemIntegrations { self.startPageCopies() }
                         if self.enableSystemIntegrations {
                             Spotlight.indexRecent(core: self.core)
                         }

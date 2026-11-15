@@ -11,6 +11,11 @@
 // Instagram: the Saved page's lists (REST feed/saved or its GraphQL
 //         successor) are forwarded whole; a post seen anywhere is saved the
 //         moment you press its bookmark (web/save).
+// X threads: a conversation page (TweetDetail) goes to the core, which
+//         adds the author's own follow-ups to the post if it is saved.
+// YouTube: Watch Later and Liked videos (playlist page: ytInitialData and
+//         its browse continuations), slimmed to what an item needs.
+// Bluesky: saved posts (app.bsky.bookmark.getBookmarks) and your likes.
 (() => {
   if (window.__wroopmarkHooked) return;
   window.__wroopmarkHooked = true;
@@ -20,6 +25,8 @@
   const host = location.hostname.replace(/^www\./, "");
   const isX = host === "x.com" || host === "twitter.com";
   const isIG = host === "instagram.com" || host.endsWith(".instagram.com");
+  const isYT = host === "youtube.com" || host === "m.youtube.com";
+  const isBsky = host === "bsky.app";
   const seen = new Map(); // post id -> raw object, oldest first
   const SEEN_MAX = 4000;
 
@@ -36,7 +43,7 @@
   // on <html> for relay.js (which finds the profile for the scan button).
   let me = null;
   function readMe() {
-    if (isX || isIG || me) return me;
+    if (isX || isIG || isYT || isBsky || me) return me;
     try {
       const el = document.getElementById("__UNIVERSAL_DATA_FOR_REHYDRATION__");
       me = JSON.parse(el.textContent).__DEFAULT_SCOPE__["webapp.app-context"].user.uniqueId || null;
@@ -48,7 +55,7 @@
   document.addEventListener("DOMContentLoaded", readMe);
   // Watch for the element only until it is read or the page has loaded.
   const meWatch = new MutationObserver(() => readMe() && meWatch.disconnect());
-  if (!isX && !isIG && !me) {
+  if (!isX && !isIG && !isYT && !isBsky && !me) {
     meWatch.observe(document.documentElement, { childList: true, subtree: true });
     window.addEventListener("load", () => meWatch.disconnect(), { once: true });
   }
@@ -175,11 +182,64 @@
     }
   }
 
+  // YouTube: only your own lists, by their fixed ids.
+  const YT_LISTS = { WL: "youtube/sonra-izle", LL: "youtube/begenilenler" };
+  const ytList = () => (location.pathname === "/playlist" ? new URLSearchParams(location.search).get("list") : null);
+  function slimYT(v, out = []) {
+    if (!v || typeof v !== "object") return out;
+    if (Array.isArray(v)) {
+      v.forEach((c) => slimYT(c, out));
+      return out;
+    }
+    const r = v.playlistVideoRenderer;
+    if (r && r.videoId) {
+      const text = (t) => (t && (t.simpleText || (t.runs || []).map((x) => x.text).join(""))) || "";
+      const by = r.shortBylineText || {};
+      const thumbs = (r.thumbnail && r.thumbnail.thumbnails) || [];
+      out.push({
+        videoId: r.videoId,
+        title: text(r.title),
+        channel: text(by),
+        handle: ((((by.runs || [])[0] || {}).navigationEndpoint || {}).browseEndpoint || {}).canonicalBaseUrl || "",
+        thumb: thumbs.length ? String(thumbs[thumbs.length - 1].url || "").split("?")[0] : "",
+      });
+      return out;
+    }
+    for (const k in v) slimYT(v[k], out);
+    return out;
+  }
+  function sendYT(data) {
+    const list = ytList();
+    const tag = list && YT_LISTS[list];
+    if (!tag) return;
+    const items = slimYT(data);
+    if (items.length) post("youtube_list", { tag, items });
+  }
+  if (isYT) {
+    // The first page of a list is in the HTML; the rest comes from browse.
+    const initial = () => window.ytInitialData && sendYT(window.ytInitialData);
+    document.addEventListener("DOMContentLoaded", () => setTimeout(initial, 500));
+    document.addEventListener("yt-navigate-finish", (e) => {
+      const d = e && e.detail && e.detail.response && e.detail.response.response;
+      d ? sendYT(d) : setTimeout(initial, 500);
+    });
+  }
+
   function onResponse(url, reqBody, text) {
     let json;
     try {
       json = JSON.parse(text);
     } catch {
+      return;
+    }
+    if (isYT) {
+      if (url.includes("/youtubei/v1/browse")) sendYT(json);
+      return;
+    }
+    if (isBsky) {
+      const tag = url.includes("app.bsky.bookmark.getBookmarks") ? "bluesky/kaydedilenler" : "bluesky/begenilenler";
+      const n = (json.bookmarks || json.feed || []).length;
+      if (n) post("bluesky_list", { tag, payload: json });
       return;
     }
     if (isIG) {
@@ -200,6 +260,7 @@
       if (!op) return;
       indexX(json);
       if (/^Bookmark(s|SearchTimeline|FolderTimeline)$/.test(op)) post("x_timeline", json);
+      else if (op === "TweetDetail") post("x_thread", json);
       else if (op === "CreateBookmark") {
         const id = bodyVar(reqBody, "tweet_id");
         if (id) saveCached("x", id);
@@ -225,7 +286,15 @@
   }
 
   const interesting = (url) =>
-    isX ? url.includes("/graphql/") : isIG ? url.includes("/api/v1/") || url.includes("/graphql") : url.includes("/api/");
+    isX
+      ? url.includes("/graphql/")
+      : isIG
+        ? url.includes("/api/v1/") || url.includes("/graphql")
+        : isYT
+          ? url.includes("/youtubei/v1/browse")
+          : isBsky
+            ? url.includes("/xrpc/app.bsky.bookmark.getBookmarks") || url.includes("/xrpc/app.bsky.feed.getActorLikes")
+            : url.includes("/api/");
 
   const origFetch = window.fetch;
   window.fetch = async function (input, init) {

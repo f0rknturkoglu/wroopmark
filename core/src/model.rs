@@ -18,6 +18,7 @@ pub enum Platform {
     Github,
     Hackernews,
     Arxiv,
+    Bluesky,
     /// A file imported from disk (old downloads, screen recordings…).
     Local,
     #[default]
@@ -25,7 +26,7 @@ pub enum Platform {
 }
 
 impl Platform {
-    pub const ALL: [Platform; 12] = [
+    pub const ALL: [Platform; 13] = [
         Self::X,
         Self::Facebook,
         Self::Tiktok,
@@ -36,6 +37,7 @@ impl Platform {
         Self::Github,
         Self::Hackernews,
         Self::Arxiv,
+        Self::Bluesky,
         Self::Local,
         Self::Web,
     ];
@@ -52,6 +54,7 @@ impl Platform {
             Self::Github => "github",
             Self::Hackernews => "hackernews",
             Self::Arxiv => "arxiv",
+            Self::Bluesky => "bluesky",
             Self::Local => "local",
             Self::Web => "web",
         }
@@ -78,6 +81,7 @@ impl Platform {
             b"github" | b"gh" => Self::Github,
             b"hackernews" | b"hn" | b"ycombinator" => Self::Hackernews,
             b"arxiv" => Self::Arxiv,
+            b"bluesky" | b"bsky" => Self::Bluesky,
             b"local" | b"file" | b"dosya" | b"yerel" => Self::Local,
             b"web" | b"custom" | b"link" => Self::Web,
             _ => return None,
@@ -109,6 +113,8 @@ impl Platform {
             Self::Hackernews
         } else if is("arxiv.org") {
             Self::Arxiv
+        } else if is("bsky.app") {
+            Self::Bluesky
         } else {
             Self::Web
         }
@@ -245,6 +251,13 @@ pub struct Item {
     /// Tags the on-device model suggested (not applied).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ai_tags: Vec<String>,
+    /// The author's own follow-up posts (an X thread), oldest first. Their
+    /// pictures are also in `media`, so they download and show like the rest.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub thread: Vec<Item>,
+    /// The page as it looked when saved (`<hash>.webarchive` in the media store).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<String>,
     /// Only the link is known (archive import); details are fetched later.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub stub: bool,

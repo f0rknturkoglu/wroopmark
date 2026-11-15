@@ -1114,7 +1114,7 @@ fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result
             let a: AddUrl = req.parse()?;
             S::ok(lib.add_url(&a.url, &a.tags, a.note.as_deref(), a.folder_id)?)
         }
-        "import_x" | "import_tiktok" | "import_reddit" | "import_instagram" => {
+        "import_x" | "import_tiktok" | "import_reddit" | "import_instagram" | "import_youtube" | "import_bluesky" => {
             let a: ImportPayload = req.parse()?;
             let mut items = {
                 let payload = match a.payload {
@@ -1129,6 +1129,8 @@ fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result
                     }
                     "import_reddit" => crate::reddit::parse_listing(&payload),
                     "import_instagram" => crate::instagram::parse_api(&payload),
+                    "import_youtube" => crate::youtube::parse_api(&payload),
+                    "import_bluesky" => crate::bluesky::parse_api(&payload),
                     _ => crate::tiktok::parse_api(&payload),
                 }
             };

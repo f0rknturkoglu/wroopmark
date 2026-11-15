@@ -276,6 +276,18 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle(isOn: $model.pageCopies) {
+                    Label("Web sayfalarının kopyasını sakla", systemImage: "doc.richtext")
+                }
+                if let s = model.aiStatus?.snapshots {
+                    LabeledContent("Kopyası olan sayfa", value: "\(s.done)" + (s.pending > 0 ? " · \(s.pending) sırada" : ""))
+                }
+            } footer: {
+                Text("Kaydettiğin her sayfa (makale, GitHub, arXiv…) görünmez bir tarayıcıda açılıp olduğu gibi saklanır; site değişse ya da kapansa da detaydaki “Sayfanın kopyası”ndan açılır. Çerez tutulmaz, sayfa başına genelde 1–5 MB.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 LabeledContent("Diskteki medya") {
                     Text(ByteCountFormatter.string(fromByteCount: model.stats?.mediaBytes ?? 0, countStyle: .file))
                         .monospacedDigit()
