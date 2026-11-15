@@ -13,6 +13,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case intelligence = "intelligence"
     case transfer = "transfer"
     case agents = "agents"
+    case sync = "sync"
     case extensionHost = "extension"
     case about = "about"
 
@@ -30,6 +31,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .intelligence: "Zeka"
         case .transfer: "İçe / Dışa Aktar"
         case .agents: "Ajanlar (MCP)"
+        case .sync: "Senkron"
         case .extensionHost: "Eklenti"
         case .about: "Hakkında"
         }
@@ -47,6 +49,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .intelligence: "sparkles"
         case .transfer: "arrow.up.arrow.down.square"
         case .agents: "point.3.filled.connected.trianglepath.dotted"
+        case .sync: "arrow.triangle.2.circlepath.icloud"
         case .extensionHost: "puzzlepiece.extension"
         case .about: "info.circle"
         }
@@ -116,6 +119,7 @@ struct SettingsView: View {
         case .intelligence: IntelligenceSettings()
         case .transfer: TransferSettings()
         case .agents: AgentsSettings()
+        case .sync: SyncSettings()
         case .extensionHost: extensionSection
         case .about: aboutSection
         }

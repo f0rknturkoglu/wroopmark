@@ -41,6 +41,8 @@ kullanım: wroopmark [--lib DİZİN] <komut>
   dupes                               olası kopyalar
   ai                                  cihazdaki modellerin durumu
   mcp [--read-only]                   ajanlar için MCP sunucusu (stdio)
+  sync [enable <klasör> | disable | status]
+                                      cihazlar arası senkron (iCloud Drive vb. klasör)
   call '<json>'                       ham API komutu
 
 kütüphane: $WROOPMARK_HOME ya da ~/Library/Application Support/wroopmark";
@@ -82,7 +84,7 @@ fn main() {
         return;
     }
     // Long background work (stub filling) is left for the app to finish.
-    let detach = matches!(cmd.as_str(), "import" | "import-files" | "export" | "embed" | "dupes" | "ai" | "rules" | "rule-add");
+    let detach = matches!(cmd.as_str(), "import" | "import-files" | "export" | "embed" | "dupes" | "ai" | "rules" | "rule-add" | "sync");
 
     let result = match cmd.as_str() {
         "add" => cmd_add(&lib, &rest),
@@ -148,6 +150,22 @@ fn main() {
             out.join("\n")
         }),
         "ai" => call(&lib, json!({ "cmd": "ai_status" })).map(|v| pretty(&v)),
+        "sync" => match rest.first().map(String::as_str) {
+            Some("enable") => call(&lib, json!({ "cmd": "sync_enable", "dir": need(&rest, 1, "klasör") })).map(|v| pretty(&v)),
+            Some("disable") => call(&lib, json!({ "cmd": "sync_disable" })).map(|_| "senkron kapalı".into()),
+            Some("status") => call(&lib, json!({ "cmd": "sync_status" })).map(|v| pretty(&v)),
+            _ => call(&lib, json!({ "cmd": "sync_now" })).map(|v| {
+                format!(
+                    "{} satır yazıldı, {} okundu ({} değişiklik), {} medya gönderildi, {} alındı{}",
+                    at(&v, "pushed"),
+                    at(&v, "pulled"),
+                    at(&v, "applied"),
+                    at(&v, "media_out"),
+                    at(&v, "media_in"),
+                    if at(&v, "busy").as_bool() == Some(true) { " (başka bir senkron sürüyordu)" } else { "" }
+                )
+            }),
+        },
         "call" => {
             let req: Value = serde_json::from_str(&need(&rest, 0, "json")).unwrap_or_else(|e| die(&format!("geçersiz JSON: {e}")));
             Ok(pretty(&api::handle_value(&lib, req)))

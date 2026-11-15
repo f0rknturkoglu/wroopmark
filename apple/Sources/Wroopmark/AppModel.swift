@@ -257,6 +257,13 @@ final class AppModel {
         }
     }
     var pageCopyTask: Task<Void, Never>?
+    // Sync (Sync.swift)
+    var syncStatus: SyncStatus?
+    var syncTask: Task<Void, Never>?
+    var syncDebounce: Task<Void, Never>?
+    var isSyncing = false
+    var syncMessage: String?
+    var lastSyncAt: Date?
     var embedTask: Task<Void, Never>?
     var embedPausedUntil: Date?
     var posterTask: Task<Void, Never>?
@@ -389,6 +396,7 @@ final class AppModel {
         startPosters()
         if enableSystemIntegrations { startPageCopies() }
         Task { await loadAIStatus() }
+        startSyncLoop()
         if enableSystemIntegrations {
             Spotlight.reindex(core: core)
             QuickSave.shared.attach(self)
@@ -419,6 +427,8 @@ final class AppModel {
         embedTask?.cancel()
         posterTask?.cancel()
         pageCopyTask?.cancel()
+        syncTask?.cancel()
+        syncDebounce?.cancel()
     }
 
     // MARK: Loading
@@ -827,6 +837,7 @@ final class AppModel {
                         self.startEmbedding()
                         self.startPosters()
                         if self.enableSystemIntegrations { self.startPageCopies() }
+                        self.syncSoon()
                         if self.enableSystemIntegrations {
                             Spotlight.indexRecent(core: self.core)
                         }
@@ -868,6 +879,8 @@ final class AppModel {
     func perform(_ command: CoreCommand, network: Bool = false) async -> Bool {
         do {
             try await core.run(command, network: network)
+            // Edits reach the other devices within seconds.
+            syncSoon()
             return true
         } catch is CancellationError {
             return false

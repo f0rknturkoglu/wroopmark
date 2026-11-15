@@ -733,7 +733,9 @@ struct AuthorLine: View {
     private var displayName: String {
         if let n = item.authorName, !n.isEmpty { return n }
         if let h = item.authorHandle { return "@\(h)" }
-        return URL(string: item.url)?.host() ?? "—"
+        if let host = URL(string: item.url)?.host(), !host.isEmpty { return host }
+        // Files from disk have no site; say what they are.
+        return (Platform(rawValue: item.platform) ?? .web).label
     }
 }
 

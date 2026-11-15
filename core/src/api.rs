@@ -1472,6 +1472,7 @@ fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result
     }
 }
 
+mod sync;
 mod v2;
 
 #[cfg(test)]

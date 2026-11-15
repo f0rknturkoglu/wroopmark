@@ -294,3 +294,84 @@ struct AgentsSettings: View {
         }
     }
 }
+
+// MARK: - Sync
+
+struct SyncSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let s = model.syncStatus
+        Form {
+            if s?.enabled == true {
+                Section {
+                    LabeledContent("Klasör") {
+                        Text(s?.dir ?? "").font(.callout).lineLimit(2).truncationMode(.middle).textSelection(.enabled)
+                    }
+                    LabeledContent("Bu cihaz", value: s?.name ?? s?.device ?? "")
+                    if let p = s?.pending, p > 0 { LabeledContent("Gönderilmeyi bekleyen", value: "\(p) kayıt") }
+                    HStack {
+                        if model.isSyncing { ProgressView().controlSize(.small) }
+                        if let m = model.syncMessage { Text(m).font(.caption).foregroundStyle(.secondary) }
+                        Spacer()
+                        Button("Şimdi eşitle") { Task { await model.syncNow(quiet: false); await model.loadSyncStatus() } }
+                            .disabled(model.isSyncing)
+                    }
+                } header: {
+                    Text("Senkron açık")
+                }
+                Section("Cihazlar") {
+                    ForEach(s?.devices ?? []) { d in
+                        LabeledContent {
+                            if let t = d.lastSync {
+                                Text(Date(timeIntervalSince1970: TimeInterval(t)).formatted(.relative(presentation: .named)))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } label: {
+                            Label(d.name ?? d.id, systemImage: d.id == s?.device ? "laptopcomputer" : "iphone")
+                        }
+                    }
+                }
+                Section {
+                    Picker("Medya", selection: Binding(get: { s?.media ?? "images" }, set: { m in Task { await model.setSyncMedia(m) } })) {
+                        Text("Görseller (önerilen)").tag("images")
+                        Text("Görseller ve videolar").tag("all")
+                        Text("Yalnızca metin").tag("none")
+                    }
+                } footer: {
+                    Text("Görseller klasöre kopyalanır, öbür cihaz hemen gösterir. Videolar her cihazda kendi iner; “Görseller ve videolar” iCloud'da birkaç GB tutabilir.")
+                        .foregroundStyle(.secondary)
+                }
+                Section {
+                    Button("Senkronu kapat", role: .destructive) { Task { await model.disableSync() } }
+                } footer: {
+                    Text("Bu cihazın kütüphanesi ve klasördeki dosyalar yerinde kalır.").foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    if let icloud = AppModel.iCloudFolder {
+                        Button {
+                            Task { await model.enableSync(at: icloud) }
+                        } label: {
+                            Label("iCloud Drive ile başlat", systemImage: "icloud")
+                        }
+                        .disabled(model.isSyncing)
+                    }
+                    Button("Başka bir klasör seç…") { model.chooseSyncFolder() }
+                        .disabled(model.isSyncing)
+                    if model.isSyncing {
+                        HStack { ProgressView().controlSize(.small); Text("İlk eşitleme: kütüphane klasöre yazılıyor…").font(.caption) }
+                    }
+                    if let m = model.syncMessage { Text(m).font(.caption).foregroundStyle(.secondary) }
+                } header: {
+                    Text("Cihazlar arası senkron")
+                } footer: {
+                    Text("Kayıtlar, etiketler, klasörler, notlar ve kayıtlı aramalar seçtiğin klasör üzerinden diğer cihazlara (iPhone, başka Mac) gider. Veritabanı klasöre konmaz; her cihaz yalnızca kendi değişikliklerini ekler, aynı şeyi iki yerde değiştirirsen son yapılan geçerli olur. Sunucu yok, hesap yok.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .task { await model.loadSyncStatus() }
+    }
+}

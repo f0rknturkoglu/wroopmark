@@ -109,6 +109,27 @@ onu gerektiğinde başlatır, bir dakika boşta kalınca kendisi kapanır. Uygul
 - **Benzerleri / kopyalar**: aynı merkezli vektörler; kopyalar ayrıca aynı medya
   dosyası ve katlanmış aynı metin.
 
+## Senkron (v0.5)
+
+Tasarım yukarıdaki "Senkron = klasör + işlem günlüğü". Uygulama (`api/sync.rs`,
+`db/sync.rs`):
+
+- **Değişiklik takibi tetikleyicilerle** (`sync_dirty`): uygulama, eklenti host'u ya da
+  CLI, kim yazarsa yazsın kaçmaz. Alan grupları: `content` (metin, medya listesi,
+  alıntı, zincir, OCR…), `tags`, `folder` (klasör yolu, adıyla), `note`, `reviewed`,
+  `ai`; ayrıca silme ve `ui.` ayarları (kayıtlı aramalar). Uzak değişiklik uygulanırken
+  (`sync_state.applying`) tetikleyiciler susar, yankı olmaz.
+- **Gönderme**: değişen her kayıt için bir satır, yalnızca değişen gruplarla, kaydın
+  o anki hâlinden. Görseller (seçime göre videolar da) içerik adıyla `media/`'ya.
+- **Alma**: diğer cihazların dosyaları kaldığı yerden (`sync_cursor`, bayt konumu)
+  okunur, yalnızca tam satırlar; zamana göre sıralanıp uygulanır. Grup başına son
+  yazan kazanır (`sync_fields`: zaman ms + cihaz id). Silme, kaydın en yeni
+  yazımından yeniyse uygulanır. Dosyası klasörde olan medya kopyalanır, olmayan her
+  cihazda kendi iner.
+- Aynı anda tek senkron (kütüphanedeki `sync.lock`). Boşta bir tur ~6 ms; 1766
+  kayıtlık ilk tur: 3 MB günlük + 410 MB görsel.
+- Vektörler, sayfa kopyaları ve video indirme denemeleri cihaza özel kalır.
+
 ## Ajanlar (MCP)
 
 `wroopmark mcp`: CLI ikilisinin stdio üzerinde JSON-RPC (MCP 2025-06-18) modu
@@ -208,7 +229,7 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
   (kayıtların `wroopmark://` adresleriyle doğrudan okunması).
 
 **v0.5: Çoklu cihaz**
-- Senkron günlüğü (yukarıdaki klasör + `ops/<cihaz>/<ay>.jsonl` tasarımı).
+- Senkron günlüğü ✅ (aşağıda).
 - iOS uygulaması + App Intent (Xcode gerekir).
 
 **Şimdilik yok**: metin vurgulama, EPUB, Raycast eklentisi (MCP çoğunu

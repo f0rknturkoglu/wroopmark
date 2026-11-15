@@ -254,9 +254,10 @@ struct ThreadSection: View {
                 }
             }
         }
-        .padding(.leading, Theme.Spacing.xs)
+        .padding(.leading, Theme.Spacing.md)
         .overlay(alignment: .leading) {
-            Rectangle().fill(Theme.accent.opacity(0.35)).frame(width: 2).padding(.vertical, 28)
+            // The thread's spine, from the title to the last post.
+            Rectangle().fill(Theme.accent.opacity(0.35)).frame(width: 2).padding(.top, 24)
         }
     }
 }

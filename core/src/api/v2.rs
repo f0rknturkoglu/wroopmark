@@ -68,7 +68,7 @@ pub struct RuleRow {
 /// Centered cosine a meaning hit needs to be shown.
 const SEMANTIC_MIN: f32 = 0.42;
 /// Similar items below this are not shown as related.
-const RELATED_MIN: f32 = 0.40;
+const RELATED_MIN: f32 = 0.45;
 /// Two items this alike are offered as duplicates.
 const DUPLICATE_MIN: f32 = 0.93;
 
@@ -831,7 +831,10 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             lib.ignore_duplicates(&req.parse::<Ids>()?.ids)?;
             S::ok(true)
         }
-        other => Err(CoreError::UnknownCmd(other.to_string())),
+        other => match super::sync::dispatch::<S>(lib, other, req) {
+            Some(r) => r,
+            None => Err(CoreError::UnknownCmd(other.to_string())),
+        },
     }
 }
 

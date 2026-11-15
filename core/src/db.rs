@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 13;
+const SCHEMA_VERSION: i64 = 14;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -198,6 +198,109 @@ CREATE INDEX IF NOT EXISTS items_stub ON items(stub) WHERE stub = 1;";
 const MIGRATE_13: &str = "ALTER TABLE items ADD COLUMN thread TEXT;
 ALTER TABLE items ADD COLUMN snapshot TEXT;
 ALTER TABLE items ADD COLUMN snapshot_tries INTEGER NOT NULL DEFAULT 0;";
+
+/// v13 → v14 (v0.5): sync. Triggers note what changed (`sync_dirty`), per
+/// item and field group, whoever wrote it (app, extension host, CLI); the
+/// sync step turns that into log lines. While remote changes are applied
+/// (`applying`), nothing is noted, so nothing echoes back.
+const MIGRATE_14: &str = "CREATE TABLE IF NOT EXISTS sync_state(
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled INTEGER NOT NULL DEFAULT 0,
+  applying INTEGER NOT NULL DEFAULT 0
+);
+INSERT OR IGNORE INTO sync_state(id) VALUES (1);
+CREATE TABLE IF NOT EXISTS sync_dirty(item TEXT NOT NULL, field TEXT NOT NULL, PRIMARY KEY(item, field)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sync_fields(item TEXT NOT NULL, field TEXT NOT NULL, ts INTEGER NOT NULL, dev TEXT NOT NULL, PRIMARY KEY(item, field)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sync_cursor(file TEXT PRIMARY KEY, offset INTEGER NOT NULL) WITHOUT ROWID;
+CREATE TRIGGER IF NOT EXISTS sync_item_ins AFTER INSERT ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'content'), (NEW.id, 'folder'), (NEW.id, 'note'), (NEW.id, 'tags');
+  DELETE FROM sync_dirty WHERE item = NEW.id AND field = 'deleted';
+END;
+CREATE TRIGGER IF NOT EXISTS sync_item_content AFTER UPDATE OF title, text, url, quote, thread, ocr, author_handle, author_name, saved_at, stub ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state)
+   AND (OLD.title IS NOT NEW.title OR OLD.text IS NOT NEW.text OR OLD.url IS NOT NEW.url OR OLD.quote IS NOT NEW.quote
+        OR OLD.thread IS NOT NEW.thread OR OLD.ocr IS NOT NEW.ocr OR OLD.author_handle IS NOT NEW.author_handle
+        OR OLD.author_name IS NOT NEW.author_name OR OLD.saved_at IS NOT NEW.saved_at OR OLD.stub IS NOT NEW.stub)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'content');
+END;
+CREATE TRIGGER IF NOT EXISTS sync_item_folder AFTER UPDATE OF folder_id ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND OLD.folder_id IS NOT NEW.folder_id
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'folder');
+END;
+CREATE TRIGGER IF NOT EXISTS sync_item_note AFTER UPDATE OF note ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND OLD.note IS NOT NEW.note
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'note');
+END;
+CREATE TRIGGER IF NOT EXISTS sync_item_reviewed AFTER UPDATE OF reviewed_at ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND (OLD.reviewed_at IS NULL) != (NEW.reviewed_at IS NULL)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'reviewed');
+END;
+CREATE TRIGGER IF NOT EXISTS sync_item_ai AFTER UPDATE OF summary, ai_tags ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND (OLD.summary IS NOT NEW.summary OR OLD.ai_tags IS NOT NEW.ai_tags)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'ai');
+END;
+CREATE TRIGGER IF NOT EXISTS sync_item_del AFTER DELETE ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state)
+BEGIN
+  DELETE FROM sync_dirty WHERE item = OLD.id;
+  INSERT OR IGNORE INTO sync_dirty VALUES (OLD.id, 'deleted');
+END;
+CREATE TRIGGER IF NOT EXISTS sync_tag_add AFTER INSERT ON item_tags
+  WHEN (SELECT enabled AND NOT applying FROM sync_state)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty SELECT id, 'tags' FROM items WHERE pk = NEW.item;
+END;
+CREATE TRIGGER IF NOT EXISTS sync_tag_remove AFTER DELETE ON item_tags
+  WHEN (SELECT enabled AND NOT applying FROM sync_state)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty SELECT id, 'tags' FROM items WHERE pk = OLD.item;
+END;
+CREATE TRIGGER IF NOT EXISTS sync_tag_rename AFTER UPDATE OF name ON tags
+  WHEN (SELECT enabled AND NOT applying FROM sync_state)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty SELECT i.id, 'tags' FROM item_tags it JOIN items i ON i.pk = it.item WHERE it.tag = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS sync_folder_rename AFTER UPDATE OF name ON folders
+  WHEN (SELECT enabled AND NOT applying FROM sync_state)
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty SELECT id, 'folder' FROM items WHERE folder_id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS sync_setting AFTER INSERT ON settings
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND NEW.key LIKE 'ui.%'
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES ('setting:' || NEW.key, 'setting');
+END;
+CREATE TRIGGER IF NOT EXISTS sync_setting_upd AFTER UPDATE OF value ON settings
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND NEW.key LIKE 'ui.%' AND OLD.value IS NOT NEW.value
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES ('setting:' || NEW.key, 'setting');
+END;";
+
+/// Every sync trigger, for tests that rebuild an old schema.
+#[cfg(test)]
+const SYNC_TRIGGERS: [&str; 14] = [
+    "sync_item_ins",
+    "sync_item_content",
+    "sync_item_folder",
+    "sync_item_note",
+    "sync_item_reviewed",
+    "sync_item_ai",
+    "sync_item_del",
+    "sync_tag_add",
+    "sync_tag_remove",
+    "sync_tag_rename",
+    "sync_folder_rename",
+    "sync_setting",
+    "sync_setting_upd",
+    "sync_state",
+];
 
 /// A video of the item is not on disk and its URL is a post page, not a
 /// file (TikTok): only an outside downloader can get it.
@@ -926,7 +1029,9 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
 }
 
 mod extra;
+mod sync;
 pub use extra::{DuplicateGroup, Rule, StubInfo};
+pub use sync::{SyncFields, SyncOp};
 
 fn pk_of(conn: &Connection, id: &str) -> Result<i64> {
     Ok(conn.query_row("SELECT pk FROM items WHERE id = ?1", [id], |r| r.get(0))?)
@@ -952,7 +1057,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -993,6 +1098,9 @@ impl Store {
         }
         if (1..13).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_13} PRAGMA user_version = 13; COMMIT;"))?;
+        }
+        if (1..14).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_14} PRAGMA user_version = 14; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -2169,6 +2277,10 @@ mod tests {
             a.links = vec!["https://example.com/".into()];
             s.upsert(&a).unwrap();
             // Back to a v3 library: no OCR column, no known files, no link retries.
+            for t in SYNC_TRIGGERS {
+                s.conn.execute_batch(&format!("DROP TRIGGER IF EXISTS {t}; DROP TABLE IF EXISTS {t};")).unwrap();
+            }
+            s.conn.execute_batch("DROP TABLE IF EXISTS sync_dirty; DROP TABLE IF EXISTS sync_fields; DROP TABLE IF EXISTS sync_cursor;").unwrap();
             s.conn
                 .execute_batch(
                     "ALTER TABLE items DROP COLUMN ocr; ALTER TABLE items DROP COLUMN reviewed_at;

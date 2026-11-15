@@ -57,6 +57,10 @@ Chromium/Safari eklentisi; hepsi tek bir yerel kütüphaneyi kullanır.
 - Her kaydın yanında anlamca benzerleri.
 - Link havuzu: gönderilerdeki tüm linkler tekilleştirilmiş, kırık olanlar işaretli.
 
+**Cihazlar arası**
+- Senkron: iCloud Drive (ya da Syncthing, Dropbox…) klasörü üzerinden; sunucu, hesap yok.
+  Kayıtlar, etiketler, klasörler, notlar, kayıtlı aramalar ve görseller gider.
+
 **Ajanlar**
 - MCP sunucusu: Claude, Cursor gibi ajanlar arşivinde arar, kayıtları okur, etiketler.
 - Kısayollar, Siri ve Apple Intelligence: "wroopmark'ta ara", "wroopmark'a kaydet", "wroopmark'ta bul".
@@ -195,6 +199,20 @@ Kısayollar uygulamasında wroopmark eylemleri: **wroopmark'ta Ara** (uygulamada
 **wroopmark'a Kaydet** (bağlantı + etiketler, paylaşım menüsünden de), **wroopmark'ta Bul**
 (sonuçları başka kısayollara verir; anlamına göre de arayabilir). Siri'ye
 "wroopmark'ta ara" demek de olur.
+
+### Senkron
+
+Ayarlar → Senkron → **iCloud Drive ile başlat** (ya da başka bir klasör). İlk seferde
+kütüphane klasöre yazılır; diğer cihazda aynı klasörü seçince hepsi gelir. Sonrasında
+değişiklikler birkaç saniye ile bir dakika içinde karşıya geçer.
+
+- Veritabanı klasöre konmaz; her cihaz yalnızca kendi değişiklik günlüğüne ekler
+  (`ops/<cihaz>/<ay>.jsonl`), diğerlerininkini okur.
+- Aynı kaydın farklı şeylerini iki cihazda değiştirirsen (birinde etiket, öbüründe not)
+  ikisi de kalır; aynı şeyi değiştirirsen son yapılan geçerli olur.
+- Medya: görseller klasöre kopyalanır (önerilen); videolar her cihazda kendi iner.
+  "Görseller ve videolar" seçilirse videolar da gider (GB'larca yer tutabilir).
+- Terminalden: `wroopmark sync`, `wroopmark sync status`.
 
 ### Kurallar
 

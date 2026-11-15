@@ -597,3 +597,30 @@ struct EmbedReport: Decodable, Sendable {
     let remaining: Int
     let total: Int
 }
+
+// MARK: - v0.5 sync
+
+struct SyncStatus: Decodable, Equatable, Sendable {
+    struct Device: Decodable, Equatable, Sendable, Identifiable {
+        let id: String
+        let name: String?
+        let lastSync: Int64?
+        let version: String?
+    }
+    let enabled: Bool
+    let dir: String?
+    let device: String
+    let name: String?
+    let media: String
+    let pending: Int
+    let devices: [Device]
+}
+
+struct SyncReport: Decodable, Equatable, Sendable {
+    let pushed: Int
+    let pulled: Int
+    let applied: Int
+    let mediaOut: Int
+    let mediaIn: Int
+    let busy: Bool
+}
