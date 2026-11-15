@@ -4,6 +4,7 @@ struct LibraryView: View {
     @Environment(PhoneModel.self) private var model
     @State private var showAdd = false
     @State private var showSettings = false
+    @State private var showFeed = false
     @State private var path: [String] = []
 
     var body: some View {
@@ -57,6 +58,10 @@ struct LibraryView: View {
                     }
                     .accessibilityLabel("Ayarlar")
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showFeed = true } label: { Image(systemName: "play.rectangle.on.rectangle") }
+                        .accessibilityLabel("Akış")
+                }
                 ToolbarItem(placement: .topBarTrailing) { ScopeMenu() }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
@@ -71,6 +76,7 @@ struct LibraryView: View {
                 }
             }
             .sheet(isPresented: $showSettings) { PhoneSettingsView() }
+            .fullScreenCover(isPresented: $showFeed) { VideoFeedView(scope: model.scope, query: model.query) }
         }
     }
 }
