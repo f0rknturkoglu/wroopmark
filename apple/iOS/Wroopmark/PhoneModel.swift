@@ -64,7 +64,8 @@ final class PhoneModel {
     var lastSyncAt: Date?
     /// Pictures from the Mac still coming down from iCloud.
     var syncWaiting = 0
-    @ObservationIgnored var askedICloud: Set<String> = []
+    /// When each file was last asked of iCloud.
+    @ObservationIgnored var askedICloud: [String: Date] = [:]
     @ObservationIgnored var mediaRound: Task<Void, Never>?
 
     /// An item to show (from a `wroopmark://item/<id>` link).

@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 16;
+const SCHEMA_VERSION: i64 = 18;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -298,6 +298,17 @@ BEGIN
   INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'content');
 END;
 INSERT OR REPLACE INTO settings(key, value) VALUES ('sync_media_backfill', '1');";
+
+/// v16 → v17: read the other devices' logs once more from the start, so
+/// files that lost to a newer line before media were merged (videos) come.
+const MIGRATE_17: &str = "DELETE FROM sync_cursor;";
+
+/// v17 → v18: files another device has not uploaded yet are waited for too
+/// (`since`: when noted). The logs are read once more, so a phone that saw
+/// the Mac's videos before they were in iCloud learns their names.
+const MIGRATE_18: &str = "ALTER TABLE sync_media_wait ADD COLUMN since INTEGER NOT NULL DEFAULT 0;
+UPDATE sync_media_wait SET since = CAST(strftime('%s', 'now') AS INTEGER);
+DELETE FROM sync_cursor;";
 
 /// Every sync trigger, for tests that rebuild an old schema.
 #[cfg(test)]
@@ -1074,7 +1085,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -1124,6 +1135,12 @@ impl Store {
         }
         if (1..16).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_16} PRAGMA user_version = 16; COMMIT;"))?;
+        }
+        if (1..17).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_17} PRAGMA user_version = 17; COMMIT;"))?;
+        }
+        if (1..18).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_18} PRAGMA user_version = 18; COMMIT;"))?;
         }
         Ok(store)
     }

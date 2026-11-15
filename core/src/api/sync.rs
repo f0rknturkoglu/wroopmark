@@ -371,6 +371,10 @@ impl Library {
                         held += usize::from(counts);
                         waits.push((name, id.to_string(), key));
                     }
+                    // Not in the folder yet: the other device may still be
+                    // uploading it. Remember the name (the item still goes
+                    // to the web meanwhile); `collect_media` takes it later.
+                    Shared::Missing if !key.is_empty() => waits.push((name, id.to_string(), key)),
                     _ => {}
                 }
                 *slot = None;
@@ -382,6 +386,56 @@ impl Library {
         Ok((n, held))
     }
 
+    /// Fills the slots our copy of an item lacks with the files another
+    /// device has for the same media URLs.
+    fn merge_media(&self, base: &Path, id: &str, theirs: &Item, report: &mut SyncReport) -> Result<bool> {
+        let Some(mut ours) = self.lock_store()?.get(id)? else { return Ok(false) };
+        let mut changed = self.offer_media(base, id, &mut ours.media, &theirs.media, report)?;
+        if let (Some(q), Some(tq)) = (ours.quote.as_mut(), theirs.quote.as_ref()) {
+            changed |= self.offer_media(base, id, &mut q.media, &tq.media, report)?;
+        }
+        if changed {
+            self.lock_store()?.set_media(id, &ours.media, ours.quote.as_deref())?;
+        }
+        Ok(changed)
+    }
+
+    fn offer_media(&self, base: &Path, id: &str, ours: &mut [Media], theirs: &[Media], report: &mut SyncReport) -> Result<bool> {
+        let mut offered: Vec<Media> = theirs
+            .iter()
+            .filter_map(|t| {
+                let o = ours.iter().find(|o| o.url == t.url)?;
+                let mut c = t.clone();
+                if o.file.is_some() {
+                    c.file = None;
+                }
+                if o.video_file.is_some() {
+                    c.video_file = None;
+                }
+                (c.file.is_some() || c.video_file.is_some()).then_some(c)
+            })
+            .collect();
+        if offered.is_empty() {
+            return Ok(false);
+        }
+        // Copies what is here; notes what iCloud still has to bring.
+        let (n, _) = self.take_media_in(base, id, &mut offered)?;
+        report.media_in += n;
+        let mut changed = false;
+        for c in offered {
+            let Some(o) = ours.iter_mut().find(|o| o.url == c.url) else { continue };
+            if o.file.is_none() && c.file.is_some() {
+                o.file = c.file;
+                changed = true;
+            }
+            if o.video_file.is_none() && c.video_file.is_some() {
+                o.video_file = c.video_file;
+                changed = true;
+            }
+        }
+        Ok(changed)
+    }
+
     /// Takes the waiting files iCloud has downloaded since. Returns how many
     /// came and the folder paths of those still on their way, so the app
     /// can ask iCloud for them.
@@ -390,12 +444,16 @@ impl Library {
         if waits.is_empty() || self.media_paused() {
             return Ok((0, vec![]));
         }
-        let ids: Vec<String> = waits.iter().map(|(_, i)| i.clone()).collect();
+        // How long a file may stay absent from the folder before we stop
+        // expecting it (the other device's media setting skips it).
+        const PATIENCE: i64 = 14 * 24 * 3600;
+        let now = crate::text::now();
+        let ids: Vec<String> = waits.iter().map(|(_, i, _)| i.clone()).collect();
         let alive = self.lock_store()?.existing_ids(&ids)?;
         let (mut done, mut items, mut remote) = (vec![], vec![], vec![]);
         let mut still: HashSet<String> = HashSet::new();
         let mut came = 0;
-        for (file, item) in waits {
+        for (file, item, since) in waits {
             let src = shared_media(base, &file);
             match shared_state(&src) {
                 _ if !alive.contains(&item) => {}
@@ -404,11 +462,14 @@ impl Library {
                     still.insert(item);
                     continue;
                 }
-                Shared::Here if self.media.contains(&file) || self.copy_in(&src, &file) => {
+                // Already brought in by another line of the log.
+                _ if self.media.contains(&file) => items.push(item),
+                Shared::Here if self.copy_in(&src, &file) => {
                     came += 1;
                     items.push(item);
                 }
-                // Gone from the folder: the usual download from the web.
+                Shared::Missing if now - since < PATIENCE => continue,
+                // Never came, or gone from the folder: the usual download.
                 _ => items.push(item),
             }
             done.push(file);
@@ -537,6 +598,12 @@ impl Library {
                 }
                 store.stamp(&id, "content", ts, dev)?;
                 changed = true;
+            } else if newer(ts, dev, deleted.as_ref()) {
+                // Files are named by their contents, so they never conflict:
+                // a line that lost on the rest still brings the files we
+                // lack (the Mac's videos while the phone kept re-sending the
+                // item as its pictures came in).
+                changed |= self.merge_media(base, &id, &item, report)?;
             }
         }
         // The rest only makes sense for an item we have.
@@ -809,11 +876,51 @@ mod tests {
         // Once is enough.
         assert_eq!(call(&a, json!({"cmd": "sync_now"})).get("pushed"), Some(&json!(0)));
 
-        let r = call(&b, json!({"cmd": "sync_now"}));
-        assert_eq!(r.get("media_in"), Some(&json!(1)), "{r}");
+        // B sends the item again after A's line (as the phone does while
+        // its pictures come in): its line wins, the video still comes.
         let id = item_id_for_url("https://example.com/v").1;
+        std::thread::sleep(Duration::from_millis(5));
+        assert!(b.lock_store().and_then(|mut s| Ok(s.mark_content_dirty(std::slice::from_ref(&id))?)).is_ok());
+        let r = call(&b, json!({"cmd": "sync_now"}));
+        assert_eq!(r.get("pushed"), Some(&json!(1)), "{r}");
+        assert_eq!(r.get("media_in"), Some(&json!(1)), "{r}");
         assert_eq!(call(&b, json!({"cmd": "get", "id": id})).pointer("/media/0/video_file"), Some(&json!(video)));
         assert!(b.media.contains(&video));
+        a.shutdown();
+        b.shutdown();
+        let _ = fs::remove_dir_all(&root);
+    }
+    /// A file the other device has not uploaded yet (not in the folder at
+    /// all) is still expected, and taken when it shows up.
+    #[test]
+    fn media_not_yet_uploaded_comes_later() {
+        let root = std::env::temp_dir().join(format!("wm-sync-late-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let shared = root.join("shared");
+        let a = Library::open(&root.join("a")).unwrap_or_else(|_| std::process::abort());
+        let b = Library::open(&root.join("b")).unwrap_or_else(|_| std::process::abort());
+        let pic = a.media.put(b"uploading", "jpg").unwrap_or_default();
+        call(
+            &a,
+            json!({"cmd": "import_items", "items": [
+            {"platform": "web", "url": "https://example.com/l", "text": "geç", "media": [{"kind": "image", "url": "https://e.invalid/l.jpg", "file": pic}]}]}),
+        );
+        call(&a, json!({"cmd": "sync_enable", "dir": shared, "media": "images"}));
+        let real = shared_media(&shared, &pic);
+        let aside = root.join("aside.jpg");
+        assert!(fs::rename(&real, &aside).is_ok());
+
+        call(&b, json!({"cmd": "sync_enable", "dir": shared}));
+        b.wait_media();
+        let id = item_id_for_url("https://example.com/l").1;
+        assert!(call(&b, json!({"cmd": "get", "id": id})).pointer("/media/0/file").is_none_or(Value::is_null));
+        assert_eq!(call(&b, json!({"cmd": "sync_now"})).get("media_in"), Some(&json!(0)));
+
+        assert!(fs::rename(&aside, &real).is_ok());
+        let r = call(&b, json!({"cmd": "sync_now"}));
+        assert_eq!(r.get("media_in"), Some(&json!(1)), "{r}");
+        b.wait_media();
+        assert_eq!(call(&b, json!({"cmd": "get", "id": id})).pointer("/media/0/file"), Some(&json!(pic)));
         a.shutdown();
         b.shutdown();
         let _ = fs::remove_dir_all(&root);

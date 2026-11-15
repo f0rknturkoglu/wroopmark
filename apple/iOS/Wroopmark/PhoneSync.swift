@@ -105,8 +105,11 @@ extension PhoneModel {
     /// never waits for them. Ask for the next ones, and while the app is
     /// open come back every little while to take what has arrived.
     private func takeICloudMedia(_ r: SyncReport) {
-        let fresh = (r.fetch ?? []).filter { !askedICloud.contains($0) }
-        askedICloud.formUnion(fresh)
+        // Asked again after a while: a request made before the other device
+        // finished uploading the file does nothing.
+        let now = Date.now
+        let fresh = (r.fetch ?? []).filter { askedICloud[$0].map { now.timeIntervalSince($0) > 300 } ?? true }
+        for p in fresh { askedICloud[p] = now }
         SyncReport.requestDownloads(fresh)
         guard syncWaiting > 0, mediaRound == nil else { return }
         mediaRound = Task { [weak self] in

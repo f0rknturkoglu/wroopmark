@@ -199,10 +199,13 @@ impl Store {
         let tx = self.write()?;
         {
             let mut known = tx.prepare_cached("INSERT OR REPLACE INTO media_files(url, file) VALUES (?1, ?2)")?;
-            let mut wait = tx.prepare_cached("INSERT OR REPLACE INTO sync_media_wait(file, item) VALUES (?1, ?2)")?;
+            let mut wait = tx.prepare_cached(
+                "INSERT INTO sync_media_wait(file, item, since) VALUES (?1, ?2, ?3) ON CONFLICT(file) DO UPDATE SET item = excluded.item",
+            )?;
+            let now = crate::text::now();
             for (file, item, url) in rows {
                 known.execute([url, file])?;
-                wait.execute([file, item])?;
+                wait.execute(params![file, item, now])?;
             }
         }
         tx.commit()?;
@@ -235,10 +238,10 @@ impl Store {
         Ok(())
     }
 
-    /// (store name, item id) of every file still waiting.
-    pub fn media_waits(&self) -> Result<Vec<(String, String)>> {
-        let mut stmt = self.conn.prepare_cached("SELECT file, item FROM sync_media_wait ORDER BY item")?;
-        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+    /// (store name, item id, noted at) of every file still waiting.
+    pub fn media_waits(&self) -> Result<Vec<(String, String, i64)>> {
+        let mut stmt = self.conn.prepare_cached("SELECT file, item, since FROM sync_media_wait ORDER BY item")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
         Ok(rows)
     }
 
