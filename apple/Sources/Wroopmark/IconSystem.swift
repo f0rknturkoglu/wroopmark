@@ -1,76 +1,13 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Link Category
+// MARK: - Link Category (the enum itself is in Models.swift, shared with iOS)
 
-enum LinkCategory: String, CaseIterable, Identifiable, Hashable, Sendable {
-    case github
-    case drive
-    case mega
-    case youtube
-    case arxiv
-    case twitter
-    case other
-
-    var id: String { rawValue }
-    var apiKey: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .github: "GitHub"
-        case .drive: "Google Drive"
-        case .mega: "Mega.nz"
-        case .youtube: "YouTube"
-        case .arxiv: "arXiv"
-        case .twitter: "Twitter / X"
-        case .other: "Diğer"
-        }
-    }
-
-    var symbolFallback: String {
-        switch self {
-        case .github: "chevron.left.forwardslash.chevron.right"
-        case .drive: "externaldrive.fill.badge.icloud"
-        case .mega: "m.circle.fill"
-        case .youtube: "play.rectangle.fill"
-        case .arxiv: "doc.text.fill"
-        case .twitter: "bubble.left.and.text.bubble.right.fill"
-        case .other: "globe"
-        }
-    }
-
+extension LinkCategory {
     @MainActor
     var iconImage: NSImage {
         FolderIcons.image(forCategory: self)
     }
-
-    func matches(host: String, url: String) -> Bool {
-        let h = host.lowercased()
-        let u = url.lowercased()
-        switch self {
-        case .github:
-            return h.contains("github.com") || h.contains("github.io") || h.contains("githubusercontent.com")
-        case .drive:
-            return h.contains("drive.google.com") || h.contains("docs.google.com")
-        case .mega:
-            return h.contains("mega.nz") || h.contains("mega.io") || u.contains("mega.nz")
-        case .youtube:
-            return h.contains("youtube.com") || h.contains("youtu.be")
-        case .arxiv:
-            return h.contains("arxiv.org")
-        case .twitter:
-            // Whole domains only: "dropbox.com" contains "x.com" and
-            // "microsoft.com" contains "t.co".
-            return h.isDomain("x.com") || h.isDomain("twitter.com") || h.isDomain("t.co")
-        case .other:
-            return !LinkCategory.allCases.filter { $0 != .other }.contains { $0.matches(host: host, url: url) }
-        }
-    }
-}
-
-private extension String {
-    /// This host is `domain` or one of its subdomains.
-    func isDomain(_ domain: String) -> Bool { self == domain || hasSuffix("." + domain) }
 }
 
 // MARK: - Folder Icons & SVGs

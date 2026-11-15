@@ -1,16 +1,14 @@
 name: release
 
-# Push a tag like v0.2.0 → a GitHub release with the .dmg and .zip attached.
+# Releases are built and published from a Mac with the Developer ID
+# certificate (apple/scripts/release.sh): signed and notarized. This job is a
+# by-hand fallback that only checks the build and keeps unsigned packages as
+# workflow artifacts; it never publishes a release.
 on:
-  push:
-    tags: ["v*"]
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
   mac:
-    # The app needs the macOS 26 SDK (Foundation Models, Liquid Glass).
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -18,12 +16,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
-      - name: Build and package
+      - name: Build and package (unsigned)
         run: apple/scripts/package.sh
-      - name: Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip \
-            --title "wroopmark $GITHUB_REF_NAME" \
-            --notes "Applications'a sürükle; ilk açılışta macOS engellerse Sistem Ayarları → Gizlilik ve Güvenlik → \"Yine de aç\". Kaynaktan kurmak için: ./install.sh"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wroopmark-mac
+          path: dist/*

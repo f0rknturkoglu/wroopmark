@@ -172,16 +172,25 @@ PLIST
 # An "Apple Development" certificate (Xcode → Settings → Accounts → Manage
 # Certificates) lets Safari load the extension without "Allow unsigned
 # extensions"; without one everything is signed ad hoc.
-SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development/ { print $2; exit }')"
+# Developer ID first (what downloads need), then Apple Development, else
+# ad hoc. SIGN_ID=… picks one by hand. Real identities sign with the
+# hardened runtime; release builds (package.sh) add Apple's secure timestamp,
+# both required for notarization.
+pick() { security find-identity -v -p codesigning 2>/dev/null | awk -F'"' -v k="$1" '$0 ~ k { print $2; exit }'; }
+SIGN_ID="${SIGN_ID:-$(pick "Developer ID Application")}"
+SIGN_ID="${SIGN_ID:-$(pick "Apple Development")}"
 SIGN_ID="${SIGN_ID:--}"
+SIGN=(--force --sign "$SIGN_ID")
+if [ "$SIGN_ID" != "-" ]; then SIGN+=(--options runtime); fi
+if [ "${WROOPMARK_RELEASE:-0}" = 1 ]; then SIGN+=(--timestamp); fi
 echo "==> imza: $([ "$SIGN_ID" = "-" ] && echo "ad-hoc" || echo "$SIGN_ID")"
 
 # Inside out: helper and extension first, then the app around them.
-codesign --force --sign "$SIGN_ID" "$APP/Contents/Helpers/wroopmark" >/dev/null 2>&1
-codesign --force --sign "$SIGN_ID" "$APP/Contents/Helpers/wroopmark-ocr" >/dev/null 2>&1
-codesign --force --sign "$SIGN_ID" "$APP/Contents/Helpers/wroopmark-ai" >/dev/null 2>&1
-codesign --force --sign "$SIGN_ID" --entitlements "$APP_PKG/Safari/WroopmarkSafari.entitlements" "$APPEX" >/dev/null 2>&1
-codesign --force --sign "$SIGN_ID" "$APP" >/dev/null 2>&1
+codesign "${SIGN[@]}" "$APP/Contents/Helpers/wroopmark" >/dev/null
+codesign "${SIGN[@]}" "$APP/Contents/Helpers/wroopmark-ocr" >/dev/null
+codesign "${SIGN[@]}" "$APP/Contents/Helpers/wroopmark-ai" >/dev/null
+codesign "${SIGN[@]}" --entitlements "$APP_PKG/Safari/WroopmarkSafari.entitlements" "$APPEX" >/dev/null
+codesign "${SIGN[@]}" "$APP" >/dev/null
 codesign --verify --deep --strict "$APP"
 echo "==> $(du -sh "$APP" | cut -f1)  $APP"
 

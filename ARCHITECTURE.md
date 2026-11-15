@@ -130,6 +130,37 @@ Tasarım yukarıdaki "Senkron = klasör + işlem günlüğü". Uygulama (`api/sy
   kayıtlık ilk tur: 3 MB günlük + 410 MB görsel.
 - Vektörler, sayfa kopyaları ve video indirme denemeleri cihaza özel kalır.
 
+## iOS (v0.5)
+
+`apple/iOS/Wroopmark.xcodeproj` (Xcode 16+ eşzamanlı klasör grubu: `apple/iOS/Wroopmark/`
+içindeki dosyalar kendiliğinden projede). Mac'le ortak: `Core.swift` (FFI köprüsü) ve
+`Models.swift`; Rust çekirdeği aynısı, `scripts/build-ios-core.sh` derleme adımı
+cihaz ya da simülatör için `cargo build --target aarch64-apple-ios[-sim]` çalıştırır.
+
+- Kütüphane uygulamanın kendi kabında (`Application Support/wroopmark`).
+- Senkron klasörü dosya seçiciden; erişim yer imi (bookmark) ile kalıcı. iCloud
+  indirmediği dosyaları yer tutucu (`.ad.icloud`) bırakır: senkrondan önce günlük
+  dosyaları `startDownloadingUbiquitousItem` + koordineli okumayla indirilir; görseller
+  gerekmez (klasörde yoksa webden iner).
+- Telefon sitelerden video indirmez (App Store kuralı 5.2.3); video ancak Mac'in
+  senkron klasörüne koyduğu dosyadan oynar. OCR, vektörler ve sayfa kopyaları Mac'te
+  üretilir, OCR ve özetler senkronla gelir.
+- Mağaza hazırlığı: gizlilik manifestleri (`PrivacyInfo.xcprivacy`, uygulama ve
+  eklentide; veri toplanmaz), `ITSAppUsesNonExemptEncryption = NO`, saydamlıksız
+  1024 px ikon, medya klasörü iCloud yedeğinin dışında, ilk sürüm yalnızca iPhone.
+  Gizlilik politikası: [PRIVACY.md](PRIVACY.md); uygulamada Ayarlar → Hakkında.
+- Dayanıklılık: arka plana geçerken `pause` (indirmeler durur, WAL katlanır; ortak
+  kaptaki SQLite kilitli kalıp iOS uygulamayı 0xdead10cc ile öldürmesin). Telefonda
+  1 GB'tan az yer kalınca görsel indirme durur (`set_media_paused`) ve uyarı çıkar;
+  bu, manifestteki disk alanı gerekçelerinin (E174.1, 85F4.1) karşılığı. İnternet
+  yokken "+" ve Kısayollar bağlantıyı `save_link` ile saklar.
+- Mağaza metni ve inceleme notları: `apple/iOS/AppStore.md`.
+- Paylaşım eklentisi (`apple/iOS/ShareExtension`): uygulamayla aynı kütüphaneyi App
+  Group kabında (`group.com.f0rknturkoglu.wroopmark`) kullanır; bağlantıyı ağa
+  çıkmadan `save_link` ile stub olarak yazar, uygulama açılınca ayrıntıları getirir.
+- App Intents: kaydet, ara, bul. `wroopmark://item/<id>`
+  ve `wroopmark://search?q=` bağlantıları.
+
 ## Ajanlar (MCP)
 
 `wroopmark mcp`: CLI ikilisinin stdio üzerinde JSON-RPC (MCP 2025-06-18) modu
@@ -230,7 +261,7 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
 
 **v0.5: Çoklu cihaz**
 - Senkron günlüğü ✅ (aşağıda).
-- iOS uygulaması + App Intent (Xcode gerekir).
+- iOS uygulaması + App Intent ✅ (aşağıda).
 
 **Şimdilik yok**: metin vurgulama, EPUB, Raycast eklentisi (MCP çoğunu
 karşılar), harici API anahtarıyla AI (cihazdaki model yetmezse).

@@ -1,0 +1,248 @@
+import SwiftUI
+
+struct LibraryView: View {
+    @Environment(PhoneModel.self) private var model
+    @State private var showAdd = false
+    @State private var showSettings = false
+    @State private var path: [String] = []
+
+    var body: some View {
+        @Bindable var model = model
+        NavigationStack(path: $path) {
+            List {
+                if let e = model.errorMessage {
+                    Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).font(.footnote)
+                }
+                if let n = model.notice {
+                    Label(n, systemImage: "wifi.slash").font(.footnote).foregroundStyle(.secondary)
+                        .onTapGesture { model.notice = nil }
+                }
+                if model.lowSpace {
+                    Label("Telefonda yer az (1 GB'tan az): yeni görseller yer açılana kadar indirilmiyor.", systemImage: "externaldrive.badge.exclamationmark")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
+                ForEach(model.items) { item in
+                    NavigationLink(value: item.id) { ItemRowView(item: item) }
+                        .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
+                        .swipeActions {
+                            Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                        }
+                }
+                if model.items.isEmpty && !model.isLoading {
+                    if model.query.isEmpty && model.scope == .all {
+                        WelcomeView(add: { showAdd = true }, sync: { showSettings = true })
+                            .listRowSeparator(.hidden)
+                    } else {
+                        ContentUnavailableView.search(text: model.query)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle(model.scope.title)
+            .navigationSubtitle(model.total > 0 ? "\(model.total) kayıt" : "")
+            .searchable(text: $model.query, prompt: "Ara: kelime, tag:dev, from:@kişi")
+            .onChange(of: model.query) { _, _ in model.queryChanged() }
+            .onChange(of: model.scope) { _, _ in Task { await model.reload() } }
+            .refreshable {
+                await model.syncNow()
+                await model.reload()
+            }
+            .navigationDestination(for: String.self) { id in ItemView(id: id) }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showSettings = true } label: {
+                        Image(systemName: model.isSyncing ? "arrow.triangle.2.circlepath" : "gearshape")
+                            .symbolEffect(.rotate, isActive: model.isSyncing)
+                    }
+                    .accessibilityLabel("Ayarlar")
+                }
+                ToolbarItem(placement: .topBarTrailing) { ScopeMenu() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showAdd = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel("Bağlantı ekle")
+                }
+            }
+            .sheet(isPresented: $showAdd) { AddURLView() }
+            .onChange(of: model.openRequest) { _, id in
+                if let id {
+                    path = [id]
+                    model.openRequest = nil
+                }
+            }
+            .sheet(isPresented: $showSettings) { PhoneSettingsView() }
+        }
+    }
+}
+
+struct ScopeMenu: View {
+    @Environment(PhoneModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Menu {
+            Picker("Görünüm", selection: $model.scope) {
+                Label("Tümü", systemImage: "tray.full").tag(PhoneScope.all)
+                Label("Etiketsiz", systemImage: "tag.slash").tag(PhoneScope.untagged)
+            }
+            Menu("Platform") {
+                let counts = model.stats?.byPlatform ?? [:]
+                ForEach(Platform.allCases.filter { (counts[$0.rawValue] ?? 0) > 0 }) { p in
+                    Button { model.scope = .platform(p.rawValue) } label: {
+                        Label("\(p.label) (\(counts[p.rawValue] ?? 0))", systemImage: p.symbol)
+                    }
+                }
+            }
+            if !model.folders.isEmpty {
+                Menu("Klasörler") {
+                    ForEach(model.folders) { f in
+                        Button { model.scope = .folder(f.id, f.name) } label: {
+                            Label("\(f.name.replacingOccurrences(of: "/", with: " › ")) (\(f.count))", systemImage: "folder")
+                        }
+                    }
+                }
+            }
+            if !model.tags.isEmpty {
+                Menu("Etiketler") {
+                    ForEach(model.tags.prefix(40), id: \.key) { t in
+                        Button("#\(t.name) (\(t.count))") { model.scope = .tag(t.key) }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: model.scope == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+        }
+        .accessibilityLabel("Süzgeç")
+    }
+}
+
+struct ItemRowView: View {
+    let item: Item
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: (Platform(rawValue: item.platform) ?? .web).symbol)
+                        .font(.caption2)
+                        .foregroundStyle(PhoneTheme.accent)
+                    Text(item.author ?? URL(string: item.url)?.host() ?? (Platform(rawValue: item.platform) ?? .web).label)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(item.saved.formatted(.relative(presentation: .named)))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                let text = item.headline.isEmpty ? (item.quote?.item.text ?? "") : item.headline
+                if !text.isEmpty {
+                    Text(text).font(.callout).lineLimit(3)
+                }
+                if !item.tags.isEmpty {
+                    Text(item.tags.map { "#\($0)" }.joined(separator: " "))
+                        .font(.caption)
+                        .foregroundStyle(PhoneTheme.accent)
+                        .lineLimit(1)
+                }
+            }
+            if let file = item.cover?.file {
+                LocalImage(file: file, maxPixel: 200)
+                    .frame(width: 64, height: 64)
+                    .clipShape(.rect(cornerRadius: 8))
+                    .overlay(alignment: .bottomTrailing) {
+                        if item.allMedia.contains(where: \.isVideo) {
+                            Image(systemName: "play.fill").font(.caption2).padding(4).background(.ultraThinMaterial, in: .circle).padding(3)
+                        }
+                    }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct AddURLView: View {
+    @Environment(PhoneModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var url = ""
+    @State private var tags = ""
+    @State private var saving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                HStack {
+                    TextField("https://…", text: $url)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    // The system paste button: no "allow paste" prompt.
+                    PasteButton(payloadType: URL.self) { urls in
+                        if let u = urls.first { url = u.absoluteString }
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonBorderShape(.capsule)
+                }
+                TextField("Etiketler (virgülle)", text: $tags)
+                    .textInputAutocapitalization(.never)
+                if saving { HStack { ProgressView(); Text("Sayfa indiriliyor…") } }
+            }
+            .navigationTitle("Bağlantı")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Vazgeç") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Kaydet") {
+                        saving = true
+                        Task {
+                            let ok = await model.addURL(url.trimmingCharacters(in: .whitespaces), tags: phoneTags(tags))
+                            saving = false
+                            if ok { dismiss() }
+                        }
+                    }
+                    .disabled(url.isEmpty || saving)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+/// First run: what the app does on its own; the Mac is optional.
+struct WelcomeView: View {
+    let add: () -> Void
+    let sync: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Kaydettiklerin, çevrimdışı").font(.title2.weight(.bold))
+                Text("Okumak, izlemek, sonra bulmak istediğin her şey tek yerde, telefonunda.")
+                    .foregroundStyle(.secondary)
+            }
+            point("square.and.arrow.up", "Her uygulamadan kaydet", "Safari, X, Reddit… Paylaş → wroopmark. Listede yoksa paylaşım satırının sonundaki “Diğer”den ekle.")
+            point("arrow.down.doc", "İnternetsiz oku", "Metin ve görseller telefona iner; sayfa silinse de arşivde kalır.")
+            point("magnifyingglass", "Her şeyi bul", "Metinde, notlarında, etiketlerinde ara: tag:okunacak, from:@kişi.")
+            point("laptopcomputer.and.iphone", "Mac'le birlikte (isteğe bağlı)", "Mac'te wroopmark kullanıyorsan iCloud Drive üzerinden iki yönlü eşitlenir.")
+            HStack {
+                Button(action: add) { Label("Bağlantı ekle", systemImage: "plus") }
+                    .buttonStyle(.borderedProminent)
+                Button("Mac'le eşitle", action: sync)
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding(.vertical, 24)
+    }
+
+    private func point(_ symbol: String, _ title: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(PhoneTheme.accent)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                Text(text).font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+    }
+}

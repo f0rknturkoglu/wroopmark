@@ -1,0 +1,90 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct PhoneSettingsView: View {
+    @Environment(PhoneModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var picking = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    if let folder = model.syncFolder {
+                        LabeledContent("Klasör", value: folder.lastPathComponent)
+                        if let s = model.syncStatus {
+                            if s.pending > 0 { LabeledContent("Gönderilmeyi bekleyen", value: "\(s.pending)") }
+                            if model.syncWaiting > 0 { LabeledContent("iCloud'dan inen görsel", value: "\(model.syncWaiting)") }
+                            ForEach(s.devices) { d in
+                                LabeledContent {
+                                    if let t = d.lastSync {
+                                        Text(Date(timeIntervalSince1970: TimeInterval(t)).formatted(.relative(presentation: .named)))
+                                    }
+                                } label: {
+                                    Label(d.name ?? d.id, systemImage: d.id == s.device ? "iphone" : "laptopcomputer")
+                                }
+                            }
+                        }
+                        Button {
+                            Task { await model.syncNow() }
+                        } label: {
+                            HStack {
+                                Text("Şimdi eşitle")
+                                if model.isSyncing { Spacer(); ProgressView() }
+                            }
+                        }
+                        .disabled(model.isSyncing)
+                        Button("Senkronu kapat", role: .destructive) { Task { await model.disableSync() } }
+                    } else {
+                        Button("Klasörü seç") { picking = true }
+                    }
+                    if let m = model.syncMessage { Text(m).font(.footnote).foregroundStyle(.secondary) }
+                } header: {
+                    Text("Senkron")
+                } footer: {
+                    Text(model.syncFolder == nil
+                         ? "Mac'te wroopmark → Ayarlar → Senkron → “iCloud Drive ile başlat” de, sonra burada iCloud Drive içindeki “wroopmark” klasörünü seç. Kayıtlar, etiketler, klasörler ve notlar iki yönlü eşitlenir."
+                         : "Uygulamayı her açışında ve aşağı çekince eşitlenir.")
+                }
+
+                if let s = model.stats {
+                    Section("Kütüphane") {
+                        LabeledContent("Kayıt", value: "\(s.items)")
+                        LabeledContent("Etiket", value: "\(s.tags)")
+                        if let b = s.mediaBytes { LabeledContent("Medya", value: ByteCountFormatter.string(fromByteCount: b, countStyle: .file)) }
+                        if let free = model.freeSpace {
+                            LabeledContent("Telefonda boş alan", value: ByteCountFormatter.string(fromByteCount: free, countStyle: .file))
+                        }
+                    }
+                }
+
+                Section("Hakkında") {
+                    Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark/blob/main/PRIVACY.md")!) {
+                        Label("Gizlilik politikası", systemImage: "hand.raised")
+                    }
+                    Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark/issues")!) {
+                        Label("Destek ve geri bildirim", systemImage: "questionmark.bubble")
+                    }
+                    LabeledContent("Sürüm", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                }
+
+                Section {
+                    Text("Safari'de, X'te, her yerde Paylaş → wroopmark. Listede yoksa paylaşım satırının sonundaki “Diğer”den ekle. Bağlantı hemen kaydedilir; metin ve görseller uygulamayı açınca gelir.")
+                        .font(.footnote)
+                } header: {
+                    Text("Telefondan kaydetmek")
+                }
+            }
+            .navigationTitle("Ayarlar")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Bitti") { dismiss() } } }
+            .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
+                if case .success(let url) = result { Task { await model.useSyncFolder(url) } }
+            }
+            .task {
+                await model.loadSyncStatus()
+                await model.refreshMeta()
+            }
+        }
+    }
+}

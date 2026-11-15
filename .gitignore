@@ -13,3 +13,6 @@ apple/build/
 *.local
 media/
 dist/
+xcuserdata/
+*.xcuserstate
+DerivedData/

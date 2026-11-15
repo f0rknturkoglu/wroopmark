@@ -507,6 +507,10 @@ impl Library {
     /// Downloads media for up to `limit` pending items and returns how many
     /// items were processed. The store lock is released during downloads.
     pub fn fetch_pending_media(&self, limit: i64) -> Result<usize> {
+        // The app pauses downloads when the device is low on space.
+        if self.media_paused() {
+            return Ok(0);
+        }
         let pending = self.lock_store()?.pending_media(limit)?;
         let videos = self.videos_enabled();
         let mut done = 0;
@@ -725,6 +729,20 @@ impl Library {
                 }
             }
         }));
+    }
+
+    pub fn media_paused(&self) -> bool {
+        self.lock_store().ok().and_then(|s| s.setting("media_paused").ok().flatten()).is_some_and(|v| v == "1")
+    }
+
+    /// Stops background work for a moment (iOS: the app is going to the
+    /// background), so no file lock is held while suspended. Work resumes
+    /// at the next `kick_media`.
+    pub fn pause(&self) {
+        self.stopping.store(true, Ordering::Release);
+        self.wait_media();
+        self.stopping.store(false, Ordering::Release);
+        self.checkpoint();
     }
 
     /// Blocks until the background media pass (if any) is done.

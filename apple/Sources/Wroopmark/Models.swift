@@ -623,4 +623,88 @@ struct SyncReport: Decodable, Equatable, Sendable {
     let mediaOut: Int
     let mediaIn: Int
     let busy: Bool
+    /// Pictures in the sync folder that iCloud has not downloaded here
+    /// yet, and paths of some of them to ask iCloud for.
+    var waiting: Int? = nil
+    var fetch: [String]? = nil
+
+    /// Asks iCloud to download these files of the sync folder. A coordinated
+    /// read brings even those `startDownloadingUbiquitousItem` leaves alone
+    /// (a folder picked in Files); nothing here waits for them.
+    static func requestDownloads(_ paths: [String]) {
+        guard !paths.isEmpty else { return }
+        let urls = paths.map { URL(fileURLWithPath: $0) }
+        Task.detached(priority: .utility) {
+            for u in urls { try? FileManager.default.startDownloadingUbiquitousItem(at: u) }
+            let intents = urls.map { NSFileAccessIntent.readingIntent(with: $0, options: []) }
+            NSFileCoordinator().coordinate(with: intents, queue: OperationQueue()) { _ in }
+        }
+    }
+}
+
+// MARK: - Link Category
+
+enum LinkCategory: String, CaseIterable, Identifiable, Hashable, Sendable {
+    case github
+    case drive
+    case mega
+    case youtube
+    case arxiv
+    case twitter
+    case other
+
+    var id: String { rawValue }
+    var apiKey: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .github: "GitHub"
+        case .drive: "Google Drive"
+        case .mega: "Mega.nz"
+        case .youtube: "YouTube"
+        case .arxiv: "arXiv"
+        case .twitter: "Twitter / X"
+        case .other: "Diğer"
+        }
+    }
+
+    var symbolFallback: String {
+        switch self {
+        case .github: "chevron.left.forwardslash.chevron.right"
+        case .drive: "externaldrive.fill.badge.icloud"
+        case .mega: "m.circle.fill"
+        case .youtube: "play.rectangle.fill"
+        case .arxiv: "doc.text.fill"
+        case .twitter: "bubble.left.and.text.bubble.right.fill"
+        case .other: "globe"
+        }
+    }
+
+    func matches(host: String, url: String) -> Bool {
+        let h = host.lowercased()
+        let u = url.lowercased()
+        switch self {
+        case .github:
+            return h.contains("github.com") || h.contains("github.io") || h.contains("githubusercontent.com")
+        case .drive:
+            return h.contains("drive.google.com") || h.contains("docs.google.com")
+        case .mega:
+            return h.contains("mega.nz") || h.contains("mega.io") || u.contains("mega.nz")
+        case .youtube:
+            return h.contains("youtube.com") || h.contains("youtu.be")
+        case .arxiv:
+            return h.contains("arxiv.org")
+        case .twitter:
+            // Whole domains only: "dropbox.com" contains "x.com" and
+            // "microsoft.com" contains "t.co".
+            return h.isDomain("x.com") || h.isDomain("twitter.com") || h.isDomain("t.co")
+        case .other:
+            return !LinkCategory.allCases.filter { $0 != .other }.contains { $0.matches(host: host, url: url) }
+        }
+    }
+}
+
+private extension String {
+    /// This host is `domain` or one of its subdomains.
+    func isDomain(_ domain: String) -> Bool { self == domain || hasSuffix("." + domain) }
 }

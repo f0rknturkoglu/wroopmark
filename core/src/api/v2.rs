@@ -724,6 +724,57 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             S::ok(lib.import_files(&paths, &a.tags, a.folder_id)?)
         }
         "fill_stubs" => S::ok(lib.fill_stubs(req.parse::<Limit>()?.limit.clamp(1, 50))?),
+        "pause" => {
+            lib.pause();
+            S::ok(true)
+        }
+        "set_media_paused" => {
+            #[derive(Deserialize)]
+            struct On {
+                on: bool,
+            }
+            let on = req.parse::<On>()?.on;
+            lib.lock_store()?.set_setting("media_paused", if on { "1" } else { "0" })?;
+            if !on {
+                lib.kick_media();
+            }
+            S::ok(true)
+        }
+        // The share sheet (a short-lived extension): store the link at once,
+        // with no network; the app fills in text and media later.
+        "save_link" => {
+            #[derive(Deserialize)]
+            struct SaveLink {
+                url: String,
+                #[serde(default)]
+                tags: Vec<String>,
+                note: Option<String>,
+                title: Option<String>,
+            }
+            let a: SaveLink = req.parse()?;
+            let url = a.url.trim();
+            if !(url.starts_with("http://") || url.starts_with("https://")) {
+                return Err(CoreError::InvalidUrl);
+            }
+            let mut item =
+                archive::to_item(&archive::Stub { url: url.to_string(), title: a.title.filter(|t| !t.trim().is_empty()), ..Default::default() });
+            item.saved_at = 0;
+            item.note = a.note.filter(|n| !n.trim().is_empty());
+            let id = item.id.clone();
+            let existed = !lib.lock_store()?.existing_ids(std::slice::from_ref(&id))?.is_empty();
+            if existed {
+                if !a.tags.is_empty() {
+                    lib.lock_store()?.edit_tags(std::slice::from_ref(&id), &a.tags, &[])?;
+                }
+                if let Some(n) = item.note.as_deref() {
+                    lib.lock_store()?.set_note(&id, Some(n))?;
+                }
+            } else {
+                lib.save_into(std::slice::from_mut(&mut item), &a.tags, None)?;
+                lib.lock_store()?.mark_stubs(std::slice::from_ref(&id))?;
+            }
+            S::ok(json!({"id": id, "new": !existed}))
+        }
         "posterless" => {
             let rows = lib.lock_store()?.posterless(req.parse::<Limit>()?.limit.clamp(1, 200))?;
             S::ok(rows.into_iter().map(|(id, file)| json!({"id": id, "video_file": file, "path": lib.media.path(&file)})).collect::<Vec<_>>())

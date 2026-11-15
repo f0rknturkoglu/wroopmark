@@ -192,4 +192,51 @@ impl Store {
         self.conn.execute("UPDATE items SET stub = ?2, ocr = coalesce(?3, ocr) WHERE pk = ?1", params![pk, item.stub, item.ocr])?;
         reindex_item(&self.conn, pk)
     }
+
+    /// Notes files of remote items that are in the sync folder but not on
+    /// this device yet: (store name, item id, the URL key `known_file` uses).
+    pub fn add_media_waits(&mut self, rows: &[(String, String, String)]) -> Result<()> {
+        let tx = self.write()?;
+        {
+            let mut known = tx.prepare_cached("INSERT OR REPLACE INTO media_files(url, file) VALUES (?1, ?2)")?;
+            let mut wait = tx.prepare_cached("INSERT OR REPLACE INTO sync_media_wait(file, item) VALUES (?1, ?2)")?;
+            for (file, item, url) in rows {
+                known.execute([url, file])?;
+                wait.execute([file, item])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Keeps an item out of the media pass while its files come by iCloud.
+    pub fn hold_media(&mut self, id: &str) -> Result<()> {
+        self.conn.execute("UPDATE items SET media_pending = 0 WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    /// (store name, item id) of every file still waiting.
+    pub fn media_waits(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare_cached("SELECT file, item FROM sync_media_wait ORDER BY item")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
+    }
+
+    /// Drops these waits; the items get a media pass, which finds the files
+    /// that came by their URL.
+    pub fn end_media_waits(&mut self, files: &[String], items: &[String]) -> Result<()> {
+        let tx = self.write()?;
+        {
+            let mut drop = tx.prepare_cached("DELETE FROM sync_media_wait WHERE file = ?1")?;
+            for f in files {
+                drop.execute([f])?;
+            }
+            let mut pending = tx.prepare_cached("UPDATE items SET media_pending = 1 WHERE id = ?1")?;
+            for id in items {
+                pending.execute([id])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
 }

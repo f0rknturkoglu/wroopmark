@@ -10,10 +10,18 @@ enum AppPaths {
                 .appendingPathComponent("Library/Application Support", isDirectory: true)
     }
 
+    /// iOS: the app and its share extension share one library.
+    static let appGroup = "group.com.f0rknturkoglu.wroopmark"
+
     static var defaultLibraryURL: URL {
         if let override = ProcessInfo.processInfo.environment["WROOPMARK_HOME"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
+        #if os(iOS)
+        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
+            return group.appendingPathComponent("wroopmark", isDirectory: true)
+        }
+        #endif
         return applicationSupportDirectory.appendingPathComponent("wroopmark", isDirectory: true)
     }
 }

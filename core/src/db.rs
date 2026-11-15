@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 14;
+const SCHEMA_VERSION: i64 = 15;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -282,6 +282,11 @@ CREATE TRIGGER IF NOT EXISTS sync_setting_upd AFTER UPDATE OF value ON settings
 BEGIN
   INSERT OR IGNORE INTO sync_dirty VALUES ('setting:' || NEW.key, 'setting');
 END;";
+
+/// v14 → v15: pictures another device put in the sync folder that iCloud
+/// has not downloaded here yet. Sync never waits for them; each round takes
+/// the ones that have arrived (`file` is the media store name).
+const MIGRATE_15: &str = "CREATE TABLE IF NOT EXISTS sync_media_wait(file TEXT PRIMARY KEY, item TEXT NOT NULL) WITHOUT ROWID;";
 
 /// Every sync trigger, for tests that rebuild an old schema.
 #[cfg(test)]
@@ -1057,7 +1062,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -1101,6 +1106,9 @@ impl Store {
         }
         if (1..14).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_14} PRAGMA user_version = 14; COMMIT;"))?;
+        }
+        if (1..15).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_15} PRAGMA user_version = 15; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -2280,7 +2288,9 @@ mod tests {
             for t in SYNC_TRIGGERS {
                 s.conn.execute_batch(&format!("DROP TRIGGER IF EXISTS {t}; DROP TABLE IF EXISTS {t};")).unwrap();
             }
-            s.conn.execute_batch("DROP TABLE IF EXISTS sync_dirty; DROP TABLE IF EXISTS sync_fields; DROP TABLE IF EXISTS sync_cursor;").unwrap();
+            s.conn
+                .execute_batch("DROP TABLE IF EXISTS sync_dirty; DROP TABLE IF EXISTS sync_fields; DROP TABLE IF EXISTS sync_cursor; DROP TABLE IF EXISTS sync_media_wait;")
+                .unwrap();
             s.conn
                 .execute_batch(
                     "ALTER TABLE items DROP COLUMN ocr; ALTER TABLE items DROP COLUMN reviewed_at;

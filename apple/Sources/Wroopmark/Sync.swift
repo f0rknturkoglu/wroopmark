@@ -74,6 +74,9 @@ extension AppModel {
     }
 
     private func afterSync(_ r: SyncReport) async {
+        // Pictures iCloud has not downloaded yet ("Optimize Mac Storage"):
+        // the next round takes them.
+        SyncReport.requestDownloads(r.fetch ?? [])
         if r.applied > 0 {
             await refreshLoaded()
             await refreshMeta(force: true)

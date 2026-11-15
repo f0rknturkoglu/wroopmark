@@ -14,6 +14,7 @@
 //! write wins (time, then device id), so concurrent edits of different
 //! things both survive.
 
+use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write as _};
 
@@ -34,6 +35,10 @@ pub struct SyncReport {
     pub media_in: usize,
     /// Another sync (app, CLI) was already running.
     pub busy: bool,
+    /// Pictures in the folder that iCloud has not downloaded here yet, and
+    /// (up to 200 of) their paths, for the app to ask iCloud for.
+    pub waiting: usize,
+    pub fetch: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,17 +69,84 @@ fn newer(ts: i64, dev: &str, have: Option<&(i64, String)>) -> bool {
     }
 }
 
+fn shared_media(base: &Path, name: &str) -> PathBuf {
+    base.join("media").join(name.get(..2).unwrap_or("00")).join(name)
+}
+
+/// Files the media pass would fetch for this item (see `media_flags_parts`).
+fn missing_files(item: &Item) -> usize {
+    let quote = item.quote.iter().flat_map(|q| q.media.iter());
+    item.media
+        .iter()
+        .chain(quote)
+        .map(|m| {
+            usize::from(m.file.is_none() && !m.local_source().is_empty()) + usize::from(m.video_file.is_none() && m.downloadable_video().is_some())
+        })
+        .sum()
+}
+
+/// Where a file of the shared folder is, as far as this device knows.
+enum Shared {
+    /// On disk, readable now.
+    Here,
+    /// In the folder but not downloaded: a dataless file, or the
+    /// `.name.icloud` placeholder iOS shows for one.
+    Remote,
+    Missing,
+}
+
+fn shared_state(path: &Path) -> Shared {
+    match fs::metadata(path) {
+        Ok(m) if m.is_file() => {
+            if is_dataless(&m) {
+                Shared::Remote
+            } else {
+                Shared::Here
+            }
+        }
+        _ => {
+            let placeholder = path.file_name().map(|n| path.with_file_name(format!(".{}.icloud", n.to_string_lossy())));
+            if placeholder.is_some_and(|p| p.exists()) { Shared::Remote } else { Shared::Missing }
+        }
+    }
+}
+
+/// A file whose contents are still in the cloud (APFS `SF_DATALESS`).
+/// `stat` does not download it; opening it does, and waits.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn is_dataless(m: &fs::Metadata) -> bool {
+    #[cfg(target_os = "ios")]
+    use std::os::ios::fs::MetadataExt;
+    #[cfg(target_os = "macos")]
+    use std::os::macos::fs::MetadataExt;
+    const SF_DATALESS: u32 = 0x4000_0000;
+    m.st_flags() & SF_DATALESS != 0
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+fn is_dataless(_: &fs::Metadata) -> bool {
+    false
+}
+
 impl Library {
     fn sync_base(&self) -> Result<Option<PathBuf>> {
         Ok(self.lock_store()?.setting("sync_dir")?.filter(|d| !d.is_empty()).map(PathBuf::from))
     }
 
-    /// This library's device id (made once, kept in the library).
+    /// This library's device id (made once, kept in the library). A copy of
+    /// the library in another place (a restored backup, a test copy) gets
+    /// its own id, so two libraries never write the same log.
     pub fn device_id(&self) -> Result<String> {
         let mut store = self.lock_store()?;
-        if let Some(id) = store.setting("device_id")? {
+        let here = self.root.display().to_string();
+        let moved = store.setting("device_root")?.is_some_and(|r| r != here);
+        if let Some(id) = store.setting("device_id")?.filter(|_| !moved) {
+            if store.setting("device_root")?.is_none() {
+                store.set_setting("device_root", &here)?;
+            }
             return Ok(id);
         }
+        store.set_setting("device_root", &here)?;
         let seed = format!("{}-{}-{}", self.root.display(), std::process::id(), chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default());
         let id = hash_hex(seed.as_bytes()).chars().take(16).collect::<String>();
         store.set_setting("device_id", &id)?;
@@ -134,6 +206,10 @@ impl Library {
         let mut report = SyncReport::default();
         self.push(&base, &dev, &mut report)?;
         self.pull(&base, &dev, &mut report)?;
+        let (came, remote) = self.collect_media(&base)?;
+        report.media_in += came;
+        report.waiting = remote.len();
+        report.fetch = remote.iter().take(200).map(|p| p.display().to_string()).collect();
         let name = self.lock_store()?.setting("device_name")?.unwrap_or_else(|| dev.clone());
         let info = json!({"id": dev, "name": name, "last_sync": crate::text::now(), "version": VERSION});
         let _ = fs::write(base.join("devices").join(format!("{dev}.json")), serde_json::to_vec_pretty(&info)?);
@@ -194,7 +270,7 @@ impl Library {
             }
             for name in files.into_iter().flatten() {
                 let src = self.media.path(name);
-                let dst = base.join("media").join(name.get(..2).unwrap_or("00")).join(name);
+                let dst = shared_media(base, name);
                 if src.is_file() && !dst.exists() {
                     if let Some(p) = dst.parent() {
                         let _ = fs::create_dir_all(p);
@@ -210,29 +286,93 @@ impl Library {
     }
 
     /// Brings a remote item's files into the media store from the shared
-    /// folder; files that are in neither stay empty and download as usual.
-    fn take_media_in(&self, base: &Path, media: &mut [Media]) -> usize {
-        let mut n = 0;
-        for m in media {
-            for slot in [&mut m.file, &mut m.video_file] {
+    /// folder, but only those already on this device: opening a file iCloud
+    /// has not downloaded yet blocks until it has, which on a phone with an
+    /// empty iCloud cache made one sync take hours. Those are noted and
+    /// taken by a later round (`collect_media`) once iCloud has them.
+    /// Returns how many files it copied and how many of the item's missing
+    /// files are waiting for iCloud rather than for the web.
+    fn take_media_in(&self, base: &Path, id: &str, media: &mut [Media]) -> Result<(usize, usize)> {
+        let (mut n, mut held) = (0, 0);
+        let mut waits = vec![];
+        for m in media.iter_mut() {
+            // The keys `remember_files` uses for each slot.
+            let keys = [m.local_source().to_string(), m.url.clone()];
+            // Whether a missing file in each slot sends the item to the web.
+            let counts = [true, m.downloadable_video().is_some()];
+            for ((slot, key), counts) in [&mut m.file, &mut m.video_file].into_iter().zip(keys).zip(counts) {
                 let Some(name) = slot.clone() else { continue };
                 if self.media.contains(&name) {
                     continue;
                 }
-                let src = base.join("media").join(name.get(..2).unwrap_or("00")).join(&name);
-                let dst = self.media.path(&name);
-                let copied = src.is_file()
-                    && dst.parent().is_some_and(|p| fs::create_dir_all(p).is_ok())
-                    && fs::copy(&src, dst.with_extension("part")).is_ok()
-                    && fs::rename(dst.with_extension("part"), &dst).is_ok();
-                if copied {
-                    n += 1;
-                } else {
-                    *slot = None;
+                let src = shared_media(base, &name);
+                match shared_state(&src) {
+                    Shared::Here if self.copy_in(&src, &name) => {
+                        n += 1;
+                        continue;
+                    }
+                    Shared::Remote if !key.is_empty() => {
+                        held += usize::from(counts);
+                        waits.push((name, id.to_string(), key));
+                    }
+                    _ => {}
                 }
+                *slot = None;
             }
         }
-        n
+        if !waits.is_empty() {
+            self.lock_store()?.add_media_waits(&waits)?;
+        }
+        Ok((n, held))
+    }
+
+    /// Takes the waiting files iCloud has downloaded since. Returns how many
+    /// came and the folder paths of those still on their way, so the app
+    /// can ask iCloud for them.
+    fn collect_media(&self, base: &Path) -> Result<(usize, Vec<PathBuf>)> {
+        let waits = self.lock_store()?.media_waits()?;
+        if waits.is_empty() {
+            return Ok((0, vec![]));
+        }
+        let ids: Vec<String> = waits.iter().map(|(_, i)| i.clone()).collect();
+        let alive = self.lock_store()?.existing_ids(&ids)?;
+        let (mut done, mut items, mut remote) = (vec![], vec![], vec![]);
+        let mut still: HashSet<String> = HashSet::new();
+        let mut came = 0;
+        for (file, item) in waits {
+            let src = shared_media(base, &file);
+            match shared_state(&src) {
+                _ if !alive.contains(&item) => {}
+                Shared::Remote => {
+                    remote.push(src);
+                    still.insert(item);
+                    continue;
+                }
+                Shared::Here if self.media.contains(&file) || self.copy_in(&src, &file) => {
+                    came += 1;
+                    items.push(item);
+                }
+                // Gone from the folder: the usual download from the web.
+                _ => items.push(item),
+            }
+            done.push(file);
+        }
+        // An item gets its media pass once all its files are here, so the
+        // ones still coming are not fetched from the site meanwhile.
+        items.retain(|i| !still.contains(i));
+        items.dedup();
+        self.lock_store()?.end_media_waits(&done, &items)?;
+        Ok((came, remote))
+    }
+
+    fn copy_in(&self, src: &Path, name: &str) -> bool {
+        let dst = self.media.path(name);
+        let part = dst.with_extension("part");
+        let ok = dst.parent().is_some_and(|p| fs::create_dir_all(p).is_ok()) && fs::copy(src, &part).is_ok() && fs::rename(&part, &dst).is_ok();
+        if !ok {
+            let _ = fs::remove_file(&part);
+        }
+        ok
     }
 
     fn pull(&self, base: &Path, dev: &str, report: &mut SyncReport) -> Result<()> {
@@ -324,13 +464,21 @@ impl Library {
             let deleted = self.lock_store()?.field_stamp(&id, "deleted")?;
             if newer(ts, dev, have.as_ref()) && newer(ts, dev, deleted.as_ref()) {
                 item.id = id.clone();
-                report.media_in += self.take_media_in(base, &mut item.media);
+                let (n, mut held) = self.take_media_in(base, &id, &mut item.media)?;
+                report.media_in += n;
                 if let Some(q) = item.quote.as_mut() {
-                    report.media_in += self.take_media_in(base, &mut q.media);
+                    let (n, h) = self.take_media_in(base, &id, &mut q.media)?;
+                    report.media_in += n;
+                    held += h;
                 }
                 let mut store = self.lock_store()?;
                 store.upsert_all(std::slice::from_mut(&mut item))?;
                 store.apply_remote_extras(&item)?;
+                // Everything missing is on its way through iCloud: no need
+                // to fetch the same pictures from the sites meanwhile.
+                if held > 0 && held == missing_files(&item) {
+                    store.hold_media(&id)?;
+                }
                 store.stamp(&id, "content", ts, dev)?;
                 changed = true;
             }
@@ -514,6 +662,61 @@ mod tests {
         for lib in [&a, &b] {
             assert_eq!(call(lib, json!({"cmd": "get", "id": one})).get("note"), Some(&json!("sonra B")));
         }
+        // A copy of A's library elsewhere is another device.
+        let a_id = a.device_id().unwrap_or_default();
+        a.shutdown();
+        b.shutdown();
+        drop(a);
+        let _ = fs::create_dir_all(root.join("a-copy"));
+        let _ = fs::copy(root.join("a/library.sqlite"), root.join("a-copy/library.sqlite"));
+        let copy = Library::open(&root.join("a-copy")).unwrap_or_else(|_| std::process::abort());
+        let copy_id = copy.device_id().unwrap_or_default();
+        assert!(!copy_id.is_empty() && copy_id != a_id);
+        copy.shutdown();
+        let _ = fs::remove_dir_all(&root);
+    }
+    /// A picture iCloud has not downloaded yet must not hold up the sync;
+    /// a later round takes it once it is there.
+    #[test]
+    fn remote_media_waits_for_the_media_pass() {
+        let root = std::env::temp_dir().join(format!("wm-sync-remote-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let shared = root.join("shared");
+        let a = Library::open(&root.join("a")).unwrap_or_else(|_| std::process::abort());
+        let b = Library::open(&root.join("b")).unwrap_or_else(|_| std::process::abort());
+        let pic = a.media.put(b"still in the cloud", "jpg").unwrap_or_default();
+        call(
+            &a,
+            json!({"cmd": "import_items", "items": [
+            {"platform": "web", "url": "https://example.com/r", "text": "uzakta", "media": [{"kind": "image", "url": "https://e.invalid/p.jpg", "file": pic}]}]}),
+        );
+        call(&a, json!({"cmd": "sync_enable", "dir": shared, "media": "images"}));
+
+        // What the iPhone shows for a file it has not downloaded.
+        let real = shared_media(&shared, &pic);
+        let placeholder = real.with_file_name(format!(".{pic}.icloud"));
+        assert!(fs::rename(&real, &placeholder).is_ok());
+        let r = call(&b, json!({"cmd": "sync_enable", "dir": shared}));
+        assert_eq!(r.get("applied"), Some(&json!(1)), "{r}");
+        assert_eq!(r.get("media_in"), Some(&json!(0)));
+        assert_eq!(r.get("waiting"), Some(&json!(1)));
+        assert_eq!(r.pointer("/fetch/0"), Some(&json!(real.display().to_string())));
+        b.wait_media();
+        let id = item_id_for_url("https://example.com/r").1;
+        let got = call(&b, json!({"cmd": "get", "id": id}));
+        assert!(got.pointer("/media/0/file").is_none_or(Value::is_null), "{got}");
+        // Not fetched from the site meanwhile: it is coming through iCloud.
+        assert!(b.lock_store().and_then(|s| Ok(s.pending_media(10)?)).is_ok_and(|p| p.is_empty()));
+
+        // iCloud delivers it; the next round takes it, and no longer waits.
+        assert!(fs::rename(&placeholder, &real).is_ok());
+        let r = call(&b, json!({"cmd": "sync_now"}));
+        assert_eq!(r.get("media_in"), Some(&json!(1)), "{r}");
+        assert_eq!(r.get("waiting"), Some(&json!(0)));
+        b.wait_media();
+        let got = call(&b, json!({"cmd": "get", "id": id}));
+        assert_eq!(got.pointer("/media/0/file"), Some(&json!(pic)), "{got}");
+        assert!(b.media.contains(&pic));
         a.shutdown();
         b.shutdown();
         let _ = fs::remove_dir_all(&root);

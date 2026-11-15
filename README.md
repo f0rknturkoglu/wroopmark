@@ -69,6 +69,35 @@ Chromium/Safari eklentisi; hepsi tek bir yerel kütüphaneyi kullanır.
 - Menü çubuğundan link kaydet; her uygulamada ⌃⌥⌘S panodaki linki kaydeder.
 - Eklentide ⌥⇧S, sağ tıkla klasöre kaydet; arşivdeki sayfalarda simgede ✓.
 
+## iPhone
+
+`apple/iOS/Wroopmark.xcodeproj`: arşivi telefonda aramak, okumak, etiketlemek, not
+almak ve telefondan kaydetmek için. Mac'le iCloud Drive senkronu üzerinden konuşur.
+
+**Telefona kurmak** (ücretsiz Apple hesabı yeter, bir kez):
+
+1. Rust'ın iOS hedefleri: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`
+2. `open apple/iOS/Wroopmark.xcodeproj`
+3. Xcode → Wroopmark hedefi → **Signing & Capabilities** → **Team**: kendi Apple
+   hesabın (yoksa Xcode → Settings → Accounts'tan ekle). Bundle id'yi başka biri
+   kullanıyorsa sonuna bir şey ekle (`…wroopmark.ios.furkan`).
+4. iPhone'u kabloyla bağla, üstte cihaz olarak seç, **Çalıştır** (⌘R). Rust çekirdeği
+   ilk seferde derlenir (birkaç dakika).
+5. iPhone: Ayarlar → Genel → VPN ve Cihaz Yönetimi → geliştirici uygulamasına güven;
+   ilk seferde Ayarlar → Gizlilik ve Güvenlik → **Geliştirici Modu**'nu aç.
+
+Ücretsiz hesapla kurulan uygulama 7 günde bir yeniden kurulmalı (Xcode'dan yine
+⌘R, verin silinmez); AltStore / SideStore bunu kendiliğinden yapar.
+
+**İlk açılış**: Mac'te Ayarlar → Senkron → iCloud Drive ile başlat; telefonda Ayarlar
+(dişli) → Klasörü seç → iCloud Drive → `wroopmark`. Kütüphane telefona iner; sonra
+her açılışta ve aşağı çekince eşitlenir.
+
+**Telefondan kaydetmek**: her uygulamada **Paylaş → wroopmark** (ilk seferde paylaşım
+listesinde "Diğer"den ekle). Bağlantı anında kaydedilir, istersen etiket ve not
+eklersin; metin ve görseller wroopmark açılınca gelir. Kısayollar'da da
+"wroopmark'a Kaydet" eylemi var.
+
 ## Kurulum (macOS 26+)
 
 ### Tek komut
@@ -93,9 +122,11 @@ Soru sormadan kurmak için `./install.sh --yes`.
 ### Hazır paket
 
 [Releases](https://github.com/f0rknturkoglu/wroopmark/releases) sayfasındaki
-`.dmg`'yi aç, wroopmark'ı Applications'a sürükle. Paket Apple'a kayıtlı bir
-sertifikayla imzalı olmadığı için ilk açılışta macOS engellerse:
-Sistem Ayarları → Gizlilik ve Güvenlik → **Yine de aç**, ya da bir kez:
+`.dmg`'yi aç, wroopmark'ı Applications'a sürükle. v0.6'dan itibaren paketler
+Developer ID ile imzalı ve Apple onaylı (notarized): uyarısız açılır.
+
+Daha eski bir paket ilk açılışta engellenirse: Sistem Ayarları → Gizlilik ve
+Güvenlik → **Yine de aç**, ya da bir kez:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/wroopmark.app
@@ -301,8 +332,12 @@ cd core && cargo fmt --check && cargo clippy --all-targets -- -D warnings && car
 apple/scripts/build-mac.sh --install
 ```
 
-Sürüm çıkarmak: `core/Cargo.toml`'daki sürümü artır, `git tag v0.2.0 && git push --tags`.
-GitHub Actions `.dmg` ve `.zip`'i derleyip release'e ekler.
+Sürüm çıkarmak: `core/Cargo.toml`'daki sürümü artır, commit'le, sonra
+`apple/scripts/release.sh`. Etiketi gönderir, imzalı + Apple onaylı `.dmg` / `.zip`
+üretip GitHub release'ine koyar. Bir kez gerekenler: "Developer ID Application"
+sertifikası ve `xcrun notarytool store-credentials wroopmark` ile kaydedilmiş onay
+profili. (GitHub Actions'taki `release` işi yalnızca elle çalıştırılan, imzasız bir
+derleme denetimi.)
 
 Mimari ve tasarım kararları: [ARCHITECTURE.md](ARCHITECTURE.md).
 
