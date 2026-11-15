@@ -67,6 +67,38 @@ extension PhoneModel {
         if let s: SyncStatus = try? await core.call(.call("sync_status", [:])) { syncStatus = s }
     }
 
+    // MARK: Videos on demand
+
+    private struct Offload: Decodable, Sendable {
+        let files: Int
+        let bytes: Int64
+    }
+
+    func setVideosOnDemand(_ on: Bool) async {
+        guard await perform(.call("videos_on_demand", ["on": .bool(on)])) else { return }
+        await loadSyncStatus()
+        await syncNow()
+        await loadOffloadable()
+    }
+
+    func loadOffloadable() async {
+        guard syncStatus?.videosOnDemand == true,
+              let o: Offload = try? await core.call(.call("offload_videos", ["dry_run": .bool(true)]))
+        else {
+            offloadable = nil
+            return
+        }
+        offloadable = (o.files, o.bytes)
+    }
+
+    func offloadVideos() async {
+        guard let o: Offload = try? await core.call(.call("offload_videos", [:])) else { return }
+        syncMessage = "\(o.files) video telefondan kaldırıldı, \(ByteCountFormatter.string(fromByteCount: o.bytes, countStyle: .file)) boşaldı. İzlediğinde iCloud'dan yeniden iner."
+        await loadOffloadable()
+        await refreshMeta()
+        await checkSpace(force: true)
+    }
+
     /// One round: send ours, take theirs. Quiet unless something came.
     func syncNow() async {
         guard let folder = syncFolder, !isSyncing else { return }

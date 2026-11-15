@@ -5,6 +5,7 @@ struct PhoneSettingsView: View {
     @Environment(PhoneModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var picking = false
+    @State private var confirmOffload = false
 
     var body: some View {
         NavigationStack {
@@ -21,7 +22,7 @@ struct PhoneSettingsView: View {
                                         Text(Date(timeIntervalSince1970: TimeInterval(t)).formatted(.relative(presentation: .named)))
                                     }
                                 } label: {
-                                    Label(d.name ?? d.id, systemImage: d.id == s.device ? "iphone" : "laptopcomputer")
+                                    Label(d.name ?? d.id, systemImage: d.symbol)
                                 }
                             }
                         }
@@ -45,6 +46,30 @@ struct PhoneSettingsView: View {
                     Text(model.syncFolder == nil
                          ? "Mac'te wroopmark → Ayarlar → Senkron → “iCloud Drive ile başlat” de, sonra burada iCloud Drive içindeki “wroopmark” klasörünü seç. Kayıtlar, etiketler, klasörler ve notlar iki yönlü eşitlenir."
                          : "Uygulamayı her açışında ve aşağı çekince eşitlenir.")
+                }
+
+                if model.syncFolder != nil {
+                    Section {
+                        Toggle("Videoları açınca indir", isOn: Binding(
+                            get: { model.syncStatus?.videosOnDemand == true },
+                            set: { on in Task { await model.setVideosOnDemand(on) } }
+                        ))
+                        if let o = model.offloadable, o.files > 0 {
+                            Button("Telefondaki \(o.files) videoyu kaldır (\(ByteCountFormatter.string(fromByteCount: o.bytes, countStyle: .file)))", role: .destructive) {
+                                confirmOffload = true
+                            }
+                        }
+                    } header: {
+                        Text("Videolar")
+                    } footer: {
+                        Text("Açıkken Mac'ten gelen videolar telefona kopyalanmaz: izlediğinde iCloud'dan iner, iOS yer gerektiğinde onları kendisi siler. Kapatırsan hepsi yeniden telefona iner.")
+                    }
+                    .task { await model.loadOffloadable() }
+                    .confirmationDialog("Videolar telefondan kaldırılsın mı?", isPresented: $confirmOffload, titleVisibility: .visible) {
+                        Button("Kaldır", role: .destructive) { Task { await model.offloadVideos() } }
+                    } message: {
+                        Text("Yalnızca iCloud'da da olan videolar kaldırılır; kayıtlar ve kapaklar kalır. İzlediğinde iCloud'dan yeniden iner.")
+                    }
                 }
 
                 if let s = model.stats {

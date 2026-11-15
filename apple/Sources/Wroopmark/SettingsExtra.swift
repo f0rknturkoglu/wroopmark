@@ -328,7 +328,7 @@ struct SyncSettings: View {
                                     .foregroundStyle(.secondary)
                             }
                         } label: {
-                            Label(d.name ?? d.id, systemImage: d.id == s?.device ? "laptopcomputer" : "iphone")
+                            Label(d.name ?? d.id, systemImage: d.symbol)
                         }
                     }
                 }

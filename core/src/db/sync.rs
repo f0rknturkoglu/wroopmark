@@ -212,6 +212,12 @@ impl Store {
         Ok(())
     }
 
+    /// Reads the other devices' logs from the start at the next sync.
+    pub fn reset_cursors(&mut self) -> Result<()> {
+        self.conn.execute("DELETE FROM sync_cursor", [])?;
+        Ok(())
+    }
+
     /// Items that have pictures or videos.
     pub fn media_item_ids(&self) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare_cached("SELECT id FROM items WHERE has_image = 1 OR has_video = 1 ORDER BY saved_at DESC")?;

@@ -58,7 +58,9 @@ final class PhoneModel {
 
     // Sync (PhoneSync.swift)
     var syncStatus: SyncStatus?
-    var syncFolder: URL?
+    var syncFolder: URL? { didSet { PhoneMedia.syncFolder = syncFolder } }
+    /// Videos copied to the phone that the sync folder also has.
+    var offloadable: (files: Int, bytes: Int64)?
     var isSyncing = false
     var syncMessage: String?
     var lastSyncAt: Date?

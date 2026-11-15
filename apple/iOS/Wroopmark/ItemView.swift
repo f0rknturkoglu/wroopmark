@@ -266,6 +266,7 @@ struct MediaViewerView: View {
     @Environment(\.dismiss) private var dismiss
     let media: Media
     @State private var player: AVPlayer?
+    @State private var failed = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -273,9 +274,19 @@ struct MediaViewerView: View {
             if media.isVideo, let v = media.videoFile {
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
-                    .onAppear {
-                        player = AVPlayer(url: Core.shared.mediaURL(v))
-                        player?.play()
+                    .overlay {
+                        if player == nil {
+                            Label(failed ? "Video şu an indirilemiyor" : "iCloud'dan iniyor…", systemImage: failed ? "icloud.slash" : "icloud.and.arrow.down")
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .task {
+                        if let url = await PhoneMedia.playable(v) {
+                            player = AVPlayer(url: url)
+                            player?.play()
+                        } else {
+                            failed = true
+                        }
                     }
                     .onDisappear { player?.pause() }
             } else if let f = media.file {

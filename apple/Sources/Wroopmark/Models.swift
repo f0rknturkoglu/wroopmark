@@ -606,6 +606,14 @@ struct SyncStatus: Decodable, Equatable, Sendable {
         let name: String?
         let lastSync: Int64?
         let version: String?
+
+        /// A device's kind from its name (the name each device gives itself).
+        var symbol: String {
+            let n = (name ?? "").lowercased()
+            if n.contains("ipad") { return "ipad" }
+            if n.contains("iphone") { return "iphone" }
+            return "laptopcomputer"
+        }
     }
     let enabled: Bool
     let dir: String?
@@ -614,6 +622,8 @@ struct SyncStatus: Decodable, Equatable, Sendable {
     let media: String
     let pending: Int
     let devices: [Device]
+    /// iPhone: videos stay in the sync folder until watched.
+    var videosOnDemand: Bool? = nil
 }
 
 struct SyncReport: Decodable, Equatable, Sendable {

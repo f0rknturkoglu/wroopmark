@@ -40,6 +40,9 @@ final class FeedPlayer {
     var progress: Double = 0
     var duration: Double = 0
     var paused = false
+    /// The video is coming down from iCloud, or could not be had.
+    var loading = false
+    var unavailable = false
     var muted = UserDefaults.standard.bool(forKey: "feedMuted") {
         didSet {
             player.isMuted = muted
@@ -64,12 +67,28 @@ final class FeedPlayer {
         guard file != current else { return }
         current = file
         looper?.disableLooping()
+        looper = nil
         player.removeAllItems()
         progress = 0
         duration = 0
-        let item = AVPlayerItem(url: Core.shared.mediaURL(file))
-        looper = AVPlayerLooper(player: player, templateItem: item)
         paused = false
+        unavailable = false
+        if let url = PhoneMedia.local(file) {
+            start(url)
+            return
+        }
+        // A video kept on demand: iCloud brings it first.
+        loading = true
+        Task {
+            let url = await PhoneMedia.playable(file)
+            guard current == file else { return }
+            loading = false
+            if let url { start(url) } else { unavailable = true }
+        }
+    }
+
+    private func start(_ url: URL) {
+        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
         player.rate = 1
         player.play()
     }
@@ -98,6 +117,8 @@ final class FeedPlayer {
         player.pause()
         player.removeAllItems()
         current = nil
+        loading = false
+        unavailable = false
     }
 }
 
@@ -486,6 +507,19 @@ private struct VideoLayer: View {
                 Image(systemName: "play.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(.white.opacity(0.8))
+                    .allowsHitTesting(false)
+            }
+            if active && player.loading {
+                Label("iCloud'dan iniyor…", systemImage: "icloud.and.arrow.down")
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .background(.ultraThinMaterial, in: .capsule)
+                    .allowsHitTesting(false)
+            } else if active && player.unavailable {
+                Label("Video şu an indirilemiyor", systemImage: "icloud.slash")
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .background(.ultraThinMaterial, in: .capsule)
                     .allowsHitTesting(false)
             }
         }

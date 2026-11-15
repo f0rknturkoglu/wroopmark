@@ -69,6 +69,11 @@ fn newer(ts: i64, dev: &str, have: Option<&(i64, String)>) -> bool {
     }
 }
 
+fn is_video_file(name: &str) -> bool {
+    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    matches!(ext.as_str(), "mp4" | "mov" | "m4v" | "webm")
+}
+
 fn shared_media(base: &Path, name: &str) -> PathBuf {
     base.join("media").join(name.get(..2).unwrap_or("00")).join(name)
 }
@@ -350,15 +355,18 @@ impl Library {
         let (mut n, mut held) = (0, 0);
         // Low on space (the iPhone app pauses media): note, do not copy.
         let paused = self.media_paused();
+        let on_demand = self.videos_on_demand();
         let mut waits = vec![];
         for m in media.iter_mut() {
             // The keys `remember_files` uses for each slot.
             let keys = [m.local_source().to_string(), m.url.clone()];
             // Whether a missing file in each slot sends the item to the web.
             let counts = [true, m.downloadable_video().is_some()];
-            for ((slot, key), counts) in [&mut m.file, &mut m.video_file].into_iter().zip(keys).zip(counts) {
+            for (i, ((slot, key), counts)) in [&mut m.file, &mut m.video_file].into_iter().zip(keys).zip(counts).enumerate() {
                 let Some(name) = slot.clone() else { continue };
-                if self.media.contains(&name) {
+                // Videos on demand: keep the name only; the app plays the
+                // file from the shared folder when it is opened.
+                if self.media.contains(&name) || (i == 1 && on_demand) {
                     continue;
                 }
                 let src = shared_media(base, &name);
@@ -450,6 +458,7 @@ impl Library {
         let now = crate::text::now();
         let ids: Vec<String> = waits.iter().map(|(_, i, _)| i.clone()).collect();
         let alive = self.lock_store()?.existing_ids(&ids)?;
+        let on_demand = self.videos_on_demand();
         let (mut done, mut items, mut remote) = (vec![], vec![], vec![]);
         let mut still: HashSet<String> = HashSet::new();
         let mut came = 0;
@@ -457,6 +466,9 @@ impl Library {
             let src = shared_media(base, &file);
             match shared_state(&src) {
                 _ if !alive.contains(&item) => {}
+                // Videos on demand are not copied (the logs, read again when
+                // the setting changed, give the item its video's name).
+                _ if on_demand && is_video_file(&file) => {}
                 Shared::Remote => {
                     remote.push(src);
                     still.insert(item);
@@ -480,6 +492,67 @@ impl Library {
         items.dedup();
         self.lock_store()?.end_media_waits(&done, &items)?;
         Ok((came, remote))
+    }
+
+    fn videos_on_demand(&self) -> bool {
+        self.lock_store().ok().and_then(|s| s.setting("videos_on_demand").ok().flatten()).is_some_and(|v| v == "1")
+    }
+
+    /// Videos on demand (the iPhone, to save space) or copied like the
+    /// pictures. Turning it on reads the logs again so every video gets its
+    /// name without the file; turning it off waits for the missing files.
+    pub fn set_videos_on_demand(&self, on: bool) -> Result<()> {
+        {
+            let mut store = self.lock_store()?;
+            store.set_setting("videos_on_demand", if on { "1" } else { "0" })?;
+            if on {
+                store.reset_cursors()?;
+                return Ok(());
+            }
+        }
+        let mut waits = vec![];
+        for (id, m) in self.videos()? {
+            if let Some(v) = m.video_file.filter(|v| !self.media.contains(v)) {
+                waits.push((v, id, m.url));
+            }
+        }
+        self.lock_store()?.add_media_waits(&waits)?;
+        Ok(())
+    }
+
+    /// Every video slot with a file name, with its item.
+    fn videos(&self) -> Result<Vec<(String, Media)>> {
+        let ids = self.lock_store()?.media_item_ids()?;
+        let mut out = vec![];
+        for id in ids {
+            let Some(item) = self.lock_store()?.get(&id)? else { continue };
+            let quote = item.quote.iter().flat_map(|q| q.media.iter());
+            for m in item.media.iter().chain(quote).filter(|m| m.video_file.is_some()) {
+                out.push((id.clone(), m.clone()));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Removes this device's copies of the videos the shared folder also
+    /// has (they play from there again). With `dry_run`, only counts.
+    /// Returns (files, bytes).
+    pub fn offload_videos(&self, dry_run: bool) -> Result<(usize, u64)> {
+        let Some(base) = self.sync_base()? else { return Ok((0, 0)) };
+        let (mut files, mut bytes) = (0, 0u64);
+        let mut seen = HashSet::new();
+        for (_, m) in self.videos()? {
+            let Some(v) = m.video_file else { continue };
+            if !seen.insert(v.clone()) || !self.media.contains(&v) || matches!(shared_state(&shared_media(&base, &v)), Shared::Missing) {
+                continue;
+            }
+            let size = self.media.file_size(&v).and_then(|n| u64::try_from(n).ok()).unwrap_or(0);
+            if dry_run || fs::remove_file(self.media.path(&v)).is_ok() {
+                files += 1;
+                bytes += size;
+            }
+        }
+        Ok((files, bytes))
     }
 
     fn copy_in(&self, src: &Path, name: &str) -> bool {
@@ -674,6 +747,7 @@ impl Library {
             "name": store.setting("device_name")?,
             "media": store.setting("sync_media")?.unwrap_or_else(|| "images".into()),
             "pending": store.dirty_count()?,
+            "videos_on_demand": store.setting("videos_on_demand")?.as_deref() == Some("1"),
             "devices": devices,
         }))
     }
@@ -691,6 +765,21 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
         "sync_disable" => lib.sync_disable().and_then(|()| S::ok(true)),
         "sync_now" => lib.sync_now().and_then(S::ok),
         "sync_status" => lib.sync_status().and_then(S::ok),
+        "videos_on_demand" => {
+            #[derive(Deserialize)]
+            struct On {
+                on: bool,
+            }
+            req.parse::<On>().and_then(|o| lib.set_videos_on_demand(o.on)).and_then(|()| S::ok(true))
+        }
+        "offload_videos" => {
+            #[derive(Deserialize)]
+            struct Dry {
+                #[serde(default)]
+                dry_run: bool,
+            }
+            req.parse::<Dry>().and_then(|d| lib.offload_videos(d.dry_run)).and_then(|(files, bytes)| S::ok(json!({"files": files, "bytes": bytes})))
+        }
         "sync_set_media" => {
             #[derive(Deserialize)]
             struct M {
@@ -923,6 +1012,57 @@ mod tests {
         assert_eq!(call(&b, json!({"cmd": "get", "id": id})).pointer("/media/0/file"), Some(&json!(pic)));
         a.shutdown();
         b.shutdown();
+        let _ = fs::remove_dir_all(&root);
+    }
+    /// Videos on demand: the phone keeps the name, not the file; offloading
+    /// removes the copies the folder also has; turning it off brings them.
+    #[test]
+    fn videos_on_demand_and_offload() {
+        let root = std::env::temp_dir().join(format!("wm-sync-ondemand-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let shared = root.join("shared");
+        let a = Library::open(&root.join("a")).unwrap_or_else(|_| std::process::abort());
+        let b = Library::open(&root.join("b")).unwrap_or_else(|_| std::process::abort());
+        let poster = a.media.put(b"poster", "jpg").unwrap_or_default();
+        let video = a.media.put(b"a video file", "mp4").unwrap_or_default();
+        call(
+            &a,
+            json!({"cmd": "import_items", "items": [
+            {"platform": "web", "url": "https://example.com/od", "text": "video", "media": [
+                {"kind": "video", "url": "https://e.invalid/od.mp4", "thumb_url": "https://e.invalid/od.jpg", "file": poster, "video_file": video}]}]}),
+        );
+        call(&a, json!({"cmd": "sync_enable", "dir": shared, "media": "all"}));
+        call(&b, json!({"cmd": "sync_enable", "dir": shared}));
+        assert!(b.media.contains(&video));
+        let id = item_id_for_url("https://example.com/od").1;
+
+        // Offload: the copy goes, the name stays, the next sync does not copy it back.
+        call(&b, json!({"cmd": "videos_on_demand", "on": true}));
+        let dry = call(&b, json!({"cmd": "offload_videos", "dry_run": true}));
+        assert_eq!(dry.get("files"), Some(&json!(1)), "{dry}");
+        assert!(b.media.contains(&video));
+        call(&b, json!({"cmd": "offload_videos"}));
+        assert!(!b.media.contains(&video));
+        call(&b, json!({"cmd": "sync_now"}));
+        assert!(!b.media.contains(&video));
+        assert_eq!(call(&b, json!({"cmd": "get", "id": id})).pointer("/media/0/video_file"), Some(&json!(video)));
+        assert!(b.media.contains(&poster));
+
+        // A new device with the setting on gets the name and no file.
+        let c = Library::open(&root.join("c")).unwrap_or_else(|_| std::process::abort());
+        call(&c, json!({"cmd": "videos_on_demand", "on": true}));
+        call(&c, json!({"cmd": "sync_enable", "dir": shared}));
+        assert_eq!(call(&c, json!({"cmd": "get", "id": id})).pointer("/media/0/video_file"), Some(&json!(video)));
+        assert!(!c.media.contains(&video));
+
+        // Off again: the video comes back.
+        call(&b, json!({"cmd": "videos_on_demand", "on": false}));
+        let r = call(&b, json!({"cmd": "sync_now"}));
+        assert_eq!(r.get("media_in"), Some(&json!(1)), "{r}");
+        assert!(b.media.contains(&video));
+        for lib in [&a, &b, &c] {
+            lib.shutdown();
+        }
         let _ = fs::remove_dir_all(&root);
     }
 }
