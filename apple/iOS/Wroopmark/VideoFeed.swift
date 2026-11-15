@@ -28,6 +28,42 @@ enum FeedMode: String {
     case videos, all
 }
 
+/// What the feed remembers on this phone: where each video was left and
+/// which ones were watched (90% seen). Not synced; kept small.
+@MainActor
+enum FeedMemory {
+    private static let positionsKey = "feedPositions"
+    private static let watchedKey = "feedWatched"
+    private static var positions: [String: Double] = UserDefaults.standard.dictionary(forKey: positionsKey) as? [String: Double] ?? [:]
+    private(set) static var watched: Set<String> = Set(UserDefaults.standard.stringArray(forKey: watchedKey) ?? [])
+
+    static func position(_ file: String) -> Double? { positions[file] }
+
+    static func remember(_ file: String, at seconds: Double, of duration: Double) {
+        // Only a video left in the middle is worth coming back to.
+        if seconds > 3 && duration > 0 && seconds < duration - 3 {
+            positions[file] = seconds
+        } else {
+            positions[file] = nil
+        }
+        if positions.count > 400 { positions.removeValue(forKey: positions.keys.first ?? "") }
+        UserDefaults.standard.set(positions, forKey: positionsKey)
+    }
+
+    static func markWatched(_ file: String) {
+        guard watched.insert(file).inserted else { return }
+        var list = UserDefaults.standard.stringArray(forKey: watchedKey) ?? []
+        list.append(file)
+        if list.count > 5000 { list.removeFirst(list.count - 5000) }
+        UserDefaults.standard.set(list, forKey: watchedKey)
+    }
+
+    static func forgetWatched() {
+        watched = []
+        UserDefaults.standard.removeObject(forKey: watchedKey)
+    }
+}
+
 /// The single player of the feed. It loops the current video and reports
 /// its progress for the bar at the bottom.
 @MainActor
@@ -59,12 +95,14 @@ final class FeedPlayer {
                 let d = item.duration.seconds
                 self.duration = d.isFinite ? d : 0
                 self.progress = self.duration > 0 ? t.seconds / self.duration : 0
+                if self.progress >= 0.9, let f = self.current { FeedMemory.markWatched(f) }
             }
         }
     }
 
     func play(_ file: String) {
         guard file != current else { return }
+        rememberPosition()
         current = file
         looper?.disableLooping()
         looper = nil
@@ -89,8 +127,29 @@ final class FeedPlayer {
 
     private func start(_ url: URL) {
         looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+        // Back where it was left.
+        if let f = current, let at = FeedMemory.position(f) {
+            player.seek(to: CMTime(seconds: at, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        }
         player.rate = 1
         player.play()
+    }
+
+    private func rememberPosition() {
+        guard let f = current, duration > 0 else { return }
+        FeedMemory.remember(f, at: player.currentTime().seconds, of: duration)
+    }
+
+    /// Readies the next videos: iCloud starts bringing those kept on
+    /// demand, local ones get their file opened ahead.
+    static func prepare(_ files: [String]) {
+        for f in files {
+            if let url = PhoneMedia.local(f) {
+                Task.detached(priority: .utility) { _ = try? await AVURLAsset(url: url).load(.isPlayable) }
+            } else {
+                PhoneMedia.prefetch(f)
+            }
+        }
     }
 
     func togglePause() {
@@ -112,6 +171,7 @@ final class FeedPlayer {
     }
 
     func stop() {
+        rememberPosition()
         looper?.disableLooping()
         looper = nil
         player.pause()
@@ -135,10 +195,13 @@ final class FeedSource {
     private let shuffled: Bool
     private let pageSize = 80
 
-    init(filter: String, mode: FeedMode, shuffled: Bool) {
+    private let hideWatched: Bool
+
+    init(filter: String, mode: FeedMode, shuffled: Bool, hideWatched: Bool = false) {
         self.filter = filter
         self.mode = mode
         self.shuffled = shuffled
+        self.hideWatched = hideWatched
     }
 
     /// Reads results until at least `want` more pages came or the library
@@ -167,6 +230,10 @@ final class FeedSource {
                 }
             }
         }
+        if hideWatched {
+            let watched = FeedMemory.watched
+            got.removeAll { e in e.video?.videoFile.map(watched.contains) ?? false }
+        }
         if shuffled { got.shuffle() }
         let known = Set(entries.map(\.id))
         entries += got.filter { !known.contains($0.id) }
@@ -191,6 +258,7 @@ struct VideoFeedView: View {
     @State private var source: FeedSource?
     @State private var current: String?
     @State private var shuffled = false
+    @State private var hideWatched = UserDefaults.standard.bool(forKey: "feedHideWatched")
     @State private var player = FeedPlayer()
     @State private var details: Item?
     @State private var deleting: Item?
@@ -232,15 +300,17 @@ struct VideoFeedView: View {
         } message: { _ in
             Text("Senkron açıksa diğer cihazlardan da silinir.")
         }
-        .task(id: "\(filter)|\(mode.rawValue)|\(shuffled)") { await open() }
+        .task(id: "\(filter)|\(mode.rawValue)|\(shuffled)|\(hideWatched)") { await open() }
         .onChange(of: current) { _, id in
             guard let source, let id, let entry = source.entries.first(where: { $0.id == id }) else { return }
             if let v = entry.video?.videoFile { player.play(v) } else { player.stop() }
             if !shuffled { UserDefaults.standard.set(id, forKey: resumeKey) }
-            if let i = source.entries.firstIndex(of: entry), i >= source.entries.count - 3 {
-                Task { await source.load() }
+            if let i = source.entries.firstIndex(of: entry) {
+                FeedPlayer.prepare(source.entries.dropFirst(i + 1).prefix(2).compactMap { $0.video?.videoFile })
+                if i >= source.entries.count - 3 { Task { await source.load() } }
             }
         }
+        .onChange(of: hideWatched) { _, h in UserDefaults.standard.set(h, forKey: "feedHideWatched") }
         .onChange(of: mode) { _, m in UserDefaults.standard.set(m.rawValue, forKey: "feedMode") }
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
@@ -273,7 +343,7 @@ struct VideoFeedView: View {
 
     private func open() async {
         player.stop()
-        let s = FeedSource(filter: filter, mode: mode, shuffled: shuffled)
+        let s = FeedSource(filter: filter, mode: mode, shuffled: shuffled, hideWatched: hideWatched)
         source = s
         current = nil
         let resume = shuffled ? nil : UserDefaults.standard.string(forKey: resumeKey)
@@ -330,6 +400,7 @@ struct VideoFeedView: View {
                         Label("Videolar", systemImage: "play.rectangle").tag(FeedMode.videos)
                         Label("Tüm gönderiler", systemImage: "text.below.photo").tag(FeedMode.all)
                     }
+                    Toggle(isOn: $hideWatched) { Label("İzlenenleri gizle", systemImage: "eye.slash") }
                     Divider()
                     Button { scope = .all } label: { Label("Tüm kütüphane", systemImage: "tray.full") }
                     if !model.folders.isEmpty {
@@ -410,6 +481,9 @@ private struct FeedPage: View {
                             Text(a).font(.headline).lineLimit(1)
                         }
                         Text(item.saved.formatted(.relative(presentation: .named))).font(.caption).opacity(0.7)
+                        if let v = entry.video?.videoFile, FeedMemory.watched.contains(v) {
+                            Label("İzlendi", systemImage: "checkmark.circle.fill").font(.caption2).labelStyle(.titleAndIcon).opacity(0.75)
+                        }
                     }
                     if !textOnly {
                         let text = item.headline
