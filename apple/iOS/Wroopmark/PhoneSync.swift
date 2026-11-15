@@ -130,6 +130,7 @@ extension PhoneModel {
             await reload()
             await refreshMeta()
             Spotlight.indexRecent()
+            WidgetSnapshot.refresh()
         }
         takeICloudMedia(r)
     }

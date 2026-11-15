@@ -116,6 +116,7 @@ final class PhoneModel {
         await refreshMeta()
         await startSync()
         Spotlight.reindex()
+        WidgetSnapshot.refresh()
         await checkClipboard()
         #if DEBUG
         if let id = ProcessInfo.processInfo.environment["WROOPMARK_OPEN_ITEM"], !id.isEmpty { openRequest = id }

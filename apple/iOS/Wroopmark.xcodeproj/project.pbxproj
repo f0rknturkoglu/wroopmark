@@ -13,6 +13,7 @@
 		A10000000000000000000101 /* Core.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000201 /* Core.swift */; };
 		A10000000000000000000102 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000202 /* Models.swift */; };
 		A10000000000000000000103 /* Spotlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* Spotlight.swift */; };
+		A30000000000000000000103 /* WroopmarkWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000301 /* WroopmarkWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,11 +22,13 @@
 		A10000000000000000000202 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = ../Sources/Wroopmark/Models.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000203 /* Spotlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Spotlight.swift; path = ../Sources/Wroopmark/Spotlight.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000301 /* wroopmark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = wroopmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30000000000000000000301 /* WroopmarkWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WroopmarkWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A20000000000000000000401 /* ShareExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ShareExtension; sourceTree = "<group>"; };
 		A10000000000000000000401 /* Wroopmark */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Wroopmark; sourceTree = "<group>"; };
+		A30000000000000000000401 /* Widget */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Widget; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,6 +38,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = A20000000000000000000701;
 			remoteInfo = ShareExtension;
+		};
+		A30000000000000000000901 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A30000000000000000000701;
+			remoteInfo = WroopmarkWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -46,6 +56,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				A20000000000000000000103 /* ShareExtension.appex in Embed Foundation Extensions */,
+				A30000000000000000000103 /* WroopmarkWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -67,6 +78,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A30000000000000000000501 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -75,6 +93,7 @@
 			children = (
 				A10000000000000000000401 /* Wroopmark */,
 				A20000000000000000000401 /* ShareExtension */,
+				A30000000000000000000401 /* Widget */,
 				A10000000000000000000602 /* Shared */,
 				A10000000000000000000603 /* Products */,
 			);
@@ -95,6 +114,7 @@
 			children = (
 				A10000000000000000000301 /* wroopmark.app */,
 				A20000000000000000000301 /* ShareExtension.appex */,
+				A30000000000000000000301 /* WroopmarkWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -116,6 +136,7 @@
 			);
 			dependencies = (
 				A20000000000000000000902 /* PBXTargetDependency */,
+				A30000000000000000000902 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000401 /* Wroopmark */,
@@ -146,6 +167,26 @@
 			productReference = A20000000000000000000301 /* ShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A30000000000000000000701 /* WroopmarkWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A30000000000000000000903 /* Build configuration list for PBXNativeTarget "WroopmarkWidget" */;
+			buildPhases = (
+				A30000000000000000000802 /* Sources */,
+				A30000000000000000000501 /* Frameworks */,
+				A30000000000000000000803 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A30000000000000000000401 /* Widget */,
+			);
+			name = WroopmarkWidget;
+			productName = WroopmarkWidget;
+			productReference = A30000000000000000000301 /* WroopmarkWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -160,6 +201,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					A20000000000000000000701 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					A30000000000000000000701 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -180,6 +224,7 @@
 			targets = (
 				A10000000000000000000701 /* Wroopmark */,
 				A20000000000000000000701 /* ShareExtension */,
+				A30000000000000000000701 /* WroopmarkWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -193,6 +238,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A20000000000000000000803 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A30000000000000000000803 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -256,6 +308,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A30000000000000000000802 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -263,6 +322,11 @@
 			isa = PBXTargetDependency;
 			target = A20000000000000000000701 /* ShareExtension */;
 			targetProxy = A20000000000000000000901 /* PBXContainerItemProxy */;
+		};
+		A30000000000000000000902 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A30000000000000000000701 /* WroopmarkWidget */;
+			targetProxy = A30000000000000000000901 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -449,6 +513,54 @@
 			};
 			name = Release;
 		};
+		A30000000000000000001003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 86B8N4LV5Z;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Widget-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = wroopmark;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 0.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.f0rknturkoglu.wroopmark.ios.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A30000000000000000001004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 86B8N4LV5Z;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Widget-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = wroopmark;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 0.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.f0rknturkoglu.wroopmark.ios.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -475,6 +587,15 @@
 			buildConfigurations = (
 				A20000000000000000001003 /* Debug */,
 				A20000000000000000001004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A30000000000000000000903 /* Build configuration list for PBXNativeTarget "WroopmarkWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A30000000000000000001003 /* Debug */,
+				A30000000000000000001004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
