@@ -39,6 +39,11 @@ OKU VE BUL
 • Metinde, notlarında ve etiketlerinde ara. Etikete, klasöre ya da kaynağa göre süz; aramada tag:, from:@kişi, after:2025 gibi süzgeçler de çalışır.
 • Klasörler (alt klasörlerle) ve iç içe etiketlerle (okuma/teknoloji) düzenle.
 
+KAYDIR VE AYIKLA
+• Videolarını ve gönderilerini tam ekran, art arda kaydırarak izle; klasör seç, karıştır, kaldığın yerden devam et.
+• Ayıkla: kayıtlar tek tek gelir, sola at sil, sağa at sakla ya da önerilen klasöre taşı.
+• Ana ekran widget'ı her saat arşivinden bir kaydı gösterir.
+
 MAC İLE BİRLİKTE (İSTEĞE BAĞLI)
 • Mac'te de wroopmark kullanıyorsan arşivin iCloud Drive üzerinden iki yönlü eşitlenir: kayıtlar, etiketler, klasörler, notlar.
 • Telefon tek başına da çalışır; Mac şart değildir.
@@ -100,6 +105,8 @@ Demo hesabı: gerekmiyor (giriş yok).
 ## Ekran görüntüleri
 
 - iPhone 6.9" (1320 × 2868): en az 3, en çok 10.
+- iPad 13" (2064 × 2752): uygulama iPad'de de çalıştığı için gerekli; üç sütunlu
+  görünüm, akış, ayıklama.
 - Uygulamayı kullanırken çek (2.3.3): liste, kayıt detayı, paylaşım ekranı, arama, ilk açılış.
 - **Kendi arşivini kullanma**: başkalarının gönderileri, adları ve logoları
   görünmesin (5.2.1). Örnek içerikle doldurulmuş bir kütüphaneyle çek (kendi

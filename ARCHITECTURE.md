@@ -160,6 +160,18 @@ cihaz ya da simülatör için `cargo build --target aarch64-apple-ios[-sim]` ça
   çıkmadan `save_link` ile stub olarak yazar, uygulama açılınca ayrıntıları getirir.
 - App Intents: kaydet, ara, bul. `wroopmark://item/<id>`
   ve `wroopmark://search?q=` bağlantıları.
+- Videolar isteğe bağlı (v0.7): `videos_on_demand` açıkken senkron videoyu kopyalamaz,
+  kayıtta yalnızca adı kalır; uygulama onu senkron klasöründen oynatır (iCloud önce
+  indirir, iOS yer gerekince kendisi siler). `offload_videos` klasörde de olan
+  kopyaları siler. Medya, içerik adı olduğu için çakışmaz: kaybeden günlük satırı da
+  eksik dosyaları getirir; klasörde henüz olmayan dosya 14 gün beklenir.
+- Akış (`VideoFeed.swift`): videolar ya da tüm gönderiler tam ekran; tek oynatıcı,
+  sonraki ikisi önceden hazırlanır, kalınan saniye ve izlenenler cihazda tutulur.
+  Ayıkla (`TriageView.swift`): kart kaydırma; Mac'tekiyle aynı komutlar.
+- Pano (bağlantı varsa şerit, sistem yapıştır düğmesi), Spotlight (Mac'in
+  `Spotlight.swift`'i ortak), ana ekran widget'ı (`apple/iOS/Widget`, uygulamanın
+  App Group'a yazdığı 12 kaydı okur; kütüphaneyi açmaz), iPad'de üç sütun
+  (`PadLibrary.swift`).
 
 ## Ajanlar (MCP)
 
@@ -259,9 +271,32 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
   ara / kaydet"; çalışırken yükü yok, Xcode derlemesi gerekir), MCP kaynakları
   (kayıtların `wroopmark://` adresleriyle doğrudan okunması).
 
-**v0.5: Çoklu cihaz**
-- Senkron günlüğü ✅ (aşağıda).
-- iOS uygulaması + App Intent ✅ (aşağıda).
+**v0.5: Çoklu cihaz** ✅
+- Senkron günlüğü, iOS uygulaması + App Intent.
+
+**v0.6: iPhone ve dağıtım** ✅
+- iPhone uygulaması, paylaşım eklentisi, App Store hazırlığı; Mac için Developer ID
+  imzası ve notarizasyon; iCloud'u beklemeyen senkron, videoların ve sonradan inen
+  dosyaların senkronu, medya birleştirme; akış (TikTok gibi) ve ayıklama.
+
+**v0.7: Telefonu cilala** ✅
+- Videolar isteğe bağlı + telefondaki kopyaları boşaltma.
+- Akış: önceden hazırlama, kalınan saniyeden devam, izlenenler.
+- Panodan kaydetme, iPhone'da Spotlight, ana ekran widget'ı, iPad'de üç sütun.
+
+**v0.8: Telefonda zeka ve okuma**
+- Ortak okuyucu (Mac + iPhone): Readability ile yapıyı koruyan çevrimdışı HTML,
+  tema/yazı/genişlik, okuma süresi ve ilerleme, vurgulama + not (senkronlu), sesli
+  okuma; X zincirleri makale gibi.
+- iPhone'da anlamsal arama ve cihazda özet/etiket önerisi; "Bugün" (geçen yıl bugün).
+
+**v0.9: Sosyal**
+- X yanıtları; eklentiyle sürekli X/Bluesky yer imi eşitleme; Reddit, Threads içe
+  alma; iPhone'da içe alma.
+
+**v1.0: App Store**
+- TestFlight, ekran görüntüleri, İngilizce, fiyat. Sonra: günlük sıkıştırma,
+  klasörü HTML olarak paylaşma.
 
 **Şimdilik yok**: metin vurgulama, EPUB, Raycast eklentisi (MCP çoğunu
 karşılar), harici API anahtarıyla AI (cihazdaki model yetmezse).

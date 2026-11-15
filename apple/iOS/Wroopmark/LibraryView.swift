@@ -1,6 +1,16 @@
 import SwiftUI
 
+/// The library: a list that opens posts on the iPhone, three columns
+/// (scopes, list, post) on the iPad.
 struct LibraryView: View {
+    @Environment(\.horizontalSizeClass) private var size
+
+    var body: some View {
+        if size == .regular { PadLibrary() } else { PhoneLibrary() }
+    }
+}
+
+struct PhoneLibrary: View {
     @Environment(PhoneModel.self) private var model
     @State private var showAdd = false
     @State private var showSettings = false
@@ -12,41 +22,7 @@ struct LibraryView: View {
         @Bindable var model = model
         NavigationStack(path: $path) {
             List {
-                if let e = model.errorMessage {
-                    Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).font(.footnote)
-                }
-                if let n = model.notice {
-                    Label(n, systemImage: "wifi.slash").font(.footnote).foregroundStyle(.secondary)
-                        .onTapGesture { model.notice = nil }
-                }
-                if model.clipboardHasLink {
-                    HStack(spacing: 10) {
-                        Image(systemName: "doc.on.clipboard").foregroundStyle(PhoneTheme.accent)
-                        Text("Panoda bir bağlantı var").font(.subheadline.weight(.medium))
-                        Spacer(minLength: 4)
-                        // The system paste button: no "allow paste" prompt.
-                        // Text, not URL: a link copied as text would leave a
-                        // URL paste button disabled.
-                        PasteButton(payloadType: String.self) { texts in
-                            guard let link = texts.lazy.compactMap { firstLink(in: $0) }.first else { return }
-                            Task {
-                                _ = await model.addURL(link, tags: [])
-                                model.dismissClipboard()
-                            }
-                        }
-                        .buttonBorderShape(.capsule)
-                        .controlSize(.small)
-                        Button { model.dismissClipboard() } label: { Image(systemName: "xmark").font(.caption.weight(.bold)) }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("Kapat")
-                    }
-                    .padding(.vertical, 4)
-                }
-                if model.lowSpace {
-                    Label("Telefonda yer az (1 GB'tan az): yeni görseller yer açılana kadar indirilmiyor.", systemImage: "externaldrive.badge.exclamationmark")
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                }
+                LibraryBanners()
                 ForEach(model.items) { item in
                     NavigationLink(value: item.id) { ItemRowView(item: item) }
                         .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
@@ -106,6 +82,52 @@ struct LibraryView: View {
             .sheet(isPresented: $showSettings) { PhoneSettingsView() }
             .fullScreenCover(isPresented: $showFeed) { VideoFeedView(scope: model.scope, query: model.query) }
             .fullScreenCover(isPresented: $showTriage) { PhoneTriageView(scope: model.scope, query: model.query) }
+        }
+    }
+}
+
+/// Notes above the list: errors, offline saves, a link on the clipboard,
+/// low space.
+struct LibraryBanners: View {
+    @Environment(PhoneModel.self) private var model
+
+    var body: some View {
+        Group {
+            if let e = model.errorMessage {
+                Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).font(.footnote)
+            }
+            if let n = model.notice {
+                Label(n, systemImage: "wifi.slash").font(.footnote).foregroundStyle(.secondary)
+                    .onTapGesture { model.notice = nil }
+            }
+            if model.clipboardHasLink {
+                HStack(spacing: 10) {
+                    Image(systemName: "doc.on.clipboard").foregroundStyle(PhoneTheme.accent)
+                    Text("Panoda bir bağlantı var").font(.subheadline.weight(.medium))
+                    Spacer(minLength: 4)
+                    // The system paste button: no "allow paste" prompt.
+                    // Text, not URL: a link copied as text would leave a
+                    // URL paste button disabled.
+                    PasteButton(payloadType: String.self) { texts in
+                        guard let link = texts.lazy.compactMap { firstLink(in: $0) }.first else { return }
+                        Task {
+                            _ = await model.addURL(link, tags: [])
+                            model.dismissClipboard()
+                        }
+                    }
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.small)
+                    Button { model.dismissClipboard() } label: { Image(systemName: "xmark").font(.caption.weight(.bold)) }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Kapat")
+                }
+                .padding(.vertical, 4)
+            }
+            if model.lowSpace {
+                Label("Telefonda yer az (1 GB'tan az): yeni görseller yer açılana kadar indirilmiyor.", systemImage: "externaldrive.badge.exclamationmark")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 }
