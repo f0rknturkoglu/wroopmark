@@ -116,7 +116,9 @@ final class PhoneModel {
         await refreshMeta()
         await startSync()
         Spotlight.reindex()
-        WidgetSnapshot.refresh()
+        // Posts in the widget's new format (folders) after the update.
+        WidgetSnapshot.refresh(force: UserDefaults.standard.integer(forKey: "widgetFormat") < 2)
+        UserDefaults.standard.set(2, forKey: "widgetFormat")
         await checkClipboard()
         #if DEBUG
         if let id = ProcessInfo.processInfo.environment["WROOPMARK_OPEN_ITEM"], !id.isEmpty { openRequest = id }

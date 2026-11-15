@@ -3,9 +3,10 @@ import ImageIO
 import UniformTypeIdentifiers
 import WidgetKit
 
-/// Writes the posts the home screen widget shows: twelve with pictures,
-/// a new random set each day, with small copies of their pictures, in the
-/// app group's container. At most every three hours.
+/// Writes the posts the home screen widget shows, with small copies of
+/// their pictures, in the app group's container: a random set from the
+/// whole archive and a few from each folder (the widget can be set to one),
+/// a new set each day. At most every three hours.
 enum WidgetSnapshot {
     private struct Post: Codable {
         let id: String
@@ -14,6 +15,7 @@ enum WidgetSnapshot {
         let platform: String
         let image: String?
         let video: Bool
+        let folder: String?
     }
 
     private static let writtenKey = "widgetWrittenAt"
@@ -29,42 +31,58 @@ enum WidgetSnapshot {
         guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppPaths.appGroup)?
             .appendingPathComponent("widget", isDirectory: true) else { return }
         // The same set all day, another tomorrow.
-        let day = Int(Date.now.timeIntervalSince1970 / 86400)
-        guard let r: SearchResult = try? await Core.shared.call(.search(q: "has:image", sort: "random:\(day % 100_000)", limit: 12, offset: 0)) else { return }
-        try? FileManager.default.removeItem(at: dir)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        var posts: [Post] = []
-        for item in r.items {
-            var image: String?
-            if let file = item.cover?.file, let small = thumbnail(Core.shared.mediaURL(file), to: dir.appendingPathComponent("\(posts.count).jpg")) {
-                image = small
+        let seed = Int(Date.now.timeIntervalSince1970 / 86400) % 100_000
+        let folders: [Folder] = (try? await Core.shared.call(.folders)) ?? []
+        let names = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0.name) })
+
+        var picked: [Item] = []
+        var seen = Set<String>()
+        func take(_ q: String, _ count: Int) async {
+            guard let r: SearchResult = try? await Core.shared.call(.search(q: q, sort: "random:\(seed)", limit: count * 3, offset: 0)) else { return }
+            for item in r.items.filter({ $0.cover?.file != nil }).prefix(count) where seen.insert(item.id).inserted {
+                picked.append(item)
             }
+        }
+        await take("", 48)
+        for f in folders { await take("folder:\(f.id)", 12) }
+
+        let tmp = dir.deletingLastPathComponent().appendingPathComponent("widget-new", isDirectory: true)
+        try? FileManager.default.removeItem(at: tmp)
+        try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        var posts: [Post] = []
+        for item in picked {
+            guard let file = item.cover?.file,
+                  let small = thumbnail(Core.shared.mediaURL(file), to: tmp.appendingPathComponent("\(posts.count).jpg")) else { continue }
             let text = item.headline.isEmpty ? (item.quote?.item.text ?? "") : item.headline
             posts.append(Post(
                 id: item.id,
                 author: item.author ?? URL(string: item.url)?.host() ?? "",
                 text: String(text.prefix(280)),
                 platform: item.platform,
-                image: image,
-                video: item.allMedia.contains(where: \.isVideo)
+                image: small,
+                video: item.allMedia.contains(where: \.isVideo),
+                folder: item.folderId.flatMap { names[$0] }
             ))
         }
-        guard let data = try? JSONEncoder().encode(posts) else { return }
-        try? data.write(to: dir.appendingPathComponent("posts.json"), options: .atomic)
+        guard !posts.isEmpty, let data = try? JSONEncoder().encode(posts) else { return }
+        try? data.write(to: tmp.appendingPathComponent("posts.json"), options: .atomic)
+        // Swapped in whole, so the widget never reads half a set.
+        try? FileManager.default.removeItem(at: dir)
+        try? FileManager.default.moveItem(at: tmp, to: dir)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    /// A JPEG of at most 700 px; returns its file name.
+    /// A JPEG of at most 600 px; returns its file name.
     private static func thumbnail(_ src: URL, to dst: URL) -> String? {
         guard let source = CGImageSourceCreateWithURL(src as CFURL, nil) else { return nil }
         let opts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 700,
+            kCGImageSourceThumbnailMaxPixelSize: 600,
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
         guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, opts as CFDictionary),
               let out = CGImageDestinationCreateWithURL(dst as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(out, cg, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
+        CGImageDestinationAddImage(out, cg, [kCGImageDestinationLossyCompressionQuality: 0.78] as CFDictionary)
         return CGImageDestinationFinalize(out) ? dst.lastPathComponent : nil
     }
 }
