@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 18;
+const SCHEMA_VERSION: i64 = 19;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -302,6 +302,11 @@ INSERT OR REPLACE INTO settings(key, value) VALUES ('sync_media_backfill', '1');
 /// v16 → v17: read the other devices' logs once more from the start, so
 /// files that lost to a newer line before media were merged (videos) come.
 const MIGRATE_17: &str = "DELETE FROM sync_cursor;";
+
+/// v18 → v19: the readable copy of web pages (`article`, cleaned HTML) and
+/// whether its pictures were brought down for offline reading.
+const MIGRATE_19: &str = "ALTER TABLE items ADD COLUMN article TEXT;
+ALTER TABLE items ADD COLUMN article_ready INTEGER NOT NULL DEFAULT 0;";
 
 /// v17 → v18: files another device has not uploaded yet are waited for too
 /// (`since`: when noted). The logs are read once more, so a phone that saw
@@ -1052,6 +1057,11 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
             tx.execute("INSERT OR IGNORE INTO item_tags(item, tag) VALUES (?1, ?2)", [pk, t])?;
         }
     }
+    // A new readable copy (a fresh save, or another device's): its
+    // pictures still have to come down.
+    if let Some(a) = &item.article {
+        tx.execute("UPDATE items SET article = ?2, article_ready = 0 WHERE pk = ?1", params![pk, a])?;
+    }
     reindex_item(tx, pk)?;
     Ok(Saved { id: item.id.clone(), created })
 }
@@ -1085,7 +1095,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -1141,6 +1151,9 @@ impl Store {
         }
         if (1..18).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_18} PRAGMA user_version = 18; COMMIT;"))?;
+        }
+        if (1..19).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_19} PRAGMA user_version = 19; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -2333,6 +2346,7 @@ mod tests {
                      DROP INDEX IF EXISTS items_stub; ALTER TABLE items DROP COLUMN summary; ALTER TABLE items DROP COLUMN ai_tags;
                      ALTER TABLE items DROP COLUMN stub; ALTER TABLE items DROP COLUMN stub_tries; DROP TABLE IF EXISTS rules; DROP TABLE IF EXISTS vectors;
                      ALTER TABLE items DROP COLUMN thread; ALTER TABLE items DROP COLUMN snapshot; ALTER TABLE items DROP COLUMN snapshot_tries;
+                     ALTER TABLE items DROP COLUMN article; ALTER TABLE items DROP COLUMN article_ready;
                      PRAGMA user_version = 3;",
                 )
                 .unwrap();

@@ -13,6 +13,7 @@
 		A10000000000000000000101 /* Core.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000201 /* Core.swift */; };
 		A10000000000000000000102 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000202 /* Models.swift */; };
 		A10000000000000000000103 /* Spotlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* Spotlight.swift */; };
+		A10000000000000000000104 /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000204 /* ReaderView.swift */; };
 		A30000000000000000000103 /* WroopmarkWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000301 /* WroopmarkWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -21,6 +22,7 @@
 		A10000000000000000000201 /* Core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Core.swift; path = ../Sources/Wroopmark/Core.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000202 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = ../Sources/Wroopmark/Models.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000203 /* Spotlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Spotlight.swift; path = ../Sources/Wroopmark/Spotlight.swift; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000204 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReaderView.swift; path = ../Sources/Wroopmark/ReaderView.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000301 /* wroopmark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = wroopmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000301 /* WroopmarkWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WroopmarkWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -105,6 +107,7 @@
 				A10000000000000000000201 /* Core.swift */,
 				A10000000000000000000202 /* Models.swift */,
 				A10000000000000000000203 /* Spotlight.swift */,
+				A10000000000000000000204 /* ReaderView.swift */,
 			);
 			name = Shared;
 			sourceTree = "<group>";
@@ -296,6 +299,7 @@
 				A10000000000000000000101 /* Core.swift in Sources */,
 				A10000000000000000000102 /* Models.swift in Sources */,
 				A10000000000000000000103 /* Spotlight.swift in Sources */,
+				A10000000000000000000104 /* ReaderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

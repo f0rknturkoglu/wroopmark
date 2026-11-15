@@ -9,6 +9,7 @@ struct ItemView: View {
     @State private var note = ""
     @State private var newTag = ""
     @State private var confirmDelete = false
+    @State private var reading = false
     @State private var viewer: Media?
     @State private var newFolder = false
     @State private var folderName = ""
@@ -59,6 +60,12 @@ struct ItemView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if item != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { reading = true } label: { Image(systemName: "book") }
+                        .accessibilityLabel("Oku")
+                }
+            }
             if let item, let url = URL(string: item.url) {
                 ToolbarItem(placement: .topBarTrailing) { ShareLink(item: url) }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -69,6 +76,7 @@ struct ItemView: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: $reading) { ReaderView(id: id) }
         .confirmationDialog("Bu kayıt silinsin mi?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Sil", role: .destructive) {
                 Task {

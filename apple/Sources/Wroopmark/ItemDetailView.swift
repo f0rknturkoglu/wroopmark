@@ -5,6 +5,7 @@ struct ItemDetailView: View {
     let item: Item
     @State private var note = ""
     @State private var showPageCopy = false
+    @State private var showReader = false
     @FocusState private var noteFocused: Bool
 
     /// Pictures of the thread's posts are kept in `media` after the first
@@ -111,15 +112,26 @@ struct ItemDetailView: View {
                 if !liveItem.thread.isEmpty {
                     ThreadSection(item: liveItem)
                 }
-                if liveItem.snapshot != nil {
+                HStack(spacing: Theme.Spacing.sm) {
                     Button {
-                        showPageCopy = true
+                        showReader = true
                     } label: {
-                        Label("Sayfanın kopyası", systemImage: "doc.richtext")
+                        Label("Oku", systemImage: "book")
                     }
                     .controlSize(.small)
-                    .help("Sayfanın kaydedildiği hâli; site değişse ya da kapansa da açılır")
-                    .sheet(isPresented: $showPageCopy) { PageCopyView(item: liveItem).environment(model) }
+                    .keyboardShortcut("r", modifiers: [.command, .option])
+                    .help("Okuyucuda aç: sade, çevrimdışı; tema, yazı boyutu, sesli okuma (⌥⌘R)")
+                    .sheet(isPresented: $showReader) { ReaderView(id: liveItem.id) }
+                    if liveItem.snapshot != nil {
+                        Button {
+                            showPageCopy = true
+                        } label: {
+                            Label("Sayfanın kopyası", systemImage: "doc.richtext")
+                        }
+                        .controlSize(.small)
+                        .help("Sayfanın kaydedildiği hâli; site değişse ya da kapansa da açılır")
+                        .sheet(isPresented: $showPageCopy) { PageCopyView(item: liveItem).environment(model) }
+                    }
                 }
                 if let quote = liveItem.quote?.item {
                     QuoteCard(item: quote) { model.openViewer(owner: liveItem, fromQuote: true, index: $0) }

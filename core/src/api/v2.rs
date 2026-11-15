@@ -882,6 +882,7 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             lib.ignore_duplicates(&req.parse::<Ids>()?.ids)?;
             S::ok(true)
         }
+        "article" | "fill_articles" => super::reader::dispatch::<S>(lib, cmd, req).unwrap_or_else(|| Err(CoreError::UnknownCmd(cmd.to_string()))),
         other => match super::sync::dispatch::<S>(lib, other, req) {
             Some(r) => r,
             None => Err(CoreError::UnknownCmd(other.to_string())),

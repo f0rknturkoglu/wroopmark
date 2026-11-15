@@ -255,6 +255,11 @@ pub struct Item {
     /// pictures are also in `media`, so they download and show like the rest.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub thread: Vec<Item>,
+    /// The readable copy of a web page: cleaned HTML (Readability) with
+    /// absolute links. Kept in its own column and read only by `article`;
+    /// an empty string means extraction was tried and found nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub article: Option<String>,
     /// The page as it looked when saved (`<hash>.webarchive` in the media store).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snapshot: Option<String>,

@@ -141,6 +141,7 @@ impl Store {
                     c.snapshot = None;
                     c.video_tries = 0;
                     c.extra = c.extra.map(|e| e.chars().take(20_000).collect());
+                    c.article = self.article(id)?.filter(|a| !a.is_empty());
                     op.content = Some(c);
                 }
                 "tags" => op.tags = Some(item.tags.clone()),

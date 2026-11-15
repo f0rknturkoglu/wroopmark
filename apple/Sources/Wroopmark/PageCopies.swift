@@ -102,8 +102,6 @@ struct PageCopyView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let item: Item
-    @State private var reading = false
-    @State private var article: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -113,12 +111,6 @@ struct PageCopyView: View {
                     Text("Kaydedildiği hâli · \(URL(string: item.url)?.host() ?? "")").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Picker("Görünüm", selection: $reading) {
-                    Text("Sayfa").tag(false)
-                    Text("Okuma").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
                 if let file = item.snapshot {
                     Button("Finder'da göster") { NSWorkspace.shared.activateFileViewerSelecting([model.core.mediaURL(file)]) }
                 }
@@ -126,27 +118,11 @@ struct PageCopyView: View {
             }
             .padding(Theme.Spacing.md)
             Divider()
-            if reading {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                        if let t = item.title { Text(t).font(.title.weight(.semibold)) }
-                        Text(article ?? item.text)
-                            .font(.system(size: 17, design: .serif))
-                            .lineSpacing(6)
-                            .textSelection(.enabled)
-                    }
-                    .frame(maxWidth: 680, alignment: .leading)
-                    .padding(Theme.Spacing.xxl)
-                    .frame(maxWidth: .infinity)
-                }
-            } else if let file = item.snapshot {
+            if let file = item.snapshot {
                 WebArchiveView(file: model.core.mediaURL(file), base: URL(string: item.url))
             }
         }
         .frame(minWidth: 900, minHeight: 680)
-        .task {
-            if let full: Item = try? await model.core.call(.get(id: item.id)), let e = full.extra, !e.isEmpty { article = e }
-        }
     }
 }
 

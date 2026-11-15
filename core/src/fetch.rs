@@ -24,6 +24,8 @@ const MAX_HTML: u64 = 4 << 20;
 const MAX_MEDIA: u64 = 30 << 20;
 const MAX_VIDEO: u64 = 600 << 20;
 const MAX_EXTRA_CHARS: usize = 20_000;
+/// A readable copy bigger than this is not kept (a page dump, not an article).
+const MAX_ARTICLE_BYTES: usize = 600_000;
 
 pub type Result<T> = std::result::Result<T, FetchError>;
 
@@ -83,6 +85,8 @@ pub struct PageMeta {
     pub body: Option<String>,
     /// `<meta http-equiv="refresh" content="0; url=…">` target.
     pub refresh: Option<String>,
+    /// The readable copy (see `readable`).
+    pub article: Option<String>,
 }
 
 static REFRESH_RE: LazyLock<Option<Regex>> =
@@ -116,7 +120,26 @@ fn validate_http_url(url: &str) -> Result<&str> {
     }
 }
 
+/// The readable part of a page (Mozilla's Readability, ported): cleaned
+/// HTML with absolute links, and its text with paragraphs kept. None when
+/// the page has too little text to be an article.
+pub fn readable(final_url: &str, html: &str) -> Option<(String, String)> {
+    let cfg = dom_smoothie::Config { text_mode: dom_smoothie::TextMode::Formatted, ..Default::default() };
+    let article = dom_smoothie::Readability::new(html, Some(final_url), Some(cfg)).ok()?.parse().ok()?;
+    let text = article.text_content.trim().to_string();
+    if text.chars().count() < 280 {
+        return None;
+    }
+    let mut content = article.content.to_string();
+    if content.len() > MAX_ARTICLE_BYTES {
+        return None;
+    }
+    content.shrink_to_fit();
+    Some((content, text))
+}
+
 pub fn parse_page(final_url: &str, html: &str) -> PageMeta {
+    let readable = readable(final_url, html);
     let doc = Html::parse_document(html);
     let base = Url::parse(final_url).ok();
     let abs = |u: &str| base.as_ref().and_then(|b| b.join(u).ok()).map(String::from).unwrap_or_else(|| u.to_string());
@@ -148,9 +171,11 @@ pub fn parse_page(final_url: &str, html: &str) -> PageMeta {
             TITLE_SEL.as_ref().and_then(|sel| doc.select(sel).next()).map(|t| tidy(&t.text().collect::<String>())).filter(|t| !t.is_empty())
         });
 
-    let mut body = String::new();
+    // Readability's text first; the old paragraph scan when it found none.
+    let mut body = readable.as_ref().map(|(_, t)| t.clone()).unwrap_or_default();
     let mut raw_para = String::new();
-    for sel in PARAS_SELS.iter().flatten() {
+    let scan = body.is_empty();
+    for sel in PARAS_SELS.iter().flatten().filter(|_| scan) {
         for p in doc.select(sel) {
             raw_para.clear();
             for chunk in p.text() {
@@ -195,6 +220,7 @@ pub fn parse_page(final_url: &str, html: &str) -> PageMeta {
         author,
         published,
         body: (!body.is_empty()).then_some(body),
+        article: readable.map(|(html, _)| html),
         // Read from the raw HTML: these stubs usually sit in <noscript>,
         // which the parser keeps as plain text.
         refresh: REFRESH_RE.as_ref().and_then(|re| re.captures(html)).and_then(|c| c.get(1)).map(|m| abs(m.as_str())),
@@ -350,6 +376,7 @@ impl Fetcher {
             links: extract_urls(&text),
             text,
             extra,
+            article: page.article,
             created_at: page.published,
             media: page.image.into_iter().map(Media::image).collect(),
             ..Default::default()

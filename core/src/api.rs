@@ -724,7 +724,9 @@ impl Library {
                 }
                 let media = lib.fetch_pending_media(10).unwrap_or(0);
                 let stubs = if media == 0 { lib.fill_stubs(5).unwrap_or(0) } else { 0 };
-                if media == 0 && stubs == 0 {
+                // Readable copies of pages, and their pictures, last.
+                let articles = if media == 0 && stubs == 0 { lib.fill_articles(3).unwrap_or(0) } else { 0 };
+                if media == 0 && stubs == 0 && articles == 0 {
                     break;
                 }
             }
@@ -1490,6 +1492,7 @@ fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result
     }
 }
 
+mod reader;
 mod sync;
 mod v2;
 
