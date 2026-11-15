@@ -59,6 +59,10 @@ final class PhoneModel {
     // Sync (PhoneSync.swift)
     var syncStatus: SyncStatus?
     var syncFolder: URL? { didSet { PhoneMedia.syncFolder = syncFolder } }
+    /// A link waits on the clipboard (detected without reading it, so iOS
+    /// shows no paste prompt; the paste button reads it).
+    var clipboardHasLink = false
+    @ObservationIgnored private var clipboardChange = 0
     /// Videos copied to the phone that the sync folder also has.
     var offloadable: (files: Int, bytes: Int64)?
     var isSyncing = false
@@ -111,13 +115,34 @@ final class PhoneModel {
         await reload()
         await refreshMeta()
         await startSync()
+        Spotlight.reindex()
+        await checkClipboard()
         #if DEBUG
         if let id = ProcessInfo.processInfo.environment["WROOPMARK_OPEN_ITEM"], !id.isEmpty { openRequest = id }
         #endif
     }
 
+    func checkClipboard() async {
+        let pb = UIPasteboard.general
+        let change = pb.changeCount
+        guard change != UserDefaults.standard.integer(forKey: "clipboardOffered"), pb.hasURLs || pb.hasStrings else {
+            clipboardHasLink = false
+            return
+        }
+        let found = (try? await pb.detectedPatterns(for: [\.probableWebURL])) ?? []
+        clipboardChange = change
+        clipboardHasLink = found.contains(\.probableWebURL)
+    }
+
+    /// The same clipboard is not offered again.
+    func dismissClipboard() {
+        UserDefaults.standard.set(clipboardChange, forKey: "clipboardOffered")
+        clipboardHasLink = false
+    }
+
     func becameActive() async {
         takePendingQuery()
+        await checkClipboard()
         // Links saved from the share sheet meanwhile: show them, fill them in.
         await reload()
         await checkSpace()
@@ -280,6 +305,7 @@ final class PhoneModel {
 
     func delete(_ id: String) async {
         if await perform(.delete(id: id)) {
+            Spotlight.remove([id])
             items.removeAll { $0.id == id }
             total = max(0, total - 1)
             await refreshMeta()

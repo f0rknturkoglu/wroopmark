@@ -12,12 +12,14 @@
 		A20000000000000000000103 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A20000000000000000000301 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A10000000000000000000101 /* Core.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000201 /* Core.swift */; };
 		A10000000000000000000102 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000202 /* Models.swift */; };
+		A10000000000000000000103 /* Spotlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* Spotlight.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A20000000000000000000301 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000201 /* Core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Core.swift; path = ../Sources/Wroopmark/Core.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000202 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = ../Sources/Wroopmark/Models.swift; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000203 /* Spotlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Spotlight.swift; path = ../Sources/Wroopmark/Spotlight.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000301 /* wroopmark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = wroopmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -83,6 +85,7 @@
 			children = (
 				A10000000000000000000201 /* Core.swift */,
 				A10000000000000000000202 /* Models.swift */,
+				A10000000000000000000203 /* Spotlight.swift */,
 			);
 			name = Shared;
 			sourceTree = "<group>";
@@ -240,6 +243,7 @@
 			files = (
 				A10000000000000000000101 /* Core.swift in Sources */,
 				A10000000000000000000102 /* Models.swift in Sources */,
+				A10000000000000000000103 /* Spotlight.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

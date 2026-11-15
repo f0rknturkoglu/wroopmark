@@ -1,3 +1,4 @@
+import CoreSpotlight
 import SwiftUI
 
 @main
@@ -31,6 +32,10 @@ struct WroopmarkPhoneApp: App {
                 .tint(PhoneTheme.accent)
                 .task { await model.start() }
                 .onOpenURL { model.open($0) }
+                // A post chosen in Spotlight.
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                    if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.openRequest = id }
+                }
                 .onChange(of: phase) { _, now in
                     // Coming back: the Mac may have saved things meanwhile.
                     if now == .active { Task { await model.becameActive() } }

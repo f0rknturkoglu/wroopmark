@@ -129,6 +129,7 @@ extension PhoneModel {
         if r.applied > 0 || r.mediaIn > 0 {
             await reload()
             await refreshMeta()
+            Spotlight.indexRecent()
         }
         takeICloudMedia(r)
     }

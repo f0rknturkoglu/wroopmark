@@ -19,6 +19,29 @@ struct LibraryView: View {
                     Label(n, systemImage: "wifi.slash").font(.footnote).foregroundStyle(.secondary)
                         .onTapGesture { model.notice = nil }
                 }
+                if model.clipboardHasLink {
+                    HStack(spacing: 10) {
+                        Image(systemName: "doc.on.clipboard").foregroundStyle(PhoneTheme.accent)
+                        Text("Panoda bir bağlantı var").font(.subheadline.weight(.medium))
+                        Spacer(minLength: 4)
+                        // The system paste button: no "allow paste" prompt.
+                        // Text, not URL: a link copied as text would leave a
+                        // URL paste button disabled.
+                        PasteButton(payloadType: String.self) { texts in
+                            guard let link = texts.lazy.compactMap { firstLink(in: $0) }.first else { return }
+                            Task {
+                                _ = await model.addURL(link, tags: [])
+                                model.dismissClipboard()
+                            }
+                        }
+                        .buttonBorderShape(.capsule)
+                        .controlSize(.small)
+                        Button { model.dismissClipboard() } label: { Image(systemName: "xmark").font(.caption.weight(.bold)) }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Kapat")
+                    }
+                    .padding(.vertical, 4)
+                }
                 if model.lowSpace {
                     Label("Telefonda yer az (1 GB'tan az): yeni görseller yer açılana kadar indirilmiyor.", systemImage: "externaldrive.badge.exclamationmark")
                         .font(.footnote)
@@ -188,8 +211,8 @@ struct AddURLView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     // The system paste button: no "allow paste" prompt.
-                    PasteButton(payloadType: URL.self) { urls in
-                        if let u = urls.first { url = u.absoluteString }
+                    PasteButton(payloadType: String.self) { texts in
+                        if let link = texts.lazy.compactMap { firstLink(in: $0) }.first { url = link }
                     }
                     .labelStyle(.iconOnly)
                     .buttonBorderShape(.capsule)
@@ -257,4 +280,15 @@ struct WelcomeView: View {
             }
         }
     }
+}
+
+/// The first web link in a piece of text (a copied link, or a post's text
+/// with one in it).
+func firstLink(in text: String) -> String? {
+    let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    let range = NSRange(text.startIndex..., in: text)
+    return detector?.matches(in: text, range: range)
+        .compactMap(\.url)
+        .first { $0.scheme == "http" || $0.scheme == "https" }?
+        .absoluteString
 }
