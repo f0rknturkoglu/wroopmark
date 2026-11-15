@@ -41,6 +41,11 @@ pub struct Query {
     pub in_folder: Option<bool>,
     /// `id:x:123` — exactly these items (links from Spotlight, the extension).
     pub ids: Vec<String>,
+    /// `site:github.com` — the post's own address or a link in it.
+    pub sites: Vec<String>,
+    pub not_sites: Vec<String>,
+    /// `is:stub` — only the link is known so far (archive imports).
+    pub stub: Option<bool>,
     pub before: Option<i64>,
     pub after: Option<i64>,
     pub saved_before: Option<i64>,
@@ -111,7 +116,7 @@ pub enum Has {
 }
 
 /// Splits on whitespace, keeping `"quoted phrases"` (and `key:"quoted"`) whole.
-fn split(input: &str) -> Vec<String> {
+pub fn split(input: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut quoted = false;
@@ -204,6 +209,14 @@ impl Query {
                 } else if eq_any_ci(key, &["id"]) && !neg {
                     q.ids.push(val.to_string());
                     true
+                } else if eq_any_ci(key, &["site", "host", "domain"]) {
+                    let h = val.trim_start_matches("www.").trim_end_matches('/').to_ascii_lowercase();
+                    if neg {
+                        q.not_sites.push(h);
+                    } else {
+                        q.sites.push(h);
+                    }
+                    true
                 } else if eq_any_ci(key, &["folder", "klasor", "f"]) {
                     let f = val.to_string();
                     if neg {
@@ -269,6 +282,9 @@ impl Query {
                         true
                     } else if eq_any_ci(val, &["reviewed"]) {
                         q.reviewed = Some(!neg);
+                        true
+                    } else if eq_any_ci(val, &["stub", "linkonly", "yalnizlink"]) {
+                        q.stub = Some(!neg);
                         true
                     } else if eq_any_ci(val, &["infolder", "in-folder", "klasorlu"]) {
                         q.in_folder = Some(!neg);
@@ -387,6 +403,9 @@ impl Query {
             || self.after.is_some()
             || self.saved_before.is_some()
             || self.saved_after.is_some()
+            || !self.sites.is_empty()
+            || !self.not_sites.is_empty()
+            || self.stub.is_some()
     }
 }
 

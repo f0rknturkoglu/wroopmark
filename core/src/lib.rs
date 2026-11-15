@@ -10,15 +10,25 @@
 //! - [`reddit`]  Reddit listing parser (saved posts and comments)
 //! - [`instagram`] Instagram media parser (the Saved page's API responses)
 //! - [`fetch`]   network capture for plain URLs (oEmbed, OpenGraph)
+//! - [`archive`] bulk imports: bookmarks.html, platform data downloads, CSV
+//! - [`localfile`] pictures and videos from disk
+//! - [`export`]  Markdown (Obsidian) and CSV export
+//! - [`ai`]      on-device vectors and summaries via the `wroopmark-ai` helper
+//! - [`mcp`]     Model Context Protocol server for agents (`wroopmark mcp`)
 //! - [`api`]     JSON command surface shared by FFI, CLI and native host
 //! - [`ffi`]     C ABI for Swift
 
+pub mod ai;
 pub mod api;
+pub mod archive;
 pub mod db;
+pub mod export;
 pub mod external;
 pub mod fetch;
 pub mod ffi;
 pub mod instagram;
+pub mod localfile;
+pub mod mcp;
 pub mod media;
 pub mod model;
 pub mod query;

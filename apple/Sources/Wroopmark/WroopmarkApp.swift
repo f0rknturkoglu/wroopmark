@@ -78,6 +78,17 @@ struct WroopmarkApp: App {
                     Label("Bağlantı ekle…", systemImage: "plus")
                 }
                 .keyboardShortcut("n", modifiers: .command)
+                Button { model.chooseImport() } label: {
+                    Label("İçe aktar…", systemImage: "square.and.arrow.down")
+                }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
+                Menu {
+                    ForEach(AppModel.ExportFormat.allCases) { f in
+                        Button(f.label) { model.chooseExport(f) }
+                    }
+                } label: {
+                    Label("Dışa aktar", systemImage: "square.and.arrow.up")
+                }
             }
             CommandMenu("Kütüphane") {
                 Button { Task { await model.reload() } } label: {
@@ -122,6 +133,13 @@ struct WroopmarkApp: App {
                     Label("Ayıkla", systemImage: "arrow.left.arrow.right.square")
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
+                Toggle(isOn: Binding(get: { model.semanticSearch }, set: { model.semanticSearch = $0 })) {
+                    Label("Anlamına göre ara", systemImage: "sparkle.magnifyingglass")
+                }
+                .keyboardShortcut("m", modifiers: [.command, .shift])
+                Button { model.showDuplicates = true } label: {
+                    Label("Kopyaları bul…", systemImage: "square.on.square")
+                }
                 Divider()
                 Button { model.showDownloads.toggle() } label: {
                     Label("İndirmeler", systemImage: "arrow.down.circle")

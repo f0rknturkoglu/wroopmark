@@ -18,12 +18,14 @@ pub enum Platform {
     Github,
     Hackernews,
     Arxiv,
+    /// A file imported from disk (old downloads, screen recordings…).
+    Local,
     #[default]
     Web,
 }
 
 impl Platform {
-    pub const ALL: [Platform; 11] = [
+    pub const ALL: [Platform; 12] = [
         Self::X,
         Self::Facebook,
         Self::Tiktok,
@@ -34,6 +36,7 @@ impl Platform {
         Self::Github,
         Self::Hackernews,
         Self::Arxiv,
+        Self::Local,
         Self::Web,
     ];
 
@@ -49,6 +52,7 @@ impl Platform {
             Self::Github => "github",
             Self::Hackernews => "hackernews",
             Self::Arxiv => "arxiv",
+            Self::Local => "local",
             Self::Web => "web",
         }
     }
@@ -74,6 +78,7 @@ impl Platform {
             b"github" | b"gh" => Self::Github,
             b"hackernews" | b"hn" | b"ycombinator" => Self::Hackernews,
             b"arxiv" => Self::Arxiv,
+            b"local" | b"file" | b"dosya" | b"yerel" => Self::Local,
             b"web" | b"custom" | b"link" => Self::Web,
             _ => return None,
         })
@@ -234,6 +239,15 @@ pub struct Item {
     pub folder_id: Option<i64>,
     #[serde(default)]
     pub video_tries: i64,
+    /// On-device summary (Foundation Models), when one was made.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// Tags the on-device model suggested (not applied).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ai_tags: Vec<String>,
+    /// Only the link is known (archive import); details are fetched later.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub stub: bool,
     /// Original payload, kept (zstd) so items can be re-parsed later.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raw: Option<Value>,

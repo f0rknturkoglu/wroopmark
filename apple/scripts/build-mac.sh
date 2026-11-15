@@ -81,6 +81,13 @@ xcrun swiftc -O -target "$(uname -m)-apple-macos${MACOSX_DEPLOYMENT_TARGET}" \
   "$APP_PKG/OCR/main.swift" -o "$APP/Contents/Helpers/wroopmark-ocr"
 strip -x "$APP/Contents/Helpers/wroopmark-ocr" 2>/dev/null || true
 
+echo "==> AI helper"
+# NaturalLanguage embeddings + Foundation Models, also short-lived: it quits
+# after a minute idle, so model memory is never held by the app.
+xcrun swiftc -O -target "$(uname -m)-apple-macos${MACOSX_DEPLOYMENT_TARGET}" \
+  "$APP_PKG/AI/main.swift" -o "$APP/Contents/Helpers/wroopmark-ai"
+strip -x "$APP/Contents/Helpers/wroopmark-ai" 2>/dev/null || true
+
 echo "==> Safari extension"
 # A Safari web extension is an app extension inside the app: the shared
 # extension JS as resources plus a native handler that links the core.
@@ -149,6 +156,7 @@ echo "==> imza: $([ "$SIGN_ID" = "-" ] && echo "ad-hoc" || echo "$SIGN_ID")"
 # Inside out: helper and extension first, then the app around them.
 codesign --force --sign "$SIGN_ID" "$APP/Contents/Helpers/wroopmark" >/dev/null 2>&1
 codesign --force --sign "$SIGN_ID" "$APP/Contents/Helpers/wroopmark-ocr" >/dev/null 2>&1
+codesign --force --sign "$SIGN_ID" "$APP/Contents/Helpers/wroopmark-ai" >/dev/null 2>&1
 codesign --force --sign "$SIGN_ID" --entitlements "$APP_PKG/Safari/WroopmarkSafari.entitlements" "$APPEX" >/dev/null 2>&1
 codesign --force --sign "$SIGN_ID" "$APP" >/dev/null 2>&1
 codesign --verify --deep --strict "$APP"

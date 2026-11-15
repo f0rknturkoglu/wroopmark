@@ -63,7 +63,7 @@ fi
 step "Sistem"
 [[ "$(uname)" == "Darwin" ]] || fail "wroopmark yalnızca macOS'ta çalışır."
 major="$(sw_vers -productVersion | cut -d. -f1)"
-(( major >= 14 )) || fail "macOS 14 (Sonoma) ya da daha yenisi gerekiyor; bu Mac'te $(sw_vers -productVersion)."
+(( major >= 26 )) || fail "macOS 26 (Tahoe) ya da daha yenisi gerekiyor; bu Mac'te $(sw_vers -productVersion)."
 note "macOS $(sw_vers -productVersion), $(uname -m)"
 
 if ! xcode-select -p >/dev/null 2>&1; then

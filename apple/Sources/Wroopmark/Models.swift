@@ -20,6 +20,11 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
     let tags: [String]
     let note: String?
     let folderId: Int64?
+    /// On-device summary and tag ideas (Foundation Models), when made.
+    let summary: String?
+    let aiTags: [String]
+    /// Only the link is known yet (archive import); details come later.
+    let stub: Bool
 
     /// Boxed so `Item` can contain an `Item`. Immutable and thread-safe.
     final class Quote: Decodable, Sendable {
@@ -29,6 +34,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, platform, url, authorHandle, authorName, title, text, extra, ocr, createdAt, savedAt, media, links, quote, tags, note
+        case summary, aiTags, stub
         case folderId = "folder_id"
     }
 
@@ -51,6 +57,9 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
         note = try c.decodeIfPresent(String.self, forKey: .note)
         folderId = try c.decodeIfPresent(Int64.self, forKey: .folderId)
+        summary = try c.decodeIfPresent(String.self, forKey: .summary)
+        aiTags = try c.decodeIfPresent([String].self, forKey: .aiTags) ?? []
+        stub = try c.decodeIfPresent(Bool.self, forKey: .stub) ?? false
     }
 
     init(
@@ -70,7 +79,10 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         quote: Quote?,
         tags: [String],
         note: String?,
-        folderId: Int64?
+        folderId: Int64?,
+        summary: String? = nil,
+        aiTags: [String] = [],
+        stub: Bool = false
     ) {
         self.id = id
         self.platform = platform
@@ -89,6 +101,9 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         self.tags = tags
         self.note = note
         self.folderId = folderId
+        self.summary = summary
+        self.aiTags = aiTags
+        self.stub = stub
     }
 
     func withFolder(_ newFolderId: Int64?) -> Item {
@@ -109,7 +124,10 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
             quote: quote,
             tags: tags,
             note: note,
-            folderId: newFolderId
+            folderId: newFolderId,
+            summary: summary,
+            aiTags: aiTags,
+            stub: stub
         )
     }
 
@@ -118,6 +136,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         a.id == b.id && a.tags == b.tags && a.note == b.note && a.media == b.media && a.text == b.text
             && a.title == b.title && a.ocr == b.ocr && a.extra == b.extra && a.savedAt == b.savedAt
             && a.links == b.links && a.quote?.item == b.quote?.item && a.folderId == b.folderId
+            && a.summary == b.summary && a.aiTags == b.aiTags && a.stub == b.stub
     }
 
     func hash(into h: inout Hasher) { h.combine(id) }
@@ -291,7 +310,7 @@ struct VideoTool: Decodable, Hashable, Sendable {
 }
 
 enum Platform: String, CaseIterable, Identifiable, Sendable {
-    case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, web
+    case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, local, web
 
     var id: String { rawValue }
 
@@ -307,6 +326,7 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         case .github: "GitHub"
         case .hackernews: "Hacker News"
         case .arxiv: "arXiv"
+        case .local: "Dosya"
         case .web: "Web"
         }
     }
@@ -323,6 +343,7 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         case .github: "chevron.left.forwardslash.chevron.right"
         case .hackernews: "y.square.fill"
         case .arxiv: "doc.text.fill"
+        case .local: "externaldrive.fill"
         case .web: "globe"
         }
     }
@@ -473,4 +494,86 @@ struct DownloadsReport: Decodable, Equatable, Sendable {
     let failed: [DownloadItem]
 
     var totalActiveOrQueued: Int { active.count + queued.count }
+}
+
+// MARK: - v0.2 / v0.3
+
+/// What the on-device models can do (`ai_status`).
+struct AIStatus: Decodable, Equatable, Sendable {
+    struct Progress: Decodable, Equatable, Sendable {
+        let done: Int
+        let total: Int
+    }
+    struct Stubs: Decodable, Equatable, Sendable {
+        let pending: Int
+        let failed: Int
+    }
+    let embed: Bool?
+    let embedModel: String?
+    let embedError: String?
+    /// "available", or why the language model cannot be used.
+    let llm: String?
+    let vectors: Progress?
+    let stubs: Stubs?
+    let helper: String?
+    let error: String?
+
+    var llmReady: Bool { llm == "available" }
+    var embedReady: Bool { embed == true }
+}
+
+/// An automatic rule: new items matching `query` get a tag and/or a folder.
+struct RuleRow: Decodable, Identifiable, Hashable, Sendable {
+    let id: Int64
+    let query: String
+    let tag: String?
+    let folderId: Int64?
+    let folderName: String?
+    let enabled: Bool
+    let matches: Int
+}
+
+struct DuplicateGroup: Decodable, Identifiable, Hashable, Sendable {
+    let reason: String
+    let items: [Item]
+    var id: String { items.map(\.id).sorted().joined(separator: ",") }
+
+    var reasonLabel: String {
+        switch reason {
+        case "media": "Aynı görsel ya da video"
+        case "text": "Aynı metin"
+        default: "Çok benzer içerik"
+        }
+    }
+}
+
+struct ArchiveReport: Decodable, Sendable {
+    struct Source: Decodable, Sendable {
+        let file: String
+        let count: Int
+    }
+    let found: Int
+    let new: Int
+    let existing: Int
+    let sources: [Source]
+}
+
+struct FilesReport: Decodable, Sendable {
+    let files: Int
+    let new: Int
+    let attached: Int
+    let existing: Int
+    let failed: Int
+}
+
+struct ExportReport: Decodable, Sendable {
+    let count: Int
+    let path: String
+    let media: Int
+}
+
+struct EmbedReport: Decodable, Sendable {
+    let done: Int
+    let remaining: Int
+    let total: Int
 }

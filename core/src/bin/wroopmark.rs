@@ -19,7 +19,8 @@ kullanım: wroopmark [--lib DİZİN] <komut>
 
   add <url> [-t etiket]... [-n not]   URL'yi indir ve kaydet
   import-x <dosya.json>               x.com GraphQL cevabını içe aktar
-  search <sorgu...>                   ara (tag:x from:@y platform:x has:image \"ifade\")
+  search [-m] <sorgu...>              ara (tag:x from:@y site:github.com has:image \"ifade\");
+                                      -m: anlamına göre de (cihazdaki model)
   show <id>                           tek kaydı göster (JSON)
   tag <id> <etiket>...                etiketleri değiştir
   tags                                etiketler ve sayıları
@@ -28,6 +29,18 @@ kullanım: wroopmark [--lib DİZİN] <komut>
   links [sorgu...] [--enrich]         link havuzu
   media [--retry]                     eksik medyayı indir
   stats                               özet
+  import <zip|klasör|dosya> [-t e]    toplu içe aktar: bookmarks.html, TikTok / Instagram /
+                                      X veri paketi, Pocket / Raindrop CSV
+  import-files <yol>... [-t e]        diskteki video ve görselleri arşive koy
+  export <klasör> [--format md|csv|json] [--no-media] [sorgu...]
+                                      dışa aktar (md: Obsidian uyumlu notlar)
+  rules                               otomatik kurallar
+  rule-add <sorgu> [-t e] [--folder ad] [--apply]
+                                      kural: aramaya uyan yeni kayıtlara etiket / klasör
+  embed                               anlamsal arama için eksik vektörleri üret
+  dupes                               olası kopyalar
+  ai                                  cihazdaki modellerin durumu
+  mcp [--read-only]                   ajanlar için MCP sunucusu (stdio)
   call '<json>'                       ham API komutu
 
 kütüphane: $WROOPMARK_HOME ya da ~/Library/Application Support/wroopmark";
@@ -61,6 +74,15 @@ fn main() {
     };
     let rest: Vec<String> = pos_it.collect();
     let lib = Library::open(&root).unwrap_or_else(|e| die(&e.to_string()));
+    if cmd == "mcp" {
+        let read_only = rest.iter().any(|a| a == "--read-only");
+        if let Err(e) = wroopmark_core::mcp::serve(&lib, read_only) {
+            die(&e.to_string());
+        }
+        return;
+    }
+    // Long background work (stub filling) is left for the app to finish.
+    let detach = matches!(cmd.as_str(), "import" | "import-files" | "export" | "embed" | "dupes" | "ai" | "rules" | "rule-add");
 
     let result = match cmd.as_str() {
         "add" => cmd_add(&lib, &rest),
@@ -75,6 +97,57 @@ fn main() {
         "links" => cmd_links(&lib, &rest),
         "media" => cmd_media(&lib, &rest),
         "stats" => call(&lib, json!({ "cmd": "stats" })).map(|v| pretty(&v)),
+        "import" => cmd_import(&lib, &rest),
+        "import-files" => {
+            let (pos, tags, _) = flags(&rest);
+            call(&lib, json!({ "cmd": "import_files", "paths": pos, "tags": tags })).map(|v| {
+                format!(
+                    "{} dosya: {} yeni, {} kayda bağlandı, {} zaten vardı, {} hata",
+                    at(&v, "files"),
+                    at(&v, "new"),
+                    at(&v, "attached"),
+                    at(&v, "existing"),
+                    at(&v, "failed")
+                )
+            })
+        }
+        "export" => cmd_export(&lib, &rest),
+        "rules" => call(&lib, json!({ "cmd": "rules" })).map(|v| {
+            v.as_array()
+                .map(|a| {
+                    a.iter()
+                        .map(|r| {
+                            format!(
+                                "{:>3}  {}  →  {}{}  ({} eşleşme){}",
+                                at(r, "id"),
+                                at(r, "query").as_str().unwrap_or(""),
+                                at(r, "tag").as_str().map(|t| format!("#{t} ")).unwrap_or_default(),
+                                at(r, "folder_name").as_str().map(|f| format!("📁 {f}")).unwrap_or_default(),
+                                at(r, "matches"),
+                                if at(r, "enabled").as_bool() == Some(false) { "  [kapalı]" } else { "" }
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                })
+                .unwrap_or_default()
+        }),
+        "rule-add" => cmd_rule_add(&lib, &rest),
+        "embed" => cmd_embed(&lib),
+        "dupes" => call(&lib, json!({ "cmd": "duplicates" })).map(|v| {
+            let groups = v.as_array().map(Vec::as_slice).unwrap_or(&[]);
+            let mut out: Vec<String> = groups
+                .iter()
+                .map(|g| {
+                    let ids: Vec<&str> =
+                        at(g, "items").as_array().map(|a| a.iter().filter_map(|i| at(i, "id").as_str()).collect()).unwrap_or_default();
+                    format!("{:<8} {}", at(g, "reason").as_str().unwrap_or(""), ids.join("  "))
+                })
+                .collect();
+            out.push(format!("— {} grup", groups.len()));
+            out.join("\n")
+        }),
+        "ai" => call(&lib, json!({ "cmd": "ai_status" })).map(|v| pretty(&v)),
         "call" => {
             let req: Value = serde_json::from_str(&need(&rest, 0, "json")).unwrap_or_else(|e| die(&format!("geçersiz JSON: {e}")));
             Ok(pretty(&api::handle_value(&lib, req)))
@@ -82,12 +155,21 @@ fn main() {
         "help" | "-h" | "--help" => Ok(HELP.into()),
         other => Err(format!("bilinmeyen komut: {other}\n\n{HELP}")),
     };
-    lib.wait_media();
-    lib.checkpoint();
+    if detach {
+        lib.shutdown();
+    } else {
+        lib.wait_media();
+        lib.checkpoint();
+    }
     match result {
         Ok(out) => println!("{out}"),
         Err(e) => die(&e),
     }
+}
+
+/// A field of a JSON object, or null.
+fn at<'a>(v: &'a Value, key: &str) -> &'a Value {
+    v.get(key).unwrap_or(&Value::Null)
 }
 
 fn die(msg: &str) -> ! {
@@ -193,8 +275,91 @@ fn cmd_import_x(lib: &Arc<Library>, args: &[String]) -> Result<String, String> {
     Ok(format!("{} yeni, {} güncellendi", total.0, total.1))
 }
 
+fn cmd_import(lib: &Arc<Library>, args: &[String]) -> Result<String, String> {
+    let (pos, tags, _) = flags(args);
+    let no_folders = pos.iter().any(|a| a == "--no-folders");
+    let mut out = vec![];
+    for path in pos.iter().filter(|a| !a.starts_with("--")) {
+        let v = call(lib, json!({ "cmd": "import_archive", "path": path, "tags": tags, "keep_folders": !no_folders }))?;
+        for s in at(&v, "sources").as_array().map(Vec::as_slice).unwrap_or(&[]) {
+            out.push(format!("  {:>6}  {}", at(s, "count"), at(s, "file").as_str().unwrap_or("")));
+        }
+        out.push(format!("{path}: {} bulundu, {} yeni, {} zaten vardı", at(&v, "found"), at(&v, "new"), at(&v, "existing")));
+    }
+    if out.is_empty() {
+        return Err("dosya eksik".into());
+    }
+    out.push("ayrıntılar (metin, yazar, medya) uygulama açıkken arka planda gelir".into());
+    Ok(out.join("\n"))
+}
+
+fn cmd_export(lib: &Arc<Library>, args: &[String]) -> Result<String, String> {
+    let mut dest = None;
+    let mut format = "md".to_string();
+    let mut media = true;
+    let mut q = vec![];
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--format" | "-f" => format = it.next().cloned().unwrap_or_default(),
+            "--no-media" => media = false,
+            _ if dest.is_none() => dest = Some(a.clone()),
+            _ => q.push(a.clone()),
+        }
+    }
+    let dest = dest.ok_or("hedef klasör eksik")?;
+    let v = call(lib, json!({ "cmd": "export", "dest": dest, "format": format, "media": media, "q": q.join(" ") }))?;
+    Ok(format!("{} kayıt, {} medya dosyası → {}", at(&v, "count"), at(&v, "media"), at(&v, "path").as_str().unwrap_or("")))
+}
+
+fn cmd_rule_add(lib: &Arc<Library>, args: &[String]) -> Result<String, String> {
+    let (mut tag, mut folder, mut apply, mut q) = (None, None, false, vec![]);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "-t" | "--tag" => tag = it.next().cloned(),
+            "--folder" => folder = it.next().cloned(),
+            "--apply" => apply = true,
+            _ => q.push(a.clone()),
+        }
+    }
+    let folder_id = match folder {
+        Some(name) => {
+            let list = call(lib, json!({ "cmd": "folders" }))?;
+            let found = list
+                .as_array()
+                .and_then(|a| a.iter().find(|f| at(f, "name").as_str().is_some_and(|n| n.eq_ignore_ascii_case(&name))).map(|f| at(f, "id").clone()));
+            match found {
+                Some(id) => id,
+                None => at(&call(lib, json!({ "cmd": "add_folder", "name": name }))?, "id").clone(),
+            }
+        }
+        None => Value::Null,
+    };
+    let v = call(lib, json!({ "cmd": "add_rule", "query": q.join(" "), "tag": tag, "folder_id": folder_id, "apply": apply }))?;
+    Ok(format!("kural {} eklendi; {} kayda uygulandı", at(at(&v, "rule"), "id"), at(&v, "applied")))
+}
+
+fn cmd_embed(lib: &Arc<Library>) -> Result<String, String> {
+    let mut done = 0u64;
+    loop {
+        let v = call(lib, json!({ "cmd": "embed_pending", "limit": 64 }))?;
+        let n = at(&v, "done").as_u64().unwrap_or(0);
+        done += n;
+        eprint!("\r{done} kayıt · {} kaldı   ", at(&v, "remaining"));
+        if n == 0 || at(&v, "remaining").as_i64() == Some(0) {
+            break;
+        }
+    }
+    eprintln!();
+    Ok(format!("{done} kaydın vektörü üretildi"))
+}
+
 fn cmd_search(lib: &Arc<Library>, args: &[String]) -> Result<String, String> {
-    let mut v = call(lib, json!({ "cmd": "search", "q": args.join(" "), "limit": 30 }))?;
+    let meaning = args.iter().any(|a| a == "-m" || a == "--anlam" || a == "--semantic");
+    let words: Vec<&str> = args.iter().map(String::as_str).filter(|a| !matches!(*a, "-m" | "--anlam" | "--semantic")).collect();
+    let cmd = if meaning { "semantic_search" } else { "search" };
+    let mut v = call(lib, json!({ "cmd": cmd, "q": words.join(" "), "limit": 30 }))?;
     let items_val = v.get_mut("items").map(Value::take).unwrap_or(Value::Null);
     let items: Vec<Item> = serde_json::from_value(items_val).map_err(|e| e.to_string())?;
     let mut out: Vec<String> = items.iter().map(line).collect();

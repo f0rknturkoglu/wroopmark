@@ -83,6 +83,14 @@ pub enum CoreError {
     ChunkSize { got: u64, expected: u64 },
     #[error("sayı sınırı aşıldı")]
     NumericOverflow,
+    #[error("{0}")]
+    Ai(#[from] crate::ai::AiError),
+    #[error("kural boş olamaz: bir arama terimi yaz (ör. site:github.com)")]
+    EmptyRule,
+    #[error("bilinmeyen biçim: {0} (md, csv ya da json)")]
+    UnknownFormat(String),
+    #[error("içe aktarılacak bir şey bulunamadı")]
+    NothingToImport,
 }
 
 /// Appends a line to `<library>/host.log`, which shows what the browser
@@ -108,6 +116,10 @@ pub struct Library {
     worker: Mutex<Option<JoinHandle<()>>>,
     stopping: AtomicBool,
     pub download_tracker: Arc<Mutex<Option<ActiveDownloadInfo>>>,
+    /// The on-device models' helper process (started on demand).
+    ai: crate::ai::Helper,
+    /// Recent query expansions, so typing does not re-ask the model.
+    expansions: Mutex<std::collections::HashMap<String, Vec<String>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -205,6 +217,8 @@ impl Library {
             worker: Mutex::new(None),
             stopping: AtomicBool::new(false),
             download_tracker: Arc::new(Mutex::new(None)),
+            ai: crate::ai::Helper::default(),
+            expansions: Mutex::new(std::collections::HashMap::new()),
         }))
     }
 
@@ -248,13 +262,22 @@ impl Library {
             }
         }
         let mut report = ImportReport::default();
-        for Saved { id, created } in self.lock_store()?.upsert_all(items)? {
+        let mut store = self.lock_store()?;
+        let mut created_ids = vec![];
+        for Saved { id, created } in store.upsert_all(items)? {
             if created {
                 report.new += 1;
+                created_ids.push(id.clone());
             } else {
                 report.updated += 1;
             }
             report.ids.push(id);
+        }
+        // Rules only touch what is new: a re-import never undoes a manual
+        // change. A failing rule never loses the save.
+        if let Err(e) = store.apply_rules(&created_ids) {
+            drop(store);
+            append_log(&self.root, &format!("kural: {e}"));
         }
         Ok(report)
     }
@@ -695,9 +718,10 @@ impl Library {
                 if lib.stopping.load(Ordering::Acquire) {
                     break;
                 }
-                match lib.fetch_pending_media(10) {
-                    Ok(n) if n > 0 => {}
-                    _ => break,
+                let media = lib.fetch_pending_media(10).unwrap_or(0);
+                let stubs = if media == 0 { lib.fill_stubs(5).unwrap_or(0) } else { 0 };
+                if media == 0 && stubs == 0 {
+                    break;
                 }
             }
         }));
@@ -1442,9 +1466,11 @@ fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result
             S::ok(lib.media.path(&file))
         }
 
-        other => Err(CoreError::UnknownCmd(other.to_string())),
+        other => v2::dispatch::<S>(lib, other, req),
     }
 }
+
+mod v2;
 
 #[cfg(test)]
 mod tests {

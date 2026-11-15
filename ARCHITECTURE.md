@@ -66,6 +66,38 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
   kayıtlarda geçen linkler gelir.
 - Apple Vision OCR (isteğe bağlı, ayarlardan) görsellerdeki yazıyı `ocr`
   alanına yazar → ekran görüntüsü tweet'ler de aranabilir.
+- `site:github.com`: gönderinin kendi adresi ya da içindeki bir link o sitede.
+- **Kurallar** (`rules` tablosu): kayıtlı bir arama + etiket ve/veya klasör. Yeni
+  oluşan her kayıt (`save_into`) ve dolan her stub kurallardan geçer; sorgu motoru
+  aynısı (`Query` + `id:` kısıtı). Klasör yalnızca klasörsüz kayda konur.
+
+## Cihazdaki zeka (v0.3)
+
+Modeller sistemin kendisi: NaturalLanguage `NLContextualEmbedding` (Latin alfabesi,
+512 boyut) ve Foundation Models (Apple Intelligence). İkisi de `wroopmark-ai`
+yardımcısında çalışır (`apple/AI/main.swift`, JSON satırları stdin/stdout); çekirdek
+onu gerektiğinde başlatır, bir dakika boşta kalınca kendisi kapanır. Uygulama ve
+çekirdek model belleği tutmaz; CLI ve MCP de aynı yolu kullanır.
+
+- **Vektörler**: kayıt başına int8 + ölçek (~0,5 KB, `vectors` tablosu). Metni çok
+  kısa olan (25 harften az) kayıt vektör almaz: anlamsız kısa metinler her aramaya
+  yakın çıkıyordu. Karşılaştırma kaba kuvvet; ortak yön (kütüphane ortalaması)
+  çıkarılıp yeniden normalize edilir, yoksa ortalama alınmış vektörlerin hepsi
+  birbirine 0,7+ benzer. Model değişirse dizin silinip yeniden oluşur.
+- **Anlamsal arama** üç listenin RRF birleşimi: aramanın kendisi (FTS, ağırlık 1),
+  dil modelinin önerdiği ilgili kelimelerle genişletilmiş VEYA araması (0,8;
+  önbellekli) ve en yakın vektörler (0,5; merkezli kosinüs ≥ 0,42). Türkçe için
+  Apple'ın cümle gömme modeli yok; genişletme bu açığı kapatıyor.
+- **Özet ve etiket önerisi**: `summarize`, `items.summary` / `ai_tags`'e yazar,
+  etiketleri kendisi eklemez. Ayıklama ekranı sıradaki kartları önceden özetler.
+- **Benzerleri / kopyalar**: aynı merkezli vektörler; kopyalar ayrıca aynı medya
+  dosyası ve katlanmış aynı metin.
+
+## Ajanlar (MCP)
+
+`wroopmark mcp`: CLI ikilisinin stdio üzerinde JSON-RPC (MCP 2025-06-18) modu
+(`mcp.rs`). Her araç `api.rs`'deki bir komuta denk gelir; `--read-only` yazanları
+listeden çıkarır. Ajan bağlanınca açılır, boru kapanınca çıkar.
 
 ## Veri alma
 
@@ -77,7 +109,8 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
 | Instagram | Eklenti: Kaydedilenler sayfasının kendi API yanıtları (REST ya da GraphQL); kaydet düğmesine basınca o gönderi |
 | Reddit | Eklenti: `/user/<ad>/saved.json` kullanıcının kendi oturumuyla, 100'er 100'er (gönderi + yorum) |
 | Pinterest / Facebook / web | Sayfanın `og:` etiketleri + makale metni |
-| Toplu | (sonra) TikTok "Favorite Videos" / Facebook "Saved items" export içe aktarma |
+| Toplu | `bookmarks.html`, TikTok / Instagram / X veri paketleri (zip, klasör ya da tek dosya; zip sistemin `ditto`'suyla açılır), Pocket / Raindrop / Reddit CSV (`archive.rs`). Çoğu yalnızca link + tarih verir: kayıt doğru id'yle *stub* olarak girer (`items.stub = 1`), metin / yazar / medya arka planda `fetcher.capture` ile tek tek, acele etmeden gelir (en çok 3 deneme). Zaten olan kayda yalnızca etiket eklenir, içeriği ezilmez. İzleme / tarama geçmişi alınmaz. |
+| Diskteki dosyalar | Video ve görseller medya deposuna kopyalanır (`localfile.rs`). Adında TikTok numarası (19 hane) ya da yt-dlp `[id]`'si olan video o gönderiye bağlanır: kayıt varsa videosu olur, yoksa stub açılır. Diğerleri `local:<içerik hash>` kayıt (aynı dosya iki kez girmez). Kapağı olmayan videolara uygulama AVFoundation ile kapak çizer (`posterless` / `set_poster`). |
 
 Görseller, video kapakları ve (Ayarlar'dan kapatılabilir) videolar indirilir.
 Video dosyası doğrudan bir mp4 değilse (TikTok gönderi sayfası) sırayla:
@@ -117,10 +150,46 @@ tasarlandı; ücretli hesap gelirse sadece kolaylaşır.
 
 ## Yol haritası
 
-1. ✅ Çekirdek: şema, FTS, medya deposu, CLI
-2. ✅ X içe aktarıcı + Chromium eklentisi (native messaging)
-3. ✅ SwiftUI macOS uygulaması (`apple/scripts/build-mac.sh`; native host uygulamanın içinde, videolar dahil çevrimdışı medya; tarayıcıdan link sürükle-bırak)
-4. ✅ Safari eklentisi (uygulamanın içinde `PlugIns/WroopmarkSafari.appex`; JS Chromium'la ortak, native taraf çekirdeğe doğrudan bağlı)
-5. Senkron günlüğü
-6. iOS uygulaması + App Intent (Xcode gerekir) — ertelendi
-7. OCR ✅ · toplu export içe aktarma · otomatik etiket kuralları
+İlke: her özellik isteğe bağlı ve hafif kalır. Yeni sunucu, arka plan servisi,
+indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır olan
+çerçevelerle (NaturalLanguage, Foundation Models, WebKit) ve SQLite'la yapılır.
+
+**Yapıldı (v0.1)**
+- Çekirdek: şema, FTS5 + Türkçe katlama, içerik adresli medya deposu, CLI
+- X / TikTok / Instagram / Reddit yakalama, Chromium + Safari eklentisi
+- SwiftUI uygulaması: galeri, ayıkla, link havuzu + kırık link taraması,
+  kayıtlı aramalar, Spotlight, menü çubuğu + ⌃⌥⌘S, yedek, OCR
+
+**v0.2: Bağlantılar** ✅
+- MCP sunucusu (`wroopmark mcp`, stdio): ajanlar (Claude vb.) arşivde arar,
+  kaydı okur, kaydeder, etiketler. Ayrı süreç; yalnızca ajan bağlıyken çalışır.
+- Otomatik kurallar: site / platform / kişi / metin → etiket ya da klasör;
+  kayıt anında, istenirse geriye dönük.
+- Dışa aktarım: Markdown (Obsidian uyumlu, ön madde + medya), CSV; arama
+  sonucundan ya da klasörden.
+- İçe aktarım: tarayıcı `bookmarks.html`, platform veri paketleri (TikTok,
+  Instagram, X beğenileri; çoğu yalnızca link verir, medya arka planda iner).
+- Yerel dosya içe aktarımı: diskteki video ve görseller (ör. eskiden indirilmiş
+  TikTok videoları). Dosya adında gönderi kimliği varsa o kayda bağlanır.
+
+**v0.3: Akıllı arama** ✅ (cihazda, Apple Intelligence / NaturalLanguage varsa)
+- Anlamsal arama: `NLContextualEmbedding` vektörleri SQLite'ta + dil modeliyle
+  arama genişletme; FTS ile hibrit sıralama (RRF). Kayıt başına ~0,5 KB.
+- Foundation Models ile özet ve etiket önerisi (ayıkla ekranında), "Benzerleri".
+- Kopyalar: aynı link, aynı medya, neredeyse aynı metin.
+
+**v0.4: Kalıcılık**
+- Web sayfasının tam kopyası: görünmez `WKWebView` → webarchive / PDF + okuma
+  görünümü metni (Monolith gibi harici araç yok).
+- X zincirleri: zincir açılınca aynı yazarın devam tweet'leri tek kayıtta.
+- YouTube "Daha Sonra İzle" / oynatma listeleri, Bluesky.
+- Ajanlar için: App Intents (Kısayollar, Siri ve Apple Intelligence'tan "wroopmark'ta
+  ara / kaydet"; çalışırken yükü yok, Xcode derlemesi gerekir), MCP kaynakları
+  (kayıtların `wroopmark://` adresleriyle doğrudan okunması).
+
+**v0.5: Çoklu cihaz**
+- Senkron günlüğü (yukarıdaki klasör + `ops/<cihaz>/<ay>.jsonl` tasarımı).
+- iOS uygulaması + App Intent (Xcode gerekir).
+
+**Şimdilik yok**: metin vurgulama, EPUB, Raycast eklentisi (MCP çoğunu
+karşılar), harici API anahtarıyla AI (cihazdaki model yetmezse).

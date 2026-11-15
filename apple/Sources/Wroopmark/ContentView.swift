@@ -97,6 +97,15 @@ struct ContentView: View {
                         }
                         .help(model.filters.isEmpty ? "Gelişmiş filtreler" : "\(model.filters.activeCount) filtre açık")
                         .popover(isPresented: $model.showFilters, arrowEdge: .bottom) { FilterPanel().environment(model) }
+
+                        Toggle(isOn: $model.semanticSearch) {
+                            Label("Anlamına göre ara", systemImage: model.semanticSearch ? "sparkle.magnifyingglass" : "magnifyingglass")
+                                .labelStyle(.iconOnly)
+                        }
+                        .toggleStyle(.button)
+                        .help(model.semanticSearch
+                              ? "Anlamına göre arama açık: yazdığın kelimelerin yanında ilgili kelimeler ve benzer içerikler de gelir (cihazda)"
+                              : "Anlamına göre ara (⇧⌘M): birebir geçmeyen ama aynı şeyden bahseden kayıtları da bul")
                     }
                 }
             }
@@ -146,13 +155,25 @@ struct ContentView: View {
         // A link dragged from the browser (or a .webloc) is saved like ⌘N.
         .dropDestination(for: URL.self) { urls, _ in
             let web = urls.filter { ["http", "https"].contains($0.scheme?.lowercased() ?? "") }
-            guard !web.isEmpty else { return false }
+            let files = urls.filter(\.isFileURL)
+            guard !web.isEmpty || !files.isEmpty else { return false }
             Task {
-                await model.addURLs(web.map(\.absoluteString))
+                if !web.isEmpty { await model.addURLs(web.map(\.absoluteString)) }
+                // Videos, pictures, data downloads, bookmarks.html…
+                if !files.isEmpty { await model.importURLs(files) }
             }
             return true
         }
         .sheet(isPresented: $model.showAdd) { AddURLSheet() }
+        .sheet(isPresented: $model.showDuplicates) { DuplicatesView().environment(model) }
+        .overlay(alignment: .bottom) {
+            if let status = model.transferStatus {
+                TransferBanner(status: status, busy: model.isTransferring) { model.transferStatus = nil }
+                    .padding(.bottom, 14)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy(duration: 0.2), value: model.transferStatus)
         .sheet(isPresented: $model.showDownloads) { DownloadsView().environment(model) }
         .sheet(isPresented: $model.showBulkTags) { BulkTagSheet(ids: Array(model.selection)) }
         .alert("Hata", isPresented: $model.hasError) {

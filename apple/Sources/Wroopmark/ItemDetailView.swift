@@ -105,6 +105,7 @@ struct ItemDetailView: View {
                 if let quote = liveItem.quote?.item {
                     QuoteCard(item: quote) { model.openViewer(owner: liveItem, fromQuote: true, index: $0) }
                 }
+                SummaryBlock(item: liveItem)
                 if let ocr = fullOCR, !ocr.isEmpty {
                     DisclosureGroup {
                         Text(ocr)
@@ -237,6 +238,8 @@ struct ItemDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+
+                RelatedSection(item: liveItem)
 
                 footer
             }

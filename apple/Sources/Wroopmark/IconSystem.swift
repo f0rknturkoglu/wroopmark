@@ -103,6 +103,7 @@ enum FolderIcons {
         case .tiktok: return get("tiktok", svg: tiktokSvg)
         case .facebook: return symbol("person.2")
         case .pinterest: return symbol("pin")
+        case .local: return symbol("externaldrive.fill")
         case .web: return get("other", svg: otherSvg)
         }
     }

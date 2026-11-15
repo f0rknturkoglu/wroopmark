@@ -39,6 +39,41 @@ enum CoreError: LocalizedError, Sendable, Equatable {
     }
 }
 
+/// A JSON value for commands built field by field (`CoreCommand.call`).
+enum CoreArg: Sendable, Encodable, Equatable {
+    case string(String)
+    case int(Int64)
+    case bool(Bool)
+    case strings([String])
+    case null
+
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .string(let s): try c.encode(s)
+        case .int(let i): try c.encode(i)
+        case .bool(let b): try c.encode(b)
+        case .strings(let a): try c.encode(a)
+        case .null: try c.encodeNil()
+        }
+    }
+}
+
+extension Optional where Wrapped == Int64 {
+    var arg: CoreArg { map(CoreArg.int) ?? .null }
+}
+
+extension Optional where Wrapped == String {
+    var arg: CoreArg { map(CoreArg.string) ?? .null }
+}
+
+private struct AnyKey: CodingKey {
+    let stringValue: String
+    init(stringValue: String) { self.stringValue = stringValue }
+    var intValue: Int? { nil }
+    init?(intValue: Int) { nil }
+}
+
 /// Strongly-typed requests understood by the Rust `core::api` JSON dispatcher.
 /// Eliminates `[String: Any]`, `NSNull`, and `JSONSerialization` crashes.
 enum CoreCommand: Sendable, Encodable, Equatable {
@@ -86,6 +121,8 @@ enum CoreCommand: Sendable, Encodable, Equatable {
     case uiSet(key: String, value: String)
     case kickMedia
     case retryMedia
+    /// Any other command, by name and fields (the v0.2 / v0.3 surface).
+    case call(String, [String: CoreArg])
 
     private enum CodingKeys: String, CodingKey {
         case cmd, id, ids, q, sort, limit, offset, url, tags, note, name, from, to, add, remove
@@ -96,8 +133,16 @@ enum CoreCommand: Sendable, Encodable, Equatable {
     }
 
     func encode(to encoder: any Encoder) throws {
+        if case .call(let cmd, let fields) = self {
+            var d = encoder.container(keyedBy: AnyKey.self)
+            try d.encode(cmd, forKey: AnyKey(stringValue: "cmd"))
+            for (k, v) in fields { try d.encode(v, forKey: AnyKey(stringValue: k)) }
+            return
+        }
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
+        case .call:
+            break
         case .stats:
             try c.encode("stats", forKey: .cmd)
         case .settings:

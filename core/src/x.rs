@@ -158,6 +158,9 @@ fn parse_tweet_depth(result: &Value, depth: u8) -> Option<Item> {
         note: None,
         folder_id: None,
         video_tries: 0,
+        summary: None,
+        ai_tags: vec![],
+        stub: false,
         raw: (depth == 0).then(|| t.clone()),
     })
 }

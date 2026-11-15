@@ -55,7 +55,12 @@ struct TriageView: View {
                 Task { _ = await model.addFolder(name: name) }
             }
         }
-        .task(id: model.items.first?.id) { await model.loadTriageSuggestions() }
+        .task(id: model.items.first?.id) {
+            await model.loadTriageSuggestions()
+            // The card on screen and the next two get their summary and tag
+            // ideas while you decide (on-device, when available).
+            if let id = model.items.first?.id { model.prefetchSummaries(after: id) }
+        }
         .onAppear {
             if keyMonitor == nil {
                 keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
@@ -355,6 +360,7 @@ private struct TriageCard: View {
                 QuoteSnippet(item: quote)
             }
             if !item.tags.isEmpty { CardTags(tags: item.tags) }
+            SummaryBlock(item: item)
         }
         .padding(Theme.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)

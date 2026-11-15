@@ -444,6 +444,11 @@ struct ItemCard: View {
                         .foregroundStyle(.primary.opacity(0.92))
                         .lineLimit(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    if item.stub {
+                        Label("Yalnızca link · ayrıntılar arka planda gelecek", systemImage: "clock.arrow.circlepath")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer(minLength: 0)
                 }
                 .padding(Theme.Spacing.md)

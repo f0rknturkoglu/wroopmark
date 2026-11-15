@@ -9,6 +9,10 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case media = "media"
     case ocr = "ocr"
     case backup = "backup"
+    case rules = "rules"
+    case intelligence = "intelligence"
+    case transfer = "transfer"
+    case agents = "agents"
     case extensionHost = "extension"
     case about = "about"
 
@@ -22,6 +26,10 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .media: "Medya"
         case .ocr: "Yazı Tanıma"
         case .backup: "Yedek"
+        case .rules: "Kurallar"
+        case .intelligence: "Zeka"
+        case .transfer: "İçe / Dışa Aktar"
+        case .agents: "Ajanlar (MCP)"
         case .extensionHost: "Eklenti"
         case .about: "Hakkında"
         }
@@ -35,6 +43,10 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .media: "play.rectangle"
         case .ocr: "text.viewfinder"
         case .backup: "externaldrive.badge.timemachine"
+        case .rules: "wand.and.rays"
+        case .intelligence: "sparkles"
+        case .transfer: "arrow.up.arrow.down.square"
+        case .agents: "point.3.filled.connected.trianglepath.dotted"
         case .extensionHost: "puzzlepiece.extension"
         case .about: "info.circle"
         }
@@ -100,6 +112,10 @@ struct SettingsView: View {
         case .media: mediaSection
         case .ocr: ocrSection
         case .backup: backupSection
+        case .rules: RulesSettings()
+        case .intelligence: IntelligenceSettings()
+        case .transfer: TransferSettings()
+        case .agents: AgentsSettings()
         case .extensionHost: extensionSection
         case .about: aboutSection
         }

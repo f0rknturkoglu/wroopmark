@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 11;
+const SCHEMA_VERSION: i64 = 12;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -170,6 +170,30 @@ SELECT
   i.saved_at AS created_at
 FROM items i;";
 
+/// v11 → v12 (v0.2 / v0.3):
+/// - `rules`: a saved search plus what to do with new items it matches.
+/// - `vectors`: on-device sentence embeddings (int8 + scale) per item.
+/// - `summary` / `ai_tags`: on-device summary and tag ideas.
+/// - `stub`: only the link is known (archive imports); filled in later.
+const MIGRATE_12: &str = "CREATE TABLE IF NOT EXISTS rules(
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  query      TEXT NOT NULL,
+  tag        TEXT,
+  folder_id  INTEGER REFERENCES folders(id) ON DELETE SET NULL,
+  enabled    INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS vectors(
+  item INTEGER PRIMARY KEY REFERENCES items(pk) ON DELETE CASCADE,
+  at   INTEGER NOT NULL,
+  vec  BLOB NOT NULL
+);
+ALTER TABLE items ADD COLUMN summary TEXT;
+ALTER TABLE items ADD COLUMN ai_tags TEXT;
+ALTER TABLE items ADD COLUMN stub INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE items ADD COLUMN stub_tries INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS items_stub ON items(stub) WHERE stub = 1;";
+
 /// A video of the item is not on disk and its URL is a post page, not a
 /// file (TikTok): only an outside downloader can get it.
 const NEEDS_EXTERNAL_VIDEO: &str = "EXISTS (SELECT 1 FROM json_each(i.media) m
@@ -184,7 +208,7 @@ const VIDEO_RETRY_SECS: i64 = 6 * 3600;
 const LINK_TRIES: i64 = 3;
 const LINK_RETRY_SECS: i64 = 3600;
 
-const ITEM_COLS: &str = "i.pk, i.id, i.platform, i.url, i.author_handle, i.author_name, i.author_avatar, i.title, i.text, i.created_at, i.saved_at, i.media, i.quote, i.note, i.folder_id, i.video_tries";
+const ITEM_COLS: &str = "i.pk, i.id, i.platform, i.url, i.author_handle, i.author_name, i.author_avatar, i.title, i.text, i.created_at, i.saved_at, i.media, i.quote, i.note, i.folder_id, i.video_tries, i.summary, i.stub, i.ai_tags";
 
 /// Hosts that only wrap the post's own media; never interesting as links.
 const NOISE_HOSTS: [&str; 4] = ["pic.twitter.com", "pic.x.com", "t.co", "pbs.twimg.com"];
@@ -445,6 +469,9 @@ fn read_item(row: &Row) -> rusqlite::Result<(i64, Item)> {
             note: row.get(13)?,
             folder_id: row.get(14)?,
             video_tries: row.get(15)?,
+            summary: row.get(16)?,
+            stub: row.get(17)?,
+            ai_tags: row.get::<_, Option<String>>(18)?.and_then(|a| serde_json::from_str(&a).ok()).unwrap_or_default(),
             ..Default::default()
         },
     ))
@@ -726,6 +753,23 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
             args.push(f.clone().into());
         }
     }
+    let site = "((i.url || '/') LIKE ? OR (i.url || '/') LIKE ? OR EXISTS (SELECT 1 FROM item_links ils JOIN links ls ON ls.id = ils.link
+                 WHERE ils.item = i.pk AND (ls.host = ? OR ls.host LIKE ?)))";
+    for (sites, neg) in [(&q.sites, ""), (&q.not_sites, "NOT ")] {
+        for h in sites {
+            wh.push(format!("{neg}{site}"));
+            let e = escape_like(h);
+            args.push(format!("%://{e}/%").into());
+            args.push(format!("%://%.{e}/%").into());
+            args.push(h.clone().into());
+            args.push(format!("%.{e}").into());
+        }
+    }
+    match q.stub {
+        Some(true) => wh.push("i.stub = 1".into()),
+        Some(false) => wh.push("i.stub = 0".into()),
+        None => {}
+    }
     match q.in_folder {
         Some(true) => wh.push("i.folder_id IS NOT NULL".into()),
         Some(false) => wh.push("i.folder_id IS NULL".into()),
@@ -859,6 +903,9 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
     Ok(Saved { id: item.id.clone(), created })
 }
 
+mod extra;
+pub use extra::{DuplicateGroup, Rule, StubInfo};
+
 fn pk_of(conn: &Connection, id: &str) -> Result<i64> {
     Ok(conn.query_row("SELECT pk FROM items WHERE id = ?1", [id], |r| r.get(0))?)
 }
@@ -883,7 +930,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -918,6 +965,9 @@ impl Store {
         }
         if (1..11).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_11} PRAGMA user_version = 11; COMMIT;"))?;
+        }
+        if (1..12).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_12} PRAGMA user_version = 12; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -1089,8 +1139,8 @@ impl Store {
             .conn
             .query_row(&format!("SELECT {ITEM_COLS}, i.extra, i.ocr FROM items i WHERE i.id = ?1"), [id], |r| {
                 let (pk, mut item) = read_item(r)?;
-                item.extra = r.get(16)?;
-                item.ocr = r.get(17)?;
+                item.extra = r.get(19)?;
+                item.ocr = r.get(20)?;
                 Ok((pk, item))
             })
             .optional()?;
@@ -1104,6 +1154,20 @@ impl Store {
     }
 
     pub fn search(&self, q: &Query, sort: Sort, limit: i64, offset: i64) -> Result<SearchResult> {
+        let (from, where_sql, order, mut args) = Self::item_query(q, sort);
+        let total: i64 = self.conn.query_row(&format!("SELECT count(*) FROM {from} {where_sql}"), params_from_iter(&args), |r| r.get(0))?;
+        args.push(limit.into());
+        args.push(offset.into());
+        let mut stmt = self.conn.prepare(&format!("SELECT {ITEM_COLS} FROM {from} {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"))?;
+        let rows = stmt.query_map(params_from_iter(&args), read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let items = self.attach(rows)?;
+
+        let links = if offset == 0 && q.has_text() { self.search_links(q, 20, 0)? } else { vec![] };
+        Ok(SearchResult { items, total, links })
+    }
+
+    /// FROM, WHERE, ORDER BY and arguments for the items matching `q`.
+    fn item_query(q: &Query, sort: Sort) -> (String, String, String, Vec<Sql>) {
         let mut from = "items i".to_string();
         let mut order = "i.saved_at DESC, i.pk DESC".to_string();
         let mut wh: Vec<String> = vec![];
@@ -1126,16 +1190,7 @@ impl Store {
             order = o;
         }
         let where_sql = if wh.is_empty() { String::new() } else { format!("WHERE {}", wh.join(" AND ")) };
-
-        let total: i64 = self.conn.query_row(&format!("SELECT count(*) FROM {from} {where_sql}"), params_from_iter(&args), |r| r.get(0))?;
-        args.push(limit.into());
-        args.push(offset.into());
-        let mut stmt = self.conn.prepare(&format!("SELECT {ITEM_COLS} FROM {from} {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"))?;
-        let rows = stmt.query_map(params_from_iter(&args), read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
-        let items = self.attach(rows)?;
-
-        let links = if offset == 0 && q.has_text() { self.search_links(q, 20, 0)? } else { vec![] };
-        Ok(SearchResult { items, total, links })
+        (from, where_sql, order, args)
     }
 
     /// Builds shared FROM/ORDER/WHERE/ARGS parts for link pool queries.
@@ -1239,9 +1294,7 @@ impl Store {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {ITEM_COLS} FROM items i JOIN item_links il ON il.item = i.pk WHERE il.link = ?1 ORDER BY i.saved_at DESC, i.pk DESC LIMIT ?2 OFFSET ?3"
         ))?;
-        let rows = stmt
-            .query_map(params![link_id, limit.clamp(1, 200), offset.max(0)], read_item)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let rows = stmt.query_map(params![link_id, limit.clamp(1, 200), offset.max(0)], read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
         self.attach(rows)
     }
 
@@ -1684,7 +1737,7 @@ impl Store {
     /// Stores recognized text ('' when there was none) and reindexes.
     pub fn set_ocr(&mut self, id: &str, text: &str) -> Result<()> {
         let pk = pk_of(&self.conn, id)?;
-        self.conn.execute("UPDATE items SET ocr = ?2 WHERE pk = ?1", params![pk, text.trim()])?;
+        self.conn.execute("UPDATE items SET ocr = ?2, updated_at = ?3 WHERE pk = ?1", params![pk, text.trim(), now()])?;
         reindex_item(&self.conn, pk)
     }
 
@@ -2092,6 +2145,8 @@ mod tests {
                      ALTER TABLE links DROP COLUMN fetch_failures; ALTER TABLE links DROP COLUMN fetch_tried_at;
                      ALTER TABLE links DROP COLUMN status; ALTER TABLE links DROP COLUMN checked_at; ALTER TABLE links DROP COLUMN dead;
                      DROP INDEX IF EXISTS items_folder; ALTER TABLE items DROP COLUMN folder_id; DROP TABLE IF EXISTS folders;
+                     DROP INDEX IF EXISTS items_stub; ALTER TABLE items DROP COLUMN summary; ALTER TABLE items DROP COLUMN ai_tags;
+                     ALTER TABLE items DROP COLUMN stub; ALTER TABLE items DROP COLUMN stub_tries; DROP TABLE IF EXISTS rules; DROP TABLE IF EXISTS vectors;
                      PRAGMA user_version = 3;",
                 )
                 .unwrap();

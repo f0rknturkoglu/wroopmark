@@ -232,6 +232,41 @@ final class AppModel {
     /// Newest saves, for the menu bar.
     var recentItems: [Item] = []
 
+    // MARK: v0.2 / v0.3 (see Intelligence.swift, Imports.swift)
+
+    /// Search also by meaning (on-device model): related words + vectors.
+    var semanticSearch: Bool {
+        didSet {
+            defaults.set(semanticSearch, forKey: "semanticSearch")
+            if !query.isEmpty { queryChanged() }
+        }
+    }
+    /// Make meaning-search vectors in the background (helper process).
+    var aiIndexing: Bool {
+        didSet {
+            defaults.set(aiIndexing, forKey: "aiIndexing")
+            if aiIndexing { startEmbedding() } else { embedTask?.cancel(); embedTask = nil }
+        }
+    }
+    var aiStatus: AIStatus?
+    var embedTask: Task<Void, Never>?
+    var embedPausedUntil: Date?
+    var posterTask: Task<Void, Never>?
+    /// Items like the one in the detail pane.
+    var related: [Item] = []
+    var relatedFor: String?
+    /// Items being summarized right now.
+    var summarizing: Set<String> = []
+    var summaryError: String?
+    var rules: [RuleRow] = []
+    var rulesError: String?
+    var duplicates: [DuplicateGroup] = []
+    var isLoadingDuplicates = false
+    var showDuplicates = false
+    /// Progress / result line for imports and exports.
+    var transferStatus: String?
+    var isTransferring = false
+
     /// Most used tags first, for the filter strip.
     var topTags: [TagCount] { Array(tags.sorted { $0.count > $1.count }.prefix(30)) }
 
@@ -284,6 +319,8 @@ final class AppModel {
         self.autoBackup = defaults.bool(forKey: "autoBackup")
         self.lastBackupAt = defaults.object(forKey: "lastBackupAt") as? Date
         self.spotlightEnabled = defaults.object(forKey: "spotlight") as? Bool ?? true
+        self.semanticSearch = defaults.bool(forKey: "semanticSearch")
+        self.aiIndexing = defaults.object(forKey: "aiIndexing") as? Bool ?? true
     }
 
     isolated deinit {
@@ -339,6 +376,9 @@ final class AppModel {
         startOCR()
         startVideoDownloads()
         startBackupSchedule()
+        startEmbedding()
+        startPosters()
+        Task { await loadAIStatus() }
         if enableSystemIntegrations {
             Spotlight.reindex(core: core)
             QuickSave.shared.attach(self)
@@ -366,6 +406,8 @@ final class AppModel {
         ocrTask?.cancel()
         videoTask?.cancel()
         backupScheduleTask?.cancel()
+        embedTask?.cancel()
+        posterTask?.cancel()
     }
 
     // MARK: Loading
@@ -403,7 +445,7 @@ final class AppModel {
 
         do {
             async let metaTask: Void = refreshMeta()
-            let r: SearchResult = try await core.call(.search(q: effectiveQuery, sort: sortArg, limit: pageSize, offset: 0))
+            let r: SearchResult = try await core.call(searchCommand(q: effectiveQuery, sort: sortArg, limit: pageSize, offset: 0))
             _ = await metaTask
             guard gen == generation, !Task.isCancelled else { return }
             setIfChanged(\.items, visible(r.items))
@@ -440,7 +482,7 @@ final class AppModel {
                 self.loadMoreTask = nil
             }
             do {
-                let r: SearchResult = try await self.core.call(.search(q: q, sort: sortArg, limit: self.pageSize, offset: offset))
+                let r: SearchResult = try await self.core.call(self.searchCommand(q: q, sort: sortArg, limit: self.pageSize, offset: offset))
                 guard gen == self.generation, !Task.isCancelled else { return }
                 let known = Set(self.items.map(\.id))
                 self.items += self.visible(r.items).filter { !known.contains($0.id) }
@@ -730,7 +772,7 @@ final class AppModel {
             while fresh.count < want {
                 guard gen == generation, !Task.isCancelled else { return }
                 let limit = min(maxPage, want - fresh.count)
-                let r: SearchResult = try await core.call(.search(q: effectiveQuery, sort: sortArg, limit: limit, offset: fresh.count))
+                let r: SearchResult = try await core.call(searchCommand(q: effectiveQuery, sort: sortArg, limit: limit, offset: fresh.count))
                 if first == nil { first = r }
                 fresh += r.items
                 if r.items.count < limit { break }
@@ -771,6 +813,8 @@ final class AppModel {
                     if let last = self.lastDataVersion, last != v {
                         await self.refreshLoaded()
                         await self.refreshMeta(force: true)
+                        self.startEmbedding()
+                        self.startPosters()
                         if self.enableSystemIntegrations {
                             Spotlight.indexRecent(core: self.core)
                         }

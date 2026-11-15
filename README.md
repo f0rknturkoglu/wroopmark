@@ -29,19 +29,33 @@ Chromium/Safari eklentisi; hepsi tek bir yerel kütüphaneyi kullanır.
 - Medya bir kez iner (aynı görsel iki gönderide olsa da); TikTok videoları
   yt-dlp ile arka planda.
 - Görsellerdeki yazı cihazda okunur (Apple Vision), ekran görüntüleri de aranır.
+- Toplu içe aktarma: tarayıcı yer imleri, TikTok / Instagram / X veri paketleri,
+  Pocket / Raindrop CSV. Diskteki videolar ve görseller de (eski TikTok indirmelerin
+  dosya adındaki numarayla gönderisine bağlanır).
+- Dışa aktarma: Markdown (Obsidian'a hazır, görsellerle), CSV, JSON.
 - Yedek: veritabanı + medya + düz bir dışa aktarım (`items.jsonl`), istenirse her gün.
 
 **Bulmak**
 - Tek arama kutusu: `rust tag:dev -from:@jack has:image after:2024 "tam ifade"`;
   Türkçe katlama ("istanbul" = "İSTANBUL" = "ıstanbul").
-- Filtre paneli (platform, medya, klasör, etiket, kişi, tarih…), kayıtlı aramalar.
+- **Anlamına göre arama** (✦): birebir geçmese de aynı şeyden bahseden kayıtlar.
+  Cihazdaki dil modeli aramayı eş anlamlılarla genişletir, her kaydın anlam
+  vektörüne bakılır. İnternete bir şey gitmez.
+- Filtre paneli (platform, medya, klasör, etiket, kişi, site, tarih…), kayıtlı aramalar.
 - Spotlight'ta da çıkar; seçince kayıt uygulamada açılır.
 - Kart, liste, akış görünümleri; foto ve video galerisi.
 
 **Düzen**
 - Klasörler (alt klasörlerle), hiyerarşik etiketler (`dev/rust`), notlar.
-- Ayıkla: kayıtlar tek tek gelir, ← sil, → sakla, 1–3 önerilen klasöre taşı.
+- Ayıkla: kayıtlar tek tek gelir, ← sil, → sakla, 1–3 önerilen klasöre taşı;
+  her kartın kısa özeti ve etiket önerileri cihazda çıkar, tek tıkla eklenir.
+- Kurallar: `site:github.com` → `#dev/github`, `from:@kişi` → klasör… yeni gelen her şeye uygulanır.
+- Kopyalar: aynı görsel/video, aynı metin ya da anlamca aynı kayıtlar; birini tut.
+- Her kaydın yanında anlamca benzerleri.
 - Link havuzu: gönderilerdeki tüm linkler tekilleştirilmiş, kırık olanlar işaretli.
+
+**Ajanlar**
+- MCP sunucusu: Claude, Cursor gibi ajanlar arşivinde arar, kayıtları okur, etiketler.
 
 **Hızlı kayıt**
 - Menü çubuğundan link kaydet; her uygulamada ⌃⌥⌘S panodaki linki kaydeder.
@@ -118,6 +132,8 @@ Kütüphane: `~/Library/Application Support/wroopmark/` (veritabanı + `media/`)
 | Reddit | reddit.com'da popup → **Reddit kaydedilenlerini aktar** (tüm gönderi ve yorumlar). Videolar sessiz iner: Reddit'in verdiği tek dosyada ses yok. |
 | Herhangi bir sayfa | Popup → Kaydet (etiket, not, klasör), ⌥⇧S, ya da sağ tık → wroopmark'a kaydet / klasöre kaydet. |
 | Uygulamadan | ⌘N, linki pencereye sürükle-bırak, menü çubuğu simgesi, her yerde ⌃⌥⌘S (panodaki link). |
+| Veri paketi, yer imleri | ⇧⌘I ya da dosyayı pencereye bırak: `bookmarks.html`, TikTok / Instagram / X'in "verilerini indir" paketi (.zip ya da klasör), Pocket / Raindrop CSV. Çoğu yalnızca link verir; metin, yazar ve medya arka planda gelir. İzleme geçmişi alınmaz. |
+| Diskteki dosyalar | Video ve görselleri (ya da klasörü) pencereye bırak. Adında TikTok numarası olan video (`7194…​.mp4`, `SnapTik…_7194….mp4`) o gönderiye bağlanır; yt-dlp adları (`Başlık [id].mp4`) YouTube'a. |
 
 ### Arama
 
@@ -131,9 +147,16 @@ Kütüphane: `~/Library/Application Support/wroopmark/` (veritabanı + `media/`)
 | `folder:ders` `is:unfiled` `is:infolder` | klasör (alt klasörler dahil) |
 | `is:untagged` `is:tagged` `is:reviewed` | durum |
 | `after:2024-01` `before:2025` `savedafter:` `savedbefore:` | paylaşılma / kaydedilme tarihi |
+| `site:github.com` | gönderinin adresi ya da içindeki bir link o sitede |
+| `is:stub` | yalnızca linki bilinen (içe aktarılmış, ayrıntısı gelmemiş) |
 | `id:x:123` | tam o kayıt |
 
 Her süzgeç `-` ile tersine döner. Filtre paneli de yalnızca bu terimleri üretir.
+
+**Anlamına göre** (arama kutusunun yanındaki ✦, ⇧⌘M): "yazılımcı olarak iş bulmak"
+yazınca içinde bu kelimeler geçmeyen mülakat, kariyer gönderileri de gelir. Süzgeçler
+(etiket, tarih…) aynen çalışır. Apple Intelligence açık bir Mac'te en iyisi; değilse
+yalnızca anlam vektörleri kullanılır.
 
 ### Kısayollar
 
@@ -146,9 +169,38 @@ Her süzgeç `-` ile tersine döner. Filtre paneli de yalnızca bu terimleri ür
 | ⌘⇧T | Seçilenleri etiketle |
 | ⌘⌫ | Seçilenleri sil |
 | ⌘⇧K | Ayıkla (← sil, → sakla, ⌘Z geri al, 1–3 önerilen klasör) |
+| ⇧⌘M | Anlamına göre aramayı aç / kapat |
+| ⇧⌘I | İçe aktar |
 | ⌘J | İndirmeler |
 | ⌃⌥⌘S | Her yerde: panodaki linki kaydet |
 | ⌥⇧S / ⌥⇧W | Tarayıcıda: sayfayı kaydet / popup (`chrome://extensions/shortcuts`) |
+
+### Kurallar
+
+Ayarlar → Kurallar: bir arama yaz (`site:github.com`, `from:@karpathy`,
+`platform:tiktok has:video`, `"yapay zeka"`…), uyan kayda eklenecek etiketi ve/veya
+klasörü seç. Yeni kaydedilen ya da içe aktarılan her şey kurallardan geçer; istersen
+mevcut kayıtlara da uygulanır. Elle seçtiğin klasör kuralı ezer.
+
+### Dışa aktarma
+
+Dosya → Dışa aktar: ekrandaki görünüm ve arama (her şey için Tümü) Markdown, CSV ya da
+JSON olarak. Markdown her kaydı ön bilgili (yazar, tarih, etiketler, kaynak) ayrı bir
+not yapar, görseller `media/` altına kopyalanır; Obsidian kasasına doğrudan konur.
+
+### Ajanlar (MCP)
+
+Ayarlar → Ajanlar'daki satırı kopyala ya da:
+
+```bash
+claude mcp add wroopmark -- /Applications/wroopmark.app/Contents/Helpers/wroopmark mcp
+```
+
+Claude Desktop / Cursor için `command`: aynı yol, `args`: `["mcp"]` (yalnızca okuma:
+`["mcp", "--read-only"]`). Araçlar: `search` (süzgeçler + anlamsal), `get_item`
+(tam metin, görseldeki yazı, medya dosya yolları), `related`, `search_links`,
+`list_tags`, `list_folders`, `stats`, `save_url`, `tag_items`, `move_to_folder`,
+`set_note`. Sunucu ajanla birlikte açılıp kapanır.
 
 ### Yedek ve geri yükleme
 
@@ -168,7 +220,12 @@ başka araçlardan kullanılabilir.
 
 ```bash
 wroopmark search "tag:dev rust"
+wroopmark search -m "veritabanı performansı"        # anlamına göre
 wroopmark add https://example.com/yazi --tag okunacak
+wroopmark import ~/Downloads/tiktok-verilerim.zip
+wroopmark import-files ~/Movies/TikTok
+wroopmark export ~/Obsidian/Kasa/wroopmark tag:dev
+wroopmark rule-add site:github.com -t dev/github --apply
 wroopmark stats
 ```
 
@@ -182,6 +239,9 @@ wroopmark stats
 - **Eklentinin ne yaptığını görmek:** `~/Library/Application Support/wroopmark/host.log`.
 - **TikTok videoları inmiyor:** Ayarlar → Medya'da "Harici video indirici" yeşil
   olmalı (`./install.sh` kurar). Olmazsa video, gönderi tarayıcıda açılınca iner.
+- **Anlamsal arama / özet çalışmıyor:** Ayarlar → Zeka'da iki modelin durumu yazar.
+  Özet için Apple Intelligence açık olmalı (Sistem Ayarları → Apple Intelligence ve Siri).
+  Anlam dizini ilk açılışta arka planda oluşur (1600 kayıt ~20 sn).
 - **Safari eklentisi listede yok:** "İmzasız eklentilere izin ver"i aç
   (Safari her açılışta kapatır).
 
@@ -190,7 +250,7 @@ wroopmark stats
 | Yol | Ne |
 |---|---|
 | `core/` | Rust çekirdek: SQLite + FTS5, ayrıştırıcılar, medya deposu, JSON API, CLI / native host |
-| `apple/` | SwiftUI macOS uygulaması, OCR yardımcısı, Safari eklentisinin native tarafı |
+| `apple/` | SwiftUI macOS uygulaması, OCR ve zeka yardımcıları (`apple/OCR`, `apple/AI`), Safari eklentisinin native tarafı |
 | `extensions/chromium/` | MV3 eklenti (Safari sürümü de buradan üretilir) |
 | `install.sh` | kaynaktan kurulum / kaldırma |
 | `apple/scripts/build-mac.sh` | uygulamayı derler (`--install` ile /Applications'a koyar) |

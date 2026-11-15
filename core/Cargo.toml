@@ -1,6 +1,6 @@
 [package]
 name = "wroopmark_core"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
 description = "wroopmark engine: platform extractors, SQLite/FTS5 library and a content-addressed media store"
 license = "MIT"
