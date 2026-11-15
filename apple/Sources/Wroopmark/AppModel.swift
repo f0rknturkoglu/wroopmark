@@ -1450,19 +1450,22 @@ enum OCRHelper {
 
         let timeoutSeconds = min(perFileTimeoutSeconds * Double(files.count), 300.0)
         let lines = Mutex<[String]>([])
+        // Only Sendable values go into the reader task (`Pipe` is not).
+        let reader = output.fileHandleForReading
+        let expected = files.count
 
         return await withTaskCancellationHandler {
             await withTaskGroup(of: Bool.self) { group in
                 group.addTask {
                     do {
-                        for try await line in output.fileHandleForReading.bytes.lines {
+                        for try await line in reader.bytes.lines {
                             if Task.isCancelled { break }
                             let parsed = (try? JSONDecoder().decode(String.self, from: Data(line.utf8))) ?? ""
                             let count = lines.withLock { store -> Int in
                                 store.append(parsed)
                                 return store.count
                             }
-                            if count >= files.count { break }
+                            if count >= expected { break }
                         }
                     } catch {}
                     return true
