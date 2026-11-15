@@ -5,6 +5,7 @@ struct LibraryView: View {
     @State private var showAdd = false
     @State private var showSettings = false
     @State private var showFeed = false
+    @State private var showTriage = false
     @State private var path: [String] = []
 
     var body: some View {
@@ -58,6 +59,10 @@ struct LibraryView: View {
                     }
                     .accessibilityLabel("Ayarlar")
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showTriage = true } label: { Image(systemName: "rectangle.stack.badge.minus") }
+                        .accessibilityLabel("Ayıkla")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showFeed = true } label: { Image(systemName: "play.rectangle.on.rectangle") }
                         .accessibilityLabel("Akış")
@@ -77,6 +82,7 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $showSettings) { PhoneSettingsView() }
             .fullScreenCover(isPresented: $showFeed) { VideoFeedView(scope: model.scope, query: model.query) }
+            .fullScreenCover(isPresented: $showTriage) { PhoneTriageView(scope: model.scope, query: model.query) }
         }
     }
 }

@@ -150,6 +150,14 @@ final class FeedSource {
         let known = Set(entries.map(\.id))
         entries += got.filter { !known.contains($0.id) }
     }
+
+    /// Drops a deleted post's pages; returns the page to show next.
+    func remove(item id: String, after current: String?) -> String? {
+        let start = current.flatMap { c in entries.firstIndex { $0.id == c } } ?? 0
+        let next = entries[start...].first { $0.item.id != id }?.id ?? entries[..<start].last { $0.item.id != id }?.id
+        entries.removeAll { $0.item.id == id }
+        return next
+    }
 }
 
 struct VideoFeedView: View {
@@ -164,6 +172,7 @@ struct VideoFeedView: View {
     @State private var shuffled = false
     @State private var player = FeedPlayer()
     @State private var details: Item?
+    @State private var deleting: Item?
 
     private var filter: String {
         [scope.filter, query.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: " ")
@@ -186,6 +195,22 @@ struct VideoFeedView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden()
+        // Swipe right to leave, like going back. On a page of several
+        // pictures sideways swipes page through them, so start at the edge.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { v in
+                    let right = v.translation.width > 90 && abs(v.translation.height) < v.translation.width * 0.6
+                    let onPictures = (source?.entries.first { $0.id == current }).map { $0.video == nil && $0.pictures.count > 1 } ?? false
+                    if right && (!onPictures || v.startLocation.x < 40) { dismiss() }
+                }
+        )
+        .confirmationDialog("Bu kayıt silinsin mi?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible, presenting: deleting) { item in
+            Button("Sil", role: .destructive) { Task { await delete(item) } }
+            Button("Vazgeç", role: .cancel) {}
+        } message: { _ in
+            Text("Senkron açıksa diğer cihazlardan da silinir.")
+        }
         .task(id: "\(filter)|\(mode.rawValue)|\(shuffled)") { await open() }
         .onChange(of: current) { _, id in
             guard let source, let id, let entry = source.entries.first(where: { $0.id == id }) else { return }
@@ -216,6 +241,15 @@ struct VideoFeedView: View {
         }
     }
 
+    private func delete(_ item: Item) async {
+        guard let source else { return }
+        player.stop()
+        let next = source.remove(item: item.id, after: current)
+        current = next
+        if let id = next, let e = source.entries.first(where: { $0.id == id }), let v = e.video?.videoFile { player.play(v) }
+        await model.delete(item.id)
+    }
+
     private func open() async {
         player.stop()
         let s = FeedSource(filter: filter, mode: mode, shuffled: shuffled)
@@ -238,7 +272,7 @@ struct VideoFeedView: View {
         ScrollView(.vertical) {
             LazyVStack(spacing: 0) {
                 ForEach(source.entries) { entry in
-                    FeedPage(entry: entry, active: entry.id == current, player: player, details: { details = entry.item })
+                    FeedPage(entry: entry, active: entry.id == current, player: player, details: { details = entry.item }, delete: { deleting = entry.item })
                         .containerRelativeFrame([.horizontal, .vertical])
                         .id(entry.id)
                 }
@@ -318,6 +352,7 @@ private struct FeedPage: View {
     let active: Bool
     let player: FeedPlayer
     let details: () -> Void
+    let delete: () -> Void
     @State private var showPause = false
     @State private var expanded = false
 
@@ -387,6 +422,7 @@ private struct FeedPage: View {
                         }
                     }
                     sideButton("info.circle", label: "Ayrıntılar", action: details)
+                    sideButton("trash", label: "Sil", action: delete)
                     if let url = URL(string: item.url), url.scheme?.hasPrefix("http") == true {
                         ShareLink(item: url) {
                             Image(systemName: "square.and.arrow.up").font(.title2).frame(width: 44, height: 44)
