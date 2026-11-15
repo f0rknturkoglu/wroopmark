@@ -209,6 +209,26 @@ impl Store {
         Ok(())
     }
 
+    /// Items that have pictures or videos.
+    pub fn media_item_ids(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare_cached("SELECT id FROM items WHERE has_image = 1 OR has_video = 1 ORDER BY saved_at DESC")?;
+        let ids = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        Ok(ids)
+    }
+
+    /// Sends these items' content again at the next push.
+    pub fn mark_content_dirty(&mut self, ids: &[String]) -> Result<()> {
+        let tx = self.write()?;
+        {
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO sync_dirty VALUES (?1, 'content')")?;
+            for id in ids {
+                stmt.execute([id])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Keeps an item out of the media pass while its files come by iCloud.
     pub fn hold_media(&mut self, id: &str) -> Result<()> {
         self.conn.execute("UPDATE items SET media_pending = 0 WHERE id = ?1", [id])?;

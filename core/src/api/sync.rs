@@ -204,6 +204,7 @@ impl Library {
         }
         let dev = self.device_id()?;
         let mut report = SyncReport::default();
+        self.queue_media_out(&base)?;
         self.push(&base, &dev, &mut report)?;
         self.pull(&base, &dev, &mut report)?;
         let (came, remote) = self.collect_media(&base)?;
@@ -260,6 +261,59 @@ impl Library {
         Ok(())
     }
 
+    /// Files of an item this device has and the folder lacks, in this mode.
+    fn media_to_send(&self, base: &Path, item: &Item, mode: MediaMode) -> Vec<String> {
+        if mode == MediaMode::None {
+            return vec![];
+        }
+        let quote = item.quote.iter().flat_map(|q| q.media.iter());
+        let mut out = vec![];
+        for m in item.media.iter().chain(quote) {
+            let video = if mode == MediaMode::All { m.video_file.as_deref() } else { None };
+            for name in [m.file.as_deref(), video].into_iter().flatten() {
+                if self.media.contains(name) && matches!(shared_state(&shared_media(base, name)), Shared::Missing) {
+                    out.push(name.to_string());
+                }
+            }
+        }
+        out
+    }
+
+    /// After the media setting changed (or on a library that synced before
+    /// media changes were sent), sends again the items whose files the
+    /// folder lacks; the push copies the files. At most about 1 GB a round.
+    fn queue_media_out(&self, base: &Path) -> Result<()> {
+        const BUDGET: u64 = 1 << 30;
+        if self.lock_store()?.setting("sync_media_backfill")?.as_deref() != Some("1") {
+            return Ok(());
+        }
+        let mode = self.media_mode()?;
+        let ids = self.lock_store()?.media_item_ids()?;
+        let (mut queued, mut bytes, mut done) = (vec![], 0u64, true);
+        for id in ids {
+            let Some(item) = self.lock_store()?.get(&id)? else { continue };
+            let files = self.media_to_send(base, &item, mode);
+            if files.is_empty() {
+                continue;
+            }
+            if bytes >= BUDGET {
+                done = false;
+                break;
+            }
+            bytes += files.iter().filter_map(|f| self.media.file_size(f)).map(|n| u64::try_from(n).unwrap_or(0)).sum::<u64>();
+            queued.push(id);
+        }
+        let mut store = self.lock_store()?;
+        store.mark_content_dirty(&queued)?;
+        if done {
+            store.set_setting("sync_media_backfill", "0")?;
+        }
+        if !queued.is_empty() {
+            append_log(&self.root, &format!("senkron: {} kaydın dosyaları klasöre gidiyor ({} MB)", queued.len(), bytes >> 20));
+        }
+        Ok(())
+    }
+
     fn copy_media_out(&self, base: &Path, item: &Item, mode: MediaMode) -> usize {
         let mut n = 0;
         let quote = item.quote.iter().flat_map(|q| q.media.iter());
@@ -294,6 +348,8 @@ impl Library {
     /// files are waiting for iCloud rather than for the web.
     fn take_media_in(&self, base: &Path, id: &str, media: &mut [Media]) -> Result<(usize, usize)> {
         let (mut n, mut held) = (0, 0);
+        // Low on space (the iPhone app pauses media): note, do not copy.
+        let paused = self.media_paused();
         let mut waits = vec![];
         for m in media.iter_mut() {
             // The keys `remember_files` uses for each slot.
@@ -307,11 +363,11 @@ impl Library {
                 }
                 let src = shared_media(base, &name);
                 match shared_state(&src) {
-                    Shared::Here if self.copy_in(&src, &name) => {
+                    Shared::Here if !paused && self.copy_in(&src, &name) => {
                         n += 1;
                         continue;
                     }
-                    Shared::Remote if !key.is_empty() => {
+                    Shared::Remote | Shared::Here if !key.is_empty() => {
                         held += usize::from(counts);
                         waits.push((name, id.to_string(), key));
                     }
@@ -331,7 +387,7 @@ impl Library {
     /// can ask iCloud for them.
     fn collect_media(&self, base: &Path) -> Result<(usize, Vec<PathBuf>)> {
         let waits = self.lock_store()?.media_waits()?;
-        if waits.is_empty() {
+        if waits.is_empty() || self.media_paused() {
             return Ok((0, vec![]));
         }
         let ids: Vec<String> = waits.iter().map(|(_, i)| i.clone()).collect();
@@ -574,7 +630,10 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
                 media: String,
             }
             req.parse::<M>().and_then(|m| {
-                lib.lock_store()?.set_setting("sync_media", &m.media)?;
+                let mut store = lib.lock_store()?;
+                store.set_setting("sync_media", &m.media)?;
+                // Files that were not sent under the old setting go now.
+                store.set_setting("sync_media_backfill", "1")?;
                 S::ok(true)
             })
         }
@@ -717,6 +776,44 @@ mod tests {
         let got = call(&b, json!({"cmd": "get", "id": id}));
         assert_eq!(got.pointer("/media/0/file"), Some(&json!(pic)), "{got}");
         assert!(b.media.contains(&pic));
+        a.shutdown();
+        b.shutdown();
+        let _ = fs::remove_dir_all(&root);
+    }
+    /// Videos skipped under "images" go to the folder once the setting is
+    /// "all", and reach the other device; so does a file downloaded later.
+    #[test]
+    fn media_setting_change_sends_old_files() {
+        let root = std::env::temp_dir().join(format!("wm-sync-videos-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let shared = root.join("shared");
+        let a = Library::open(&root.join("a")).unwrap_or_else(|_| std::process::abort());
+        let b = Library::open(&root.join("b")).unwrap_or_else(|_| std::process::abort());
+        let poster = a.media.put(b"poster", "jpg").unwrap_or_default();
+        let video = a.media.put(b"video", "mp4").unwrap_or_default();
+        call(
+            &a,
+            json!({"cmd": "import_items", "items": [
+            {"platform": "web", "url": "https://example.com/v", "text": "video", "media": [
+                {"kind": "video", "url": "https://e.invalid/v.mp4", "thumb_url": "https://e.invalid/v.jpg", "file": poster, "video_file": video}]}]}),
+        );
+        call(&a, json!({"cmd": "sync_enable", "dir": shared, "media": "images"}));
+        assert!(matches!(shared_state(&shared_media(&shared, &poster)), Shared::Here));
+        assert!(matches!(shared_state(&shared_media(&shared, &video)), Shared::Missing));
+        call(&b, json!({"cmd": "sync_enable", "dir": shared}));
+
+        call(&a, json!({"cmd": "sync_set_media", "media": "all"}));
+        let r = call(&a, json!({"cmd": "sync_now"}));
+        assert_eq!(r.get("pushed"), Some(&json!(1)), "{r}");
+        assert!(matches!(shared_state(&shared_media(&shared, &video)), Shared::Here));
+        // Once is enough.
+        assert_eq!(call(&a, json!({"cmd": "sync_now"})).get("pushed"), Some(&json!(0)));
+
+        let r = call(&b, json!({"cmd": "sync_now"}));
+        assert_eq!(r.get("media_in"), Some(&json!(1)), "{r}");
+        let id = item_id_for_url("https://example.com/v").1;
+        assert_eq!(call(&b, json!({"cmd": "get", "id": id})).pointer("/media/0/video_file"), Some(&json!(video)));
+        assert!(b.media.contains(&video));
         a.shutdown();
         b.shutdown();
         let _ = fs::remove_dir_all(&root);
