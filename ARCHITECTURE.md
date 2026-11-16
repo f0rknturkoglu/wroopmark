@@ -368,5 +368,11 @@ hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
   kimliği doğrulanmadan kurulmaz; kaynaktan derlenmiş sürüm yalnızca sayfayı açar.
 - Kilit ekranı widget'ları; isteğe bağlı "Geçmişte bugün" bildirimi.
 
+**v1.7.1** ✅
+- Mac: Ayarlar → Görünüm'de tema (Sistem / Açık / Koyu); tarihler arayüzün
+  dilinde (İngilizcede artık "sa. önce" yok).
+- iPhone: paylaşım menüsünden Fotoğraflar'a kaydetme izni (çökme düzeltmesi).
+- Gizlilik ve destek sayfaları sitede; paketleme macOS 27'de yeniden notarize ediyor.
+
 **Şimdilik yok**: RSS ve bültenler, EPUB, hesap ve sunucu, Raycast eklentisi (MCP çoğunu karşılar), harici API
 anahtarıyla AI (cihazdaki model yetmezse).
