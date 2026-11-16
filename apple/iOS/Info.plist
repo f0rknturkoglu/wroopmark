@@ -20,5 +20,7 @@
 		<string>en</string>
 		<string>tr</string>
 	</array>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Videolardaki konuşmayı cihazda aramak için yazıya döker.</string>
 </dict>
 </plist>

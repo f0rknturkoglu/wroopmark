@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use chrono::DateTime;
 
-use crate::model::Item;
+use crate::model::{Highlight, Item};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
@@ -109,7 +109,7 @@ impl Names {
 
 /// One Markdown note. `media` are the stored files it embeds, written by
 /// the caller to `media/`.
-pub fn markdown(item: &Item, folder: Option<&str>) -> (String, Vec<String>) {
+pub fn markdown(item: &Item, folder: Option<&str>, highlights: &[Highlight]) -> (String, Vec<String>) {
     let mut s = String::from("---\n");
     s.push_str(&format!("id: {}\n", yq(&item.id)));
     s.push_str(&format!("url: {}\n", yq(&item.url)));
@@ -168,6 +168,27 @@ pub fn markdown(item: &Item, folder: Option<&str>) -> (String, Vec<String>) {
         let who = q.author_handle.as_deref().map(|h| format!("@{h}")).unwrap_or_default();
         s.push_str(&format!("> **{who}** {}\n", q.text.trim().replace('\n', "\n> ")));
         s.push_str(&format!("> {}\n\n", q.url));
+    }
+    if !highlights.is_empty() {
+        s.push_str("## Vurgular\n\n");
+        for h in highlights {
+            s.push_str(&format!("> {}\n", h.quote.trim().replace('\n', "\n> ")));
+            if let Some(n) = h.note.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
+                s.push_str(&format!("- Not: {n}\n"));
+            }
+            s.push('\n');
+        }
+    }
+    if !item.replies.is_empty() {
+        s.push_str("## Yanıtlar\n\n");
+        for r in &item.replies {
+            let who = r.author_handle.as_deref().map(|h| format!("@{h}")).or_else(|| r.author_name.clone()).unwrap_or_else(|| "…".into());
+            let body = r.text.trim();
+            if body.is_empty() {
+                continue;
+            }
+            s.push_str(&format!("**{who}**: {body}\n\n"));
+        }
     }
     if let Some(n) = item.note.as_deref().filter(|n| !n.trim().is_empty()) {
         s.push_str(&format!("## Not\n\n{}\n\n", n.trim()));
@@ -236,6 +257,8 @@ struct Words {
     video: &'static str,
     note: &'static str,
     summary: &'static str,
+    highlights: &'static str,
+    replies: &'static str,
     made: &'static str,
     none: &'static str,
 }
@@ -248,6 +271,8 @@ const TR: Words = Words {
     video: "Videoyu kaynağında aç",
     note: "Not",
     summary: "Özet",
+    highlights: "Vurgular",
+    replies: "Yanıtlar",
     made: "wroopmark ile çevrimdışı arşivden",
     none: "Eşleşen kayıt yok",
 };
@@ -260,6 +285,8 @@ const EN: Words = Words {
     video: "Open the video at its source",
     note: "Note",
     summary: "Summary",
+    highlights: "Highlights",
+    replies: "Replies",
     made: "From an offline wroopmark archive",
     none: "No matching items",
 };
@@ -289,7 +316,14 @@ pub type Embed<'a> = dyn FnMut(&str) -> Option<String> + 'a;
 
 /// One self-contained page: every item as a card, its pictures inside the
 /// file (as far as `embed` allows), a search box; opens offline anywhere.
-pub fn html_page(title: &str, items: &[Item], folder_of: &dyn Fn(&Item) -> Option<String>, english: bool, embed: &mut Embed<'_>) -> String {
+pub fn html_page(
+    title: &str,
+    items: &[Item],
+    folder_of: &dyn Fn(&Item) -> Option<String>,
+    highlights_of: &dyn Fn(&Item) -> Vec<Highlight>,
+    english: bool,
+    embed: &mut Embed<'_>,
+) -> String {
     let w = if english { &EN } else { &TR };
     let mut s = String::with_capacity(64 * 1024);
     s.push_str(&format!(
@@ -352,6 +386,31 @@ pub fn html_page(title: &str, items: &[Item], folder_of: &dyn Fn(&Item) -> Optio
         if let Some(sum) = item.summary.as_deref().filter(|t| !t.trim().is_empty()) {
             s.push_str(&format!("<div class=\"box\"><b>{}:</b> {}</div>", w.summary, esc(sum.trim())));
         }
+        let hl = highlights_of(item);
+        if !hl.is_empty() {
+            let parts: Vec<String> = hl
+                .iter()
+                .map(|h| match h.note.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
+                    Some(n) => format!("“{}” — <i>{}</i>", esc(h.quote.trim()), esc(n)),
+                    None => format!("“{}”", esc(h.quote.trim())),
+                })
+                .collect();
+            s.push_str(&format!("<div class=\"box\"><b>{}:</b> {}</div>", w.highlights, parts.join("<br>")));
+        }
+        if !item.replies.is_empty() {
+            let parts: Vec<String> = item
+                .replies
+                .iter()
+                .filter(|r| !r.text.trim().is_empty())
+                .map(|r| {
+                    let who = r.author_handle.as_deref().map(|h| format!("@{h}")).or_else(|| r.author_name.clone()).unwrap_or_default();
+                    format!("<b>{}</b> {}", esc(&who), esc(r.text.trim()))
+                })
+                .collect();
+            if !parts.is_empty() {
+                s.push_str(&format!("<div class=\"box\"><b>{}:</b> {}</div>", w.replies, parts.join("<br>")));
+            }
+        }
         if let Some(n) = item.note.as_deref().filter(|n| !n.trim().is_empty()) {
             s.push_str(&format!("<div class=\"box\"><b>{}:</b> {}</div>", w.note, esc(n.trim())));
         }
@@ -405,10 +464,16 @@ mod tests {
             saved_at: 1_700_000_000,
             ..Default::default()
         };
-        let (md, files) = markdown(&item, Some("Ders"));
+        let (md, files) = markdown(
+            &Item { replies: vec![Item { author_handle: Some("b".into()), text: "haklısın".into(), ..Default::default() }], ..item.clone() },
+            Some("Ders"),
+            &[Highlight { quote: "Merhaba".into(), note: Some("vurgulandı".into()), ..Default::default() }],
+        );
         assert!(md.starts_with("---\nid: \"x:1\"\n"));
         assert!(md.contains("  - \"iki-kelime\"\n"));
         assert!(md.contains("![](media/ab12.jpg)"));
+        assert!(md.contains("## Vurgular") && md.contains("> Merhaba") && md.contains("- Not: vurgulandı"));
+        assert!(md.contains("## Yanıtlar") && md.contains("**@b**: haklısın"));
         assert_eq!(files, vec!["ab12.jpg"]);
         let row = csv_row(&item, None);
         assert!(row.contains("\"Merhaba \"\"dünya\"\"\nikinci satır\""));

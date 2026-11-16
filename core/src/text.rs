@@ -252,6 +252,56 @@ pub fn tidy(s: &str) -> String {
     out
 }
 
+/// Cleans a WebVTT or SRT subtitle file into plain searchable speech lines,
+/// dropping headers, cue numbers, timestamps, inline tags and repeated cues.
+pub fn strip_subtitles(raw: &str) -> String {
+    let mut out: Vec<String> = vec![];
+    let mut total = 0usize;
+    let mut prev = String::new();
+    for line in raw.lines() {
+        let t = line.trim().trim_start_matches('\u{feff}');
+        if t.is_empty()
+            || t == "WEBVTT"
+            || t.starts_with("Kind:")
+            || t.starts_with("Language:")
+            || t == "NOTE"
+            || t == "STYLE"
+            || t.contains("-->")
+            || t.chars().all(|c| c.is_ascii_digit())
+        {
+            continue;
+        }
+        let mut clean = String::with_capacity(t.len());
+        let mut inside = false;
+        for ch in t.chars() {
+            match ch {
+                '<' => inside = true,
+                '>' => inside = false,
+                _ if !inside => clean.push(ch),
+                _ => {}
+            }
+        }
+        let clean = clean
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&nbsp;", " ")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if clean.is_empty() || clean == prev {
+            continue;
+        }
+        total += clean.chars().count() + 1;
+        if total > 30_000 {
+            break;
+        }
+        prev = clean.clone();
+        out.push(clean);
+    }
+    out.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,5 +344,11 @@ mod tests {
     fn extracts_urls() {
         let t = "bak: https://a.com/x. ve (https://b.com/y) https://en.wikipedia.org/wiki/Rust_(language)!";
         assert_eq!(extract_urls(t), vec!["https://a.com/x", "https://b.com/y", "https://en.wikipedia.org/wiki/Rust_(language)"]);
+    }
+
+    #[test]
+    fn strips_subtitles() {
+        let vtt = "WEBVTT\nKind: captions\nLanguage: tr\n\n1\n00:00:00.000 --> 00:00:02.000\n<c>Merhaba</c> dünya\n\n2\n00:00:02.000 --> 00:00:04.000\nMerhaba dünya\n\n3\n00:00:04.000 --> 00:00:06.000\nRust &amp; Swift\n";
+        assert_eq!(strip_subtitles(vtt), "Merhaba dünya\nRust & Swift");
     }
 }

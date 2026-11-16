@@ -241,6 +241,9 @@ pub fn embed_text(item: &Item) -> String {
     if let Some(o) = item.ocr.as_deref() {
         parts.push(o);
     }
+    if let Some(e) = item.extra.as_deref() {
+        parts.push(e);
+    }
     let joined = parts.into_iter().map(str::trim).filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n");
     // A word or two ("lol", a caption made of hashtags) carries no meaning
     // to match on; such items get no vector rather than a vague one that

@@ -295,7 +295,9 @@ fn read_resource(lib: &Arc<Library>, uri: &str) -> Result<Value, Value> {
     };
     let folder = ctx.folder_name(v.get("folder_id").and_then(Value::as_i64));
     let item: crate::model::Item = serde_json::from_value(v).unwrap_or_default();
-    let (mut md, files) = crate::export::markdown(&item, folder.as_str());
+    let hl: Vec<crate::model::Highlight> =
+        ctx.call(json!({"cmd": "highlights", "id": id})).ok().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
+    let (mut md, files) = crate::export::markdown(&item, folder.as_str(), &hl);
     for f in files {
         md = md.replace(&format!("media/{f}"), &lib.media.path(&f).display().to_string());
     }

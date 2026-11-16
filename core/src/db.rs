@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 21;
+const SCHEMA_VERSION: i64 = 22;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -323,6 +323,10 @@ CREATE TRIGGER IF NOT EXISTS sync_item_replies AFTER UPDATE OF replies ON items
 BEGIN
   INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'content');
 END;";
+
+/// v21 → v22 (v1.2): 64-bit perceptual image fingerprint (`dHash`) for finding
+/// visually similar images and duplicate photos.
+const MIGRATE_22: &str = "ALTER TABLE items ADD COLUMN imghash INTEGER;";
 
 /// v17 → v18: files another device has not uploaded yet are waited for too
 /// (`since`: when noted). The logs are read once more, so a phone that saw
@@ -1176,7 +1180,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} {MIGRATE_20} {MIGRATE_21} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} {MIGRATE_20} {MIGRATE_21} {MIGRATE_22} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -1241,6 +1245,9 @@ impl Store {
         }
         if (1..21).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_21} PRAGMA user_version = 21; COMMIT;"))?;
+        }
+        if (1..22).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_22} PRAGMA user_version = 22; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -2453,7 +2460,7 @@ mod tests {
                      ALTER TABLE items DROP COLUMN stub; ALTER TABLE items DROP COLUMN stub_tries; DROP TABLE IF EXISTS rules; DROP TABLE IF EXISTS vectors;
                      ALTER TABLE items DROP COLUMN thread; ALTER TABLE items DROP COLUMN snapshot; ALTER TABLE items DROP COLUMN snapshot_tries;
                      ALTER TABLE items DROP COLUMN article; ALTER TABLE items DROP COLUMN article_ready; ALTER TABLE items DROP COLUMN highlights;
-                     ALTER TABLE items DROP COLUMN replies;
+                     ALTER TABLE items DROP COLUMN replies; ALTER TABLE items DROP COLUMN imghash;
                      PRAGMA user_version = 3;",
                 )
                 .unwrap();

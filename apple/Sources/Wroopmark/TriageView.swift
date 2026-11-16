@@ -13,6 +13,7 @@ struct TriageView: View {
     /// focus stays in the sidebar list, which would take the arrows.
     @State private var keyMonitor: Any?
     @State private var showNewFolderSheet = false
+    @State private var showBatchSuggest = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,6 +56,10 @@ struct TriageView: View {
                 Task { _ = await model.addFolder(name: name) }
             }
         }
+        .sheet(isPresented: $showBatchSuggest) {
+            MacBatchSuggestSheet()
+                .environment(model)
+        }
         .task(id: model.items.first?.id) {
             await model.loadTriageSuggestions()
             // The card on screen and the next two get their summary and tag
@@ -77,7 +82,7 @@ struct TriageView: View {
     /// ← → and ⌘Z, unless the user is typing (search, tags, note) or the
     /// media viewer / filter panel is open.
     private func handle(_ event: NSEvent) -> Bool {
-        guard model.scope == .triage, model.viewer == nil, !model.showFilters, !model.showBulkTags,
+        guard model.scope == .triage, model.viewer == nil, !model.showFilters, !model.showBulkTags, !showBatchSuggest,
               !(event.window?.firstResponder is NSText) else { return false }
         let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
         switch (event.keyCode, mods) {
@@ -260,6 +265,11 @@ struct TriageView: View {
                     }
                     .tint(.green)
                     .help("Sakla (→)")
+                    Button { showBatchSuggest = true } label: {
+                        Label("Toplu Öneriler", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.glass)
+                    .help("Etiketsiz kayıtlar için klasör ve yapay zekâ önerilerini toplu uygula")
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
@@ -295,6 +305,9 @@ struct TriageView: View {
         } description: {
             Text("Sakladıkların buraya bir daha gelmez. Filtreleri değiştirebilir ya da saklananları yeniden gözden geçirebilirsin.")
         } actions: {
+            Button { showBatchSuggest = true } label: {
+                Label("Toplu Öneriler", systemImage: "sparkles")
+            }
             Button { Task { await model.resetReviewed() } } label: {
                 Label("Saklananları yeniden göster", systemImage: "arrow.counterclockwise")
             }
@@ -307,6 +320,101 @@ private struct TrailingIcon: LabelStyle {
         HStack(spacing: Theme.Spacing.sm) {
             configuration.title
             configuration.icon
+        }
+    }
+}
+
+private struct MacBatchSuggestSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var suggestions: [BatchSuggestion] = []
+    @State private var selected: Set<String> = []
+    @State private var loading = true
+    @State private var applying = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label("Toplu Öneriler", systemImage: "sparkles")
+                    .font(.headline)
+                Spacer()
+                Button("Kapat") { dismiss() }
+            }
+            .padding()
+            Divider()
+            if loading {
+                ProgressView("Öneriler hazırlanıyor…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if suggestions.isEmpty {
+                ContentUnavailableView(
+                    "Öneri bulunamadı",
+                    systemImage: "sparkles",
+                    description: Text("Etiketsiz kayıtlar için klasör geçmişi veya yapay zekâ önerisi henüz oluşmadı.")
+                )
+            } else {
+                List(suggestions) { row in
+                    let isOn = selected.contains(row.id)
+                    HStack(alignment: .top, spacing: 10) {
+                        Toggle(isOn: Binding(
+                            get: { isOn },
+                            set: { v in
+                                if v { selected.insert(row.id) } else { selected.remove(row.id) }
+                            }
+                        )) {
+                            EmptyView()
+                        }
+                        .toggleStyle(.checkbox)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(row.item.title ?? (row.item.text.isEmpty ? row.item.url : row.item.text))
+                                .font(.body.weight(.medium))
+                                .lineLimit(2)
+                            HStack(spacing: 6) {
+                                if let f = row.folderName {
+                                    Label(f, systemImage: "folder")
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.accent)
+                                }
+                                ForEach(row.tags, id: \.self) { t in
+                                    Text("#\(t)")
+                                        .font(.caption)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Theme.Stroke.subtleFill, in: .capsule)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                Divider()
+                HStack {
+                    Text("\(selected.count) kayıt seçili")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        applying = true
+                        Task {
+                            let picked = suggestions.filter { selected.contains($0.id) }
+                            _ = await model.applyBatch(picked)
+                            applying = false
+                            dismiss()
+                        }
+                    } label: {
+                        Text(applying ? "Uygulanıyor…" : "Tümünü Uygula")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(selected.isEmpty || applying)
+                }
+                .padding()
+            }
+        }
+        .frame(width: 560, height: 460)
+        .task {
+            let loaded = await model.suggestBatch(q: model.effectiveQuery, limit: 30)
+            suggestions = loaded
+            selected = Set(loaded.map(\.id))
+            loading = false
         }
     }
 }

@@ -333,12 +333,11 @@ hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
   (eklenen videolar dahil); yeni telefon aynı klasörü seçince arşiv geri gelir.
 - Swift tarafında çekirdek JSON'unu çözme testleri.
 
-**v1.2: Aramada derinlik**
-- Görsel içeriğiyle arama (Vision sınıflandırma) ve benzer görseller (görsel
-  parmak izi).
-- Videoda konuşulanı arama: hazır altyazı, yoksa cihazda konuşma tanıma.
-- Etiketsiz kayıtlara toplu etiket/klasör önerisi, tek ekranda onay.
-- Dışa aktarmaya (Markdown, HTML) vurgular ve X yanıtları.
+**v1.2: Aramada derinlik** ✅
+- Görsel içeriğiyle arama (Vision sınıflandırma, iki dilli etiketler) ve benzer görseller (`dHash` görsel parmak izi).
+- Videoda konuşulanı arama: hazır altyazı (`.vtt`/`.srt`), yoksa kullanıcı başlattığında cihazda konuşma tanıma (`SFSpeechRecognizer`, çevrimdışı).
+- Etiketsiz kayıtlara toplu etiket/klasör önerisi (`suggest_batch` / `apply_batch`), tek ekranda onay.
+- Dışa aktarmaya (Markdown, HTML, MCP kaynağı) vurgular ve X yanıtları.
 
 **v1.3: Mac'in araçları telefonda**
 - Kurallar, kopyalar, link havuzu ve kırık link taraması, kayıtlı aramalar,

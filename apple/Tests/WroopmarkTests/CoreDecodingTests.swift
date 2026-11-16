@@ -61,15 +61,24 @@ struct CoreDecodingTests {
         let core = Core(libraryURL: dir)
 
         try await core.run(.call("import_items", [
-            "items": .array([.object([
-                "platform": .string("tiktok"),
-                "url": .string("https://www.tiktok.com/@a/video/789"),
-                "text": .string("klip"),
-                "media": .array([.object([
-                    "kind": .string("video"),
-                    "url": .string("https://v.example/789.mp4"),
-                ])]),
-            ])]),
+            "items": .array([
+                .object([
+                    "platform": .string("tiktok"),
+                    "url": .string("https://www.tiktok.com/@a/video/789"),
+                    "author_handle": .string("ali"),
+                    "text": .string("klip"),
+                    "media": .array([.object([
+                        "kind": .string("video"),
+                        "url": .string("https://v.example/789.mp4"),
+                    ])]),
+                ]),
+                .object([
+                    "platform": .string("tiktok"),
+                    "url": .string("https://www.tiktok.com/@a/video/790"),
+                    "author_handle": .string("ali"),
+                    "text": .string("önceki klip"),
+                ]),
+            ]),
         ]))
         let waiting: [Item] = try await core.call(.call("needs_video", ["limit": .int(10)]))
         #expect(waiting.first?.id == "tiktok:789")
@@ -91,6 +100,14 @@ struct CoreDecodingTests {
         let item: Item = try await core.call(.call("get", ["id": .string("tiktok:789")]))
         #expect(item.media.first?.videoFile?.hasSuffix(".mov") == true)
         #expect(item.snapshot == snapName)
+
+        let folder: Folder = try await core.call(.addFolder(name: "Klipler"))
+        try await core.run(.moveToFolder(id: "tiktok:790", folderID: folder.id))
+        try await core.run(.setTags(id: "tiktok:790", tags: ["hazir"]))
+        let suggestions: [BatchSuggestion] = try await core.call(.call("suggest_batch", ["q": .string(""), "limit": .int(10)]))
+        #expect(suggestions.first?.id == "tiktok:789")
+        #expect(suggestions.first?.folderId == folder.id)
+        #expect(suggestions.first?.folderName == "Klipler")
 
         await core.checkpointForQuit()
     }

@@ -163,7 +163,8 @@ enum CoreCommand: Sendable, Encodable, Equatable {
     case retryAllDownloads
     case setNote(id: String, note: String)
     case ocrPending(limit: Int)
-    case setOCR(id: String, text: String)
+    case setOCR(id: String, text: String, labels: String? = nil, imghash: Int64? = nil)
+    case appendExtra(id: String, text: String)
     case links(q: String, limit: Int, offset: Int)
     case linkCounts
     case linksPage(q: String, category: String?, onlyDead: Bool, limit: Int, offset: Int)
@@ -183,7 +184,7 @@ enum CoreCommand: Sendable, Encodable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case cmd, id, ids, q, sort, limit, offset, url, tags, note, name, from, to, add, remove
-        case reviewed, text, dest, key, value, category
+        case reviewed, text, labels, imghash, dest, key, value, category
         case downloadVideos = "download_videos"
         case folderID = "folder_id"
         case onlyDead = "only_dead"
@@ -293,8 +294,14 @@ enum CoreCommand: Sendable, Encodable, Equatable {
         case .ocrPending(let limit):
             try c.encode("ocr_pending", forKey: .cmd)
             try c.encode(limit, forKey: .limit)
-        case .setOCR(let id, let text):
+        case .setOCR(let id, let text, let labels, let imghash):
             try c.encode("set_ocr", forKey: .cmd)
+            try c.encode(id, forKey: .id)
+            try c.encode(text, forKey: .text)
+            try c.encodeIfPresent(labels, forKey: .labels)
+            try c.encodeIfPresent(imghash, forKey: .imghash)
+        case .appendExtra(let id, let text):
+            try c.encode("append_extra", forKey: .cmd)
             try c.encode(id, forKey: .id)
             try c.encode(text, forKey: .text)
         case .links(let q, let limit, let offset):

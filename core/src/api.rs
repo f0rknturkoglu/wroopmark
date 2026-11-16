@@ -671,8 +671,12 @@ impl Library {
             }
         }
         drop(_tracker_guard);
+        let subs = crate::external::read_subtitles(&work);
         let mut store = self.lock_store()?;
         store.set_media(&item.id, &item.media, item.quote.as_deref())?;
+        if let Some(subs) = subs {
+            let _ = store.append_extra(&item.id, &subs);
+        }
         if result.is_err() {
             store.video_failed(&item.id)?;
         }
@@ -881,6 +885,10 @@ struct SetNote {
 struct SetExtra {
     id: String,
     text: String,
+    #[serde(default)]
+    labels: Option<String>,
+    #[serde(default)]
+    imghash: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -1374,12 +1382,24 @@ fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result
         }
         "set_ocr" => {
             let a: SetExtra = req.parse()?;
-            lib.lock_store()?.set_ocr(&a.id, &a.text)?;
+            let mut store = lib.lock_store()?;
+            store.set_ocr(&a.id, &a.text)?;
+            if let Some(labels) = a.labels.as_deref().filter(|s| !s.trim().is_empty()) {
+                store.append_extra(&a.id, labels)?;
+            }
+            if let Some(h) = a.imghash {
+                store.set_imghash(&a.id, h)?;
+            }
             S::ok(true)
         }
         "set_extra" => {
             let a: SetExtra = req.parse()?;
             lib.lock_store()?.set_extra(&a.id, &a.text)?;
+            S::ok(true)
+        }
+        "append_extra" => {
+            let a: SetExtra = req.parse()?;
+            lib.lock_store()?.append_extra(&a.id, &a.text)?;
             S::ok(true)
         }
 

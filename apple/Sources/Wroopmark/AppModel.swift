@@ -929,6 +929,45 @@ final class AppModel {
         await refreshItem(id)
     }
 
+    func transcribeVideo(for item: Item) async throws -> String {
+        guard let vf = item.media.first(where: { $0.isVideo && $0.videoFile != nil })?.videoFile else {
+            return ""
+        }
+        let url = core.mediaURL(vf)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw NSError(domain: "wroopmark", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: String(localized: "Video dosyası henüz yerelde değil."),
+            ])
+        }
+        let transcript = try await VideoSpeech.transcribe(url: url)
+        guard !transcript.isEmpty else { return "" }
+        _ = await perform(.appendExtra(id: item.id, text: transcript))
+        await refreshItem(item.id)
+        return transcript
+    }
+
+    func suggestBatch(q: String = "", limit: Int = 25) async -> [BatchSuggestion] {
+        (try? await core.call(.call("suggest_batch", ["q": .string(q), "limit": .int(Int64(limit))]))) ?? []
+    }
+
+    func applyBatch(_ entries: [BatchSuggestion]) async -> Int {
+        guard !entries.isEmpty else { return 0 }
+        let payload: [CoreArg] = entries.map { e in
+            var obj: [String: CoreArg] = [
+                "id": .string(e.id),
+                "tags": .strings(e.tags),
+            ]
+            if let fid = e.folderId {
+                obj["folder_id"] = .int(fid)
+            }
+            return .object(obj)
+        }
+        let count: Int = (try? await core.call(.call("apply_batch", ["items": .array(payload)]))) ?? 0
+        await reload()
+        await refreshMeta()
+        return count
+    }
+
     func delete(_ ids: [String]) async {
         for id in ids { _ = await perform(.delete(id: id)) }
         if enableSystemIntegrations { Spotlight.remove(ids) }
@@ -1013,16 +1052,28 @@ final class AppModel {
                 }
                 guard !batch.isEmpty else { break }
                 let files = batch.flatMap(\.files)
-                guard let texts = await OCRHelper.run(helper, files: files), texts.count == files.count else {
+                guard let inspections = await OCRHelper.run(helper, files: files), inspections.count == files.count else {
                     // The helper does not start or batch stalled completely; try again later.
                     self.ocrPausedUntil = .now + 600
                     break
                 }
-                var next = texts.makeIterator()
+                var next = inspections.makeIterator()
                 for item in batch {
                     guard !Task.isCancelled else { break }
-                    let text = item.files.compactMap { _ in next.next() }.filter { !$0.isEmpty }.joined(separator: "\n\n")
-                    _ = await self.perform(.setOCR(id: item.id, text: text))
+                    let parts = item.files.compactMap { _ in next.next() }
+                    let text = parts.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n\n")
+                    var seenLabels: Set<String> = []
+                    let labels = parts
+                        .flatMap { $0.labels.split(separator: " ").map(String.init) }
+                        .filter { seenLabels.insert($0).inserted }
+                        .joined(separator: " ")
+                    let imghash = parts.compactMap(\.imghash).first
+                    _ = await self.perform(.setOCR(
+                        id: item.id,
+                        text: text,
+                        labels: labels.isEmpty ? nil : labels,
+                        imghash: imghash
+                    ))
                 }
                 await self.refreshMeta()
             }
@@ -1429,11 +1480,18 @@ enum OCRHelper {
     /// its text recognizer; that file is skipped instead of stalling the whole queue.
     static let perFileTimeoutSeconds: Double = 45
 
-    /// One recognized text per file, in order ("" for files skipped after a
-    /// stall); nil only if the helper cannot start at all or task was cancelled.
-    static func run(_ helper: URL, files: [String]) async -> [String]? {
-        await Task.detached(priority: .utility) { () -> [String]? in
-            var results: [String] = []
+    struct Inspection: Decodable, Sendable {
+        let text: String
+        let labels: String
+        let imghash: Int64?
+        static let empty = Inspection(text: "", labels: "", imghash: nil)
+    }
+
+    /// One inspection result per file, in order (empty for files skipped
+    /// after a stall); nil only if the helper cannot start at all or task was cancelled.
+    static func run(_ helper: URL, files: [String]) async -> [Inspection]? {
+        await Task.detached(priority: .utility) { () -> [Inspection]? in
+            var results: [Inspection] = []
             var remaining = files[...]
             while !remaining.isEmpty && !Task.isCancelled {
                 guard let got = await runOnce(helper, files: Array(remaining)) else { return nil }
@@ -1442,7 +1500,7 @@ enum OCRHelper {
                 // The helper stopped short: it hung (or crashed) on the next
                 // file. Skip that one and continue in a fresh process.
                 if !remaining.isEmpty && !Task.isCancelled {
-                    results.append("")
+                    results.append(.empty)
                     remaining = remaining.dropFirst()
                 }
             }
@@ -1450,7 +1508,7 @@ enum OCRHelper {
         }.value
     }
 
-    private static func runOnce(_ helper: URL, files: [String]) async -> [String]? {
+    private static func runOnce(_ helper: URL, files: [String]) async -> [Inspection]? {
         let p = Process()
         p.executableURL = helper
         let input = Pipe(), output = Pipe()
@@ -1468,7 +1526,7 @@ enum OCRHelper {
         // A class around the Mutex: a closure may share a reference to it,
         // not to a noncopyable local.
         final class Lines: Sendable {
-            let store = Mutex<[String]>([])
+            let store = Mutex<[Inspection]>([])
         }
         let lines = Lines()
         // Only Sendable values go into the reader task (`Pipe` is not).
@@ -1481,7 +1539,7 @@ enum OCRHelper {
                     do {
                         for try await line in reader.bytes.lines {
                             if Task.isCancelled { break }
-                            let parsed = (try? JSONDecoder().decode(String.self, from: Data(line.utf8))) ?? ""
+                            let parsed = (try? JSONDecoder().decode(Inspection.self, from: Data(line.utf8))) ?? .empty
                             let count = lines.store.withLock { store -> Int in
                                 store.append(parsed)
                                 return store.count

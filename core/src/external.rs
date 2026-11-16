@@ -119,7 +119,17 @@ impl Tool {
         let owned = |v: &[&str]| v.iter().map(|a| a.to_string()).collect::<Vec<_>>();
         match self {
             Tool::YtDlp => {
-                let mut a = owned(&["--no-playlist", "--no-warnings", "--newline"]);
+                let mut a = owned(&[
+                    "--no-playlist",
+                    "--no-warnings",
+                    "--newline",
+                    "--write-subs",
+                    "--write-auto-subs",
+                    "--sub-langs",
+                    "tr,en",
+                    "--sub-format",
+                    "vtt/srt",
+                ]);
                 a.extend(owned(&["--socket-timeout", "30", "-f", YTDLP_FORMAT, "-o"]));
                 a.push(format!("{dir}/video.%(ext)s"));
                 a.push("--".into());
@@ -266,7 +276,7 @@ fn run(tool: Tool, exe: &Path, dir: &Path, url: &str, on_progress: Option<&Progr
         .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
         .map(|e| e.path())
         .filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("video.")))
-        .filter(|p| !p.extension().is_some_and(|e| e == "part" || e == "ytdl"))
+        .filter(|p| !p.extension().is_some_and(|e| matches!(e.to_str(), Some("part" | "ytdl" | "vtt" | "srt"))))
         .max_by_key(|p| fs::metadata(p).map(|m| m.len()).unwrap_or(0));
     match file {
         Some(f) if status.success() => Ok(f),
@@ -301,6 +311,35 @@ pub fn download_with_progress(url: &str, work: &Path, on_progress: Option<&Progr
         }
     }
     Err(ExternalError::Multiple(errors.join("; ")))
+}
+
+/// Reads the best downloaded `.vtt`/`.srt` subtitle track left in `dir`, if any.
+pub fn read_subtitles(dir: &Path) -> Option<String> {
+    let mut files: Vec<PathBuf> = fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_file() && p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e, "vtt" | "srt")))
+        .collect();
+    files.sort_by_key(|p| {
+        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if name.contains(".tr.") {
+            0
+        } else if name.contains(".en.") {
+            1
+        } else {
+            2
+        }
+    });
+    for p in files {
+        if let Ok(raw) = fs::read_to_string(&p) {
+            let clean = crate::text::strip_subtitles(&raw);
+            if !clean.is_empty() {
+                return Some(clean);
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]

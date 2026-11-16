@@ -65,6 +65,15 @@ pub struct RuleRow {
     pub matches: i64,
 }
 
+#[derive(Debug, Serialize)]
+pub struct BatchSuggestion {
+    pub id: String,
+    pub item: Item,
+    pub tags: Vec<String>,
+    pub folder_id: Option<i64>,
+    pub folder_name: Option<String>,
+}
+
 /// Centered cosine a meaning hit needs to be shown.
 const SEMANTIC_MIN: f32 = 0.42;
 /// Similar items below this are not shown as related.
@@ -364,7 +373,8 @@ impl Library {
             Some(format!("data:{kind};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
         };
         let folder_of = |i: &Item| i.folder_id.and_then(|f| folders.get(&f).cloned());
-        let html = export::html_page(&title, &items, &folder_of, english, &mut embed);
+        let hl_of = |i: &Item| self.lock_store().ok().and_then(|s| s.highlights(&i.id).ok()).unwrap_or_default();
+        let html = export::html_page(&title, &items, &folder_of, &hl_of, english, &mut embed);
         let path = dest.join(format!("{}.html", export::safe_name(&title)));
         std::fs::write(&path, html).map_err(io)?;
         Ok(ExportReport { path: path.display().to_string(), count: items.len(), media })
@@ -414,7 +424,8 @@ impl Library {
                         f.write_all(b"\n").map_err(io)?;
                     }
                     (None, _) => {
-                        let (md, files) = export::markdown(item, folder);
+                        let hl = self.lock_store()?.highlights(&item.id)?;
+                        let (md, files) = export::markdown(item, folder, &hl);
                         std::fs::write(dest.join(names.next(item)), md).map_err(io)?;
                         if with_media {
                             for name in files {
@@ -550,16 +561,43 @@ impl Library {
         Ok(SearchResult { items, total, links })
     }
 
-    /// Items closest in meaning to this one.
+    /// Items closest in meaning (or visual appearance via image fingerprint) to this one.
     pub fn related(&self, id: &str, limit: i64) -> Result<Vec<Item>> {
         let store = self.lock_store()?;
-        let Some((pk, v)) = store.vector_of(id)? else { return Ok(vec![]) };
-        if v.is_empty() {
+        let k = usize::try_from(limit.clamp(1, 50)).unwrap_or(8);
+        let mut pks: Vec<i64> = vec![];
+        if let Some((pk, v)) = store.vector_of(id)?
+            && !v.is_empty()
+        {
+            let space = Space::new(&store.vectors_for(&Query::default())?);
+            pks = space.nearest(&v, k, Some(pk)).into_iter().filter(|(_, s)| *s >= RELATED_MIN).map(|(pk, _)| pk).collect();
+        }
+        if pks.len() < k
+            && let Some(target_hash) = store.imghash_of(id)?
+        {
+            let target_bits = target_hash as u64;
+            let mut visual: Vec<(u32, i64)> = store
+                .imghashes()?
+                .into_iter()
+                .filter(|(_, oid, _)| oid != id)
+                .filter_map(|(opk, _, oh)| {
+                    let dist = (target_bits ^ (oh as u64)).count_ones();
+                    (dist <= 10).then_some((dist, opk))
+                })
+                .collect();
+            visual.sort_by_key(|(d, _)| *d);
+            for (_, opk) in visual {
+                if !pks.contains(&opk) {
+                    pks.push(opk);
+                    if pks.len() >= k {
+                        break;
+                    }
+                }
+            }
+        }
+        if pks.is_empty() {
             return Ok(vec![]);
         }
-        let space = Space::new(&store.vectors_for(&Query::default())?);
-        let k = usize::try_from(limit.clamp(1, 50)).unwrap_or(8);
-        let pks: Vec<i64> = space.nearest(&v, k, Some(pk)).into_iter().filter(|(_, s)| *s >= RELATED_MIN).map(|(pk, _)| pk).collect();
         Ok(store.items_by_pks(&pks)?)
     }
 
@@ -620,6 +658,16 @@ impl Library {
     pub fn duplicates(&self) -> Result<Vec<DuplicateGroup>> {
         let store = self.lock_store()?;
         let mut groups: Vec<(&str, Vec<i64>)> = store.duplicate_candidates()?;
+        let hashes = store.imghashes()?;
+        if hashes.len() <= 20_000 {
+            for (i, (pk1, _, h1)) in hashes.iter().enumerate() {
+                for (pk2, _, h2) in hashes.iter().skip(i + 1) {
+                    if ((*h1 as u64) ^ (*h2 as u64)).count_ones() <= 4 {
+                        groups.push(("media", vec![*pk1, *pk2]));
+                    }
+                }
+            }
+        }
         let space = Space::new(&store.vectors_for(&Query::default())?);
         if space.len() <= 20_000 {
             groups.extend(space.pairs(DUPLICATE_MIN).into_iter().map(|(a, b)| ("similar", vec![a, b])));
@@ -699,6 +747,37 @@ impl Library {
         list.push(ids.join(","));
         store.set_setting("dup_ignored", &serde_json::to_string(&list)?)?;
         Ok(())
+    }
+
+    pub fn suggest_batch(&self, q: &str, limit: i64) -> Result<Vec<BatchSuggestion>> {
+        let lim = limit.clamp(1, 25);
+        let q = if q.trim().is_empty() { "is:untagged" } else { q };
+        let found = self.lock_store()?.search(&Query::parse(q), Sort::SavedNewest, lim, 0)?;
+        let llm_ready = self.ai.status().get("llm_ready").and_then(Value::as_bool) == Some(true);
+        let mut out = vec![];
+        for mut item in found.items {
+            if item.ai_tags.is_empty()
+                && llm_ready
+                && let Ok(updated) = self.summarize(&item.id)
+            {
+                item = updated;
+            }
+            let have: HashSet<String> = item.tags.iter().map(|t| t.to_lowercase()).collect();
+            let tags: Vec<String> = item.ai_tags.iter().filter(|t| !have.contains(&t.to_lowercase())).cloned().collect();
+            let folders = self.lock_store()?.suggest_folders(&item.id, 1)?;
+            let best_folder = folders.into_iter().next().filter(|_| item.folder_id.is_none());
+            if tags.is_empty() && best_folder.is_none() {
+                continue;
+            }
+            out.push(BatchSuggestion {
+                id: item.id.clone(),
+                folder_id: best_folder.as_ref().map(|f| f.id),
+                folder_name: best_folder.map(|f| f.name),
+                item,
+                tags,
+            });
+        }
+        Ok(out)
     }
 }
 
@@ -971,6 +1050,52 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             lib.ignore_duplicates(&req.parse::<Ids>()?.ids)?;
             S::ok(true)
         }
+        "suggest_batch" => {
+            #[derive(Deserialize)]
+            struct BatchReq {
+                #[serde(default)]
+                q: String,
+                #[serde(default = "ten")]
+                limit: i64,
+            }
+            fn ten() -> i64 {
+                10
+            }
+            let r: BatchReq = req.parse()?;
+            S::ok(lib.suggest_batch(&r.q, r.limit)?)
+        }
+        "apply_batch" => {
+            #[derive(Deserialize)]
+            struct BatchEntry {
+                id: String,
+                #[serde(default)]
+                tags: Vec<String>,
+                #[serde(default)]
+                folder_id: Option<i64>,
+            }
+            #[derive(Deserialize)]
+            struct ApplyReq {
+                items: Vec<BatchEntry>,
+            }
+            let a: ApplyReq = req.parse()?;
+            let mut store = lib.lock_store()?;
+            let mut count = 0usize;
+            for entry in a.items {
+                let mut touched = false;
+                if !entry.tags.is_empty() {
+                    store.edit_tags(std::slice::from_ref(&entry.id), &entry.tags, &[])?;
+                    touched = true;
+                }
+                if let Some(fid) = entry.folder_id {
+                    store.move_to_folder(&entry.id, Some(fid))?;
+                    touched = true;
+                }
+                if touched {
+                    count += 1;
+                }
+            }
+            S::ok(count)
+        }
         "article" | "fill_articles" | "highlights" | "highlight" | "today" => {
             super::reader::dispatch::<S>(lib, cmd, req).unwrap_or_else(|| Err(CoreError::UnknownCmd(cmd.to_string())))
         }
@@ -1027,6 +1152,89 @@ mod tests {
         assert_eq!(again.pointer("/data/media").and_then(Value::as_array).map(Vec::len), Some(1));
         let found = handle_value(&lib, json!({"cmd": "search", "q": "üçüncü"}));
         assert_eq!(found.pointer("/data/total"), Some(&json!(1)));
+        lib.shutdown();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn v12_visual_labels_hashes_transcripts_and_batch_ai() {
+        let dir = std::env::temp_dir().join(format!("wm-v12-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let lib = Library::open(&dir).unwrap_or_else(|_| std::process::abort());
+        handle_value(
+            &lib,
+            json!({
+                "cmd": "import_items",
+                "items": [
+                    {"platform": "web", "url": "https://example.com/a", "author_handle": "ali", "text": "foto bir"},
+                    {"platform": "web", "url": "https://example.com/b", "author_handle": "ali", "text": "foto iki"},
+                    {"platform": "web", "url": "https://example.com/c", "author_handle": "ali", "text": "önceki"}
+                ]
+            }),
+        );
+        let all = handle_value(&lib, json!({"cmd": "search", "q": "", "sort": "saved_oldest"}));
+        let items = all.pointer("/data/items").and_then(Value::as_array).cloned().unwrap_or_default();
+        assert_eq!(items.len(), 3, "{all}");
+        let aid = items.first().and_then(|v| v.get("id")).and_then(Value::as_str).unwrap_or_default().to_string();
+        let bid = items.get(1).and_then(|v| v.get("id")).and_then(Value::as_str).unwrap_or_default().to_string();
+        let cid = items.get(2).and_then(|v| v.get("id")).and_then(Value::as_str).unwrap_or_default().to_string();
+        assert!(!aid.is_empty() && !bid.is_empty() && !cid.is_empty());
+
+        // set_ocr saves labels + imghash, making labels searchable and items visually related/duplicate.
+        let r = handle_value(
+            &lib,
+            json!({
+                "cmd": "set_ocr",
+                "id": aid,
+                "text": "ekran görüntüsü",
+                "labels": "kedi cat evcil",
+                "imghash": 0x0F0F_0F0F_0F0F_0F0Fi64
+            }),
+        );
+        assert_eq!(r.get("ok"), Some(&json!(true)));
+        let r2 = handle_value(
+            &lib,
+            json!({
+                "cmd": "set_ocr",
+                "id": bid,
+                "text": "",
+                "labels": "kedi",
+                "imghash": 0x0F0F_0F0F_0F0F_0F0Ei64
+            }),
+        );
+        assert_eq!(r2.get("ok"), Some(&json!(true)));
+
+        // Search finds visual label & extra transcript appended via append_extra.
+        let by_label = handle_value(&lib, json!({"cmd": "search", "q": "evcil"}));
+        assert_eq!(by_label.pointer("/data/total"), Some(&json!(1)));
+
+        let app = handle_value(&lib, json!({"cmd": "append_extra", "id": bid, "text": "tarifte tarçın var"}));
+        assert_eq!(app.get("ok"), Some(&json!(true)));
+        let by_speech = handle_value(&lib, json!({"cmd": "search", "q": "tarçın"}));
+        assert_eq!(by_speech.pointer("/data/total"), Some(&json!(1)));
+
+        // Related & duplicates by imghash (Hamming distance == 1 <= 4 <= 10).
+        let rel = handle_value(&lib, json!({"cmd": "related", "id": aid, "limit": 8}));
+        assert_eq!(rel.pointer("/data/0/id"), Some(&json!(bid)));
+        let dups = handle_value(&lib, json!({"cmd": "duplicates"}));
+        let has_media_dup =
+            dups.pointer("/data").and_then(Value::as_array).is_some_and(|arr| arr.iter().any(|g| g.get("reason") == Some(&json!("media"))));
+        assert!(has_media_dup, "{dups}");
+
+        // Folder-history batch suggestions and apply_batch.
+        let folder = handle_value(&lib, json!({"cmd": "add_folder", "name": "Örnekler"}));
+        let fid = folder.pointer("/data/id").and_then(Value::as_i64);
+        assert!(fid.is_some());
+        handle_value(&lib, json!({"cmd": "move_to_folder", "id": cid, "folder_id": fid}));
+        handle_value(&lib, json!({"cmd": "set_tags", "id": cid, "tags": ["arsiv"]}));
+        let sug = handle_value(&lib, json!({"cmd": "suggest_batch", "q": "", "limit": 10}));
+        let suggestions = sug.pointer("/data").and_then(Value::as_array).cloned().unwrap_or_default();
+        assert_eq!(suggestions.len(), 2, "{sug}");
+        let entries: Vec<Value> =
+            suggestions.iter().map(|s| json!({"id": s.get("id"), "tags": ["örnek"], "folder_id": s.get("folder_id")})).collect();
+        let applied = handle_value(&lib, json!({"cmd": "apply_batch", "items": entries}));
+        assert_eq!(applied.pointer("/data"), Some(&json!(2)));
+
         lib.shutdown();
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -140,6 +140,7 @@ struct PhoneTriageView: View {
     @State private var details: Item?
     @State private var player = FeedPlayer()
     @State private var feedback = 0
+    @State private var showBatchSuggest = false
 
     private var filter: String {
         [scope.filter, query.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: " ")
@@ -171,10 +172,20 @@ struct PhoneTriageView: View {
                     Button("Bitti") { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
+                    Button { showBatchSuggest = true } label: { Image(systemName: "sparkles") }
+                        .accessibilityLabel("Toplu Öneriler")
+                }
+                ToolbarItem(placement: .primaryAction) {
                     Button { Task { await undo() } } label: { Image(systemName: "arrow.uturn.backward") }
                         .disabled(queue?.canUndo != true)
                         .accessibilityLabel("Son kararı geri al")
                 }
+            }
+            .sheet(isPresented: $showBatchSuggest) {
+                PhoneBatchSuggestSheet(query: filter) {
+                    await queue?.refill()
+                }
+                .environment(model)
             }
             .sheet(item: $details) { item in
                 NavigationStack {
@@ -350,6 +361,90 @@ struct PhoneTriageView: View {
     private func undo() async {
         feedback += 1
         await queue?.undo()
+    }
+}
+
+private struct PhoneBatchSuggestSheet: View {
+    @Environment(PhoneModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let query: String
+    let onApplied: @MainActor () async -> Void
+    @State private var suggestions: [BatchSuggestion] = []
+    @State private var selected: Set<String> = []
+    @State private var loading = true
+    @State private var applying = false
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if loading {
+                    ProgressView("Öneriler hazırlanıyor…")
+                } else if suggestions.isEmpty {
+                    ContentUnavailableView(
+                        "Öneri bulunamadı",
+                        systemImage: "sparkles",
+                        description: Text("Etiketsiz kayıtlar için klasör geçmişi veya yapay zekâ önerisi henüz oluşmadı.")
+                    )
+                } else {
+                    List(suggestions) { row in
+                        let isOn = selected.contains(row.id)
+                        Button {
+                            if isOn { selected.remove(row.id) } else { selected.insert(row.id) }
+                        } label: {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(isOn ? PhoneTheme.accent : .secondary)
+                                    .font(.title3)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(row.item.title ?? (row.item.text.isEmpty ? row.item.url : row.item.text))
+                                        .foregroundStyle(.primary)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(2)
+                                    HStack(spacing: 6) {
+                                        if let f = row.folderName {
+                                            Label(f, systemImage: "folder")
+                                                .font(.caption)
+                                                .foregroundStyle(PhoneTheme.accent)
+                                        }
+                                        ForEach(row.tags, id: \.self) { t in
+                                            Text("#\(t)")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Toplu Öneriler")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Kapat") { dismiss() } }
+                if !suggestions.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(applying ? "Uygulanıyor…" : "Tümünü Uygula") {
+                            applying = true
+                            Task {
+                                let picked = suggestions.filter { selected.contains($0.id) }
+                                _ = await model.applyBatch(picked)
+                                await onApplied()
+                                applying = false
+                                dismiss()
+                            }
+                        }
+                        .disabled(selected.isEmpty || applying)
+                    }
+                }
+            }
+        }
+        .task {
+            let loaded = await model.suggestBatch(q: query, limit: 30)
+            suggestions = loaded
+            selected = Set(loaded.map(\.id))
+            loading = false
+        }
     }
 }
 

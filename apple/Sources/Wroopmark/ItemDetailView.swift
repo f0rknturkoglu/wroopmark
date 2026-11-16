@@ -6,6 +6,9 @@ struct ItemDetailView: View {
     @State private var note = ""
     @State private var showPageCopy = false
     @State private var showReader = false
+    @State private var fullExtra: String?
+    @State private var transcribing = false
+    @State private var speechError: String?
     @FocusState private var noteFocused: Bool
 
     /// Pictures of the thread's posts are kept in `media` after the first
@@ -135,6 +138,38 @@ struct ItemDetailView: View {
                         .help("Sayfanın kaydedildiği hâli; site değişse ya da kapansa da açılır")
                         .sheet(isPresented: $showPageCopy) { PageCopyView(item: liveItem).environment(model) }
                     }
+                    if liveItem.media.contains(where: { $0.isVideo && $0.videoFile != nil }) {
+                        Button {
+                            speechError = nil
+                            transcribing = true
+                            Task {
+                                defer { transcribing = false }
+                                do {
+                                    let text = try await model.transcribeVideo(for: liveItem)
+                                    if !text.isEmpty { fullExtra = text }
+                                } catch {
+                                    speechError = error.localizedDescription
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: Theme.Spacing.xs) {
+                                if transcribing {
+                                    ProgressView().controlSize(.mini)
+                                    Text("Konuşma okunuyor…")
+                                } else {
+                                    Label("Videodaki konuşmayı metne dök", systemImage: "waveform.badge.magnifyingglass")
+                                }
+                            }
+                        }
+                        .controlSize(.small)
+                        .disabled(transcribing)
+                        .help("Videodaki konuşmayı cihazda metne döker ve aramaya ekler")
+                    }
+                }
+                if let speechError {
+                    Text(speechError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
                 if let quote = liveItem.quote?.item {
                     QuoteCard(item: quote) { model.openViewer(owner: liveItem, fromQuote: true, index: $0) }
@@ -150,6 +185,20 @@ struct ItemDetailView: View {
                             .padding(.top, Theme.Spacing.sm)
                     } label: {
                         Label("Görseldeki yazı", systemImage: "text.viewfinder")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let extra = fullExtra, !extra.isEmpty {
+                    DisclosureGroup {
+                        Text(extra)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, Theme.Spacing.sm)
+                    } label: {
+                        Label("Konuşma ve ek metin", systemImage: "waveform")
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -293,10 +342,13 @@ struct ItemDetailView: View {
         .onAppear { note = item.note ?? "" }
         .task(id: "\(item.id)#\(detailReloadToken)") {
             fullOCR = liveItem.ocr
+            fullExtra = liveItem.extra
+            speechError = nil
             loadError = nil
             do {
                 let full: Item = try await model.core.call(.get(id: item.id))
                 fullOCR = full.ocr
+                fullExtra = full.extra
                 loadError = nil
             } catch is CancellationError {
                 return

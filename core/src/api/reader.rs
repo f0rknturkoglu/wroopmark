@@ -265,6 +265,8 @@ mod tests {
             {"platform": "web", "url": "https://example.com/b", "text": "ikinci"}]}),
         );
         assert_eq!(r.get("ok"), Some(&json!(true)), "{r}");
+        let aid = crate::text::item_id_for_url("https://example.com/a").1;
+        handle_value(&lib, json!({"cmd": "highlight", "id": aid, "quote": "ilk", "note": "altın değerinde"}));
         let out = handle_value(
             &lib,
             json!({"cmd": "export", "format": "html", "q": "tag:okuma", "dest": root.join("out"), "title": "Okuma / Listesi", "lang": "en"}),
@@ -276,6 +278,7 @@ mod tests {
         let html = std::fs::read_to_string(&path).unwrap_or_default();
         assert!(html.contains("data:image/png;base64,"));
         assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt; ilk"));
+        assert!(html.contains("Highlights:") && html.contains("altın değerinde"));
         assert!(!html.contains("<script>alert"));
         assert!(html.contains("Search this page") && html.contains("lang=\"en\""));
         lib.shutdown();

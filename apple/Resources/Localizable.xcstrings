@@ -1825,6 +1825,16 @@
         }
       }
     },
+    "Bu cihazda çevrimdışı konuşma tanıma hazır değil.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On-device speech recognition is not ready on this device."
+          }
+        }
+      }
+    },
     "Bu cihazın kütüphanesi ve klasördeki dosyalar yerinde kalır.": {
       "localizations": {
         "en": {
@@ -2693,6 +2703,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Untagged"
+          }
+        }
+      }
+    },
+    "Etiketsiz kayıtlar için klasör geçmişi veya yapay zekâ önerisi henüz oluşmadı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folder-history or AI suggestions are ready for untagged items yet."
+          }
+        }
+      }
+    },
+    "Etiketsiz kayıtlar için klasör ve yapay zekâ önerilerini toplu uygula": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply folder and AI suggestions to untagged items in bulk"
           }
         }
       }
@@ -4163,6 +4193,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Location"
+          }
+        }
+      }
+    },
+    "Konuşma okunuyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribing speech…"
+          }
+        }
+      }
+    },
+    "Konuşma tanıma izni verilmedi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech recognition permission was denied."
+          }
+        }
+      }
+    },
+    "Konuşma ve ek metin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech & transcript"
           }
         }
       }
@@ -5787,6 +5847,16 @@
         }
       }
     },
+    "Toplu Öneriler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batch Suggestions"
+          }
+        }
+      }
+    },
     "Tüm gönderiler": {
       "localizations": {
         "en": {
@@ -5837,6 +5907,16 @@
         }
       }
     },
+    "Tümünü Uygula": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply All"
+          }
+        }
+      }
+    },
     "Tümünü Yeniden Dene": {
       "localizations": {
         "en": {
@@ -5883,6 +5963,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Syncs every time you open the app and when you pull down."
+          }
+        }
+      }
+    },
+    "Uygulanıyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applying…"
           }
         }
       }
@@ -5953,6 +6043,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "The database, all media and an export any program can read (items.jsonl) are copied. The first backup copies everything, later ones only what is new."
+          }
+        }
+      }
+    },
+    "Video dosyası henüz cihazda değil.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video file is not on this device yet."
+          }
+        }
+      }
+    },
+    "Video dosyası henüz yerelde değil.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video file is not downloaded locally yet."
           }
         }
       }
@@ -6033,6 +6143,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Video: plays in the app"
+          }
+        }
+      }
+    },
+    "Videodaki konuşmayı cihazda metne döker ve aramaya ekler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribes speech in the video on-device and makes it searchable"
+          }
+        }
+      }
+    },
+    "Videodaki konuşmayı metne dök": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe spoken audio"
           }
         }
       }
@@ -7071,12 +7201,32 @@
         }
       }
     },
+    "Öneri bulunamadı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No suggestions found"
+          }
+        }
+      }
+    },
     "Önerilen": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Suggested"
+          }
+        }
+      }
+    },
+    "Öneriler hazırlanıyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing suggestions…"
           }
         }
       }

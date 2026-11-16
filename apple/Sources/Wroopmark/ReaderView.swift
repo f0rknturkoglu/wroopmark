@@ -1,5 +1,6 @@
 import AVFoundation
 import NaturalLanguage
+import Speech
 import SwiftUI
 import WebKit
 
@@ -465,6 +466,79 @@ final class ReaderSpeech: NSObject, AVSpeechSynthesizerDelegate {
         Task { @MainActor in
             self.speaking = false
             self.paused = false
+        }
+    }
+}
+
+/// On-device video speech transcription shared by Mac and iPhone.
+/// Never initiates downloads; strictly operates on user-initiated local files.
+enum VideoSpeech {
+    enum SpeechError: LocalizedError {
+        case denied
+        case unavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .denied: String(localized: "Konuşma tanıma izni verilmedi.")
+            case .unavailable: String(localized: "Bu cihazda çevrimdışı konuşma tanıma hazır değil.")
+            }
+        }
+    }
+
+    static func transcribe(url: URL) async throws -> String {
+        let status = await withCheckedContinuation { cont in
+            SFSpeechRecognizer.requestAuthorization { s in
+                cont.resume(returning: s)
+            }
+        }
+        guard status == .authorized else { throw SpeechError.denied }
+
+        let tr = SFSpeechRecognizer(locale: Locale(identifier: "tr-TR"))
+        let en = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        let active: SFSpeechRecognizer
+        if let tr, tr.isAvailable, tr.supportsOnDeviceRecognition {
+            active = tr
+        } else if let en, en.isAvailable, en.supportsOnDeviceRecognition {
+            active = en
+        } else {
+            throw SpeechError.unavailable
+        }
+
+        let request = SFSpeechURLRecognitionRequest(url: url)
+        request.requiresOnDeviceRecognition = true
+        request.shouldReportPartialResults = false
+
+        final class Gate: @unchecked Sendable {
+            private let lock = NSLock()
+            private var done = false
+            private var task: SFSpeechRecognitionTask?
+            func setTask(_ t: SFSpeechRecognitionTask) { lock.withLock { task = t } }
+            func cancel() { lock.withLock { task?.cancel() } }
+            func finish(_ block: () -> Void) {
+                let run = lock.withLock { () -> Bool in
+                    guard !done else { return false }
+                    done = true
+                    return true
+                }
+                if run { block() }
+            }
+        }
+        let gate = Gate()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                let task = active.recognitionTask(with: request) { result, error in
+                    if let error {
+                        gate.finish { cont.resume(throwing: error) }
+                    } else if let result, result.isFinal {
+                        let text = result.bestTranscription.formattedString
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        gate.finish { cont.resume(returning: text) }
+                    }
+                }
+                gate.setTask(task)
+            }
+        } onCancel: {
+            gate.cancel()
         }
     }
 }

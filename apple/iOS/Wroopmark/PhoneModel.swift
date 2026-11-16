@@ -318,6 +318,45 @@ final class PhoneModel {
         (try? await core.call(.call("related", ["id": .string(id), "limit": .int(6)]))) ?? []
     }
 
+    func transcribeVideo(for item: Item) async throws -> String {
+        guard let vf = item.media.first(where: { $0.isVideo && $0.videoFile != nil })?.videoFile else {
+            return ""
+        }
+        let url = core.mediaURL(vf)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw NSError(domain: "wroopmark", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: String(localized: "Video dosyası henüz cihazda değil."),
+            ])
+        }
+        let transcript = try await VideoSpeech.transcribe(url: url)
+        guard !transcript.isEmpty else { return "" }
+        _ = await perform(.appendExtra(id: item.id, text: transcript))
+        syncSoon()
+        return transcript
+    }
+
+    func suggestBatch(q: String = "", limit: Int = 25) async -> [BatchSuggestion] {
+        (try? await core.call(.call("suggest_batch", ["q": .string(q), "limit": .int(Int64(limit))]))) ?? []
+    }
+
+    func applyBatch(_ entries: [BatchSuggestion]) async -> Int {
+        guard !entries.isEmpty else { return 0 }
+        let payload: [CoreArg] = entries.map { e in
+            var obj: [String: CoreArg] = [
+                "id": .string(e.id),
+                "tags": .strings(e.tags),
+            ]
+            if let fid = e.folderId {
+                obj["folder_id"] = .int(fid)
+            }
+            return .object(obj)
+        }
+        let count: Int = (try? await core.call(.call("apply_batch", ["items": .array(payload)]))) ?? 0
+        await reload()
+        await refreshMeta()
+        return count
+    }
+
     // MARK: Loading
 
     func reload() async {

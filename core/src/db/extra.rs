@@ -314,19 +314,21 @@ impl Store {
     /// Items with no vector, or one older than their last edit.
     pub fn embed_pending(&self, limit: i64) -> Result<Vec<(i64, Item)>> {
         let mut stmt = self.conn.prepare_cached(&format!(
-            "SELECT {ITEM_COLS}, i.ocr FROM items i LEFT JOIN vectors v ON v.item = i.pk
+            "SELECT {ITEM_COLS}, i.extra, i.ocr FROM items i LEFT JOIN vectors v ON v.item = i.pk
               WHERE v.item IS NULL OR v.at < i.updated_at ORDER BY i.saved_at DESC LIMIT ?1"
         ))?;
         let rows = stmt
             .query_map([limit], |r| {
                 let (pk, mut item) = read_item(r)?;
-                item.ocr = r.get(22)?;
+                item.extra = r.get(22)?;
+                item.ocr = r.get(23)?;
                 Ok((pk, item))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         let pks: Vec<i64> = rows.iter().map(|(pk, _)| *pk).collect();
-        let ocr: Vec<Option<String>> = rows.iter().map(|(_, i)| i.ocr.clone()).collect();
-        let items = self.attach(rows)?.into_iter().zip(ocr).map(|(mut i, o)| {
+        let texts: Vec<(Option<String>, Option<String>)> = rows.iter().map(|(_, i)| (i.extra.clone(), i.ocr.clone())).collect();
+        let items = self.attach(rows)?.into_iter().zip(texts).map(|(mut i, (e, o))| {
+            i.extra = e;
             i.ocr = o;
             i
         });
@@ -546,6 +548,44 @@ impl Store {
         let tags = serde_json::to_string(tags)?;
         self.conn.execute("UPDATE items SET summary = ?2, ai_tags = ?3 WHERE id = ?1", params![id, summary, tags])?;
         Ok(())
+    }
+
+    pub fn append_extra(&mut self, id: &str, more: &str) -> Result<()> {
+        let add = more.trim();
+        if add.is_empty() {
+            return Ok(());
+        }
+        let Some((pk, have)) = self
+            .conn
+            .query_row("SELECT pk, extra FROM items WHERE id = ?1", [id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, Option<String>>(1)?)))
+            .optional()?
+        else {
+            return Ok(());
+        };
+        let current = have.unwrap_or_default();
+        if current.contains(add) {
+            return Ok(());
+        }
+        let mut combined = if current.trim().is_empty() { add.to_string() } else { format!("{}\n\n{add}", current.trim_end()) };
+        if combined.chars().count() > 60_000 {
+            combined = combined.chars().take(60_000).collect();
+        }
+        self.conn.execute("UPDATE items SET extra = ?2, updated_at = ?3 WHERE pk = ?1", params![pk, combined, now()])?;
+        reindex_item(&self.conn, pk)
+    }
+
+    pub fn set_imghash(&mut self, id: &str, hash: i64) -> Result<()> {
+        self.conn.execute("UPDATE items SET imghash = ?2 WHERE id = ?1", params![id, hash])?;
+        Ok(())
+    }
+
+    pub fn imghash_of(&self, id: &str) -> Result<Option<i64>> {
+        Ok(self.conn.query_row("SELECT imghash FROM items WHERE id = ?1", [id], |r| r.get(0)).optional()?.flatten())
+    }
+
+    pub fn imghashes(&self) -> Result<Vec<(i64, String, i64)>> {
+        let mut stmt = self.conn.prepare("SELECT pk, id, imghash FROM items WHERE imghash IS NOT NULL")?;
+        Ok(stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?)
     }
 
     // --- Duplicates -------------------------------------------------------------

@@ -67,4 +67,24 @@ extension CoreCommandTests {
         #expect(object["limit"] as? Int == 60)
         #expect(object["offset"] as? Int == 120)
     }
+
+    @Test func setOCREncodesLabelsAndImghash() throws {
+        let data = try JSONEncoder().encode(
+            CoreCommand.setOCR(id: "web:1", text: "merhaba", labels: "kedi cat", imghash: 42)
+        )
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["cmd"] as? String == "set_ocr")
+        #expect(object["id"] as? String == "web:1")
+        #expect(object["text"] as? String == "merhaba")
+        #expect(object["labels"] as? String == "kedi cat")
+        #expect(object["imghash"] as? Int64 == 42)
+    }
+
+    @Test func appendExtraEncodesText() throws {
+        let data = try JSONEncoder().encode(CoreCommand.appendExtra(id: "x:9", text: "konuşma metni"))
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["cmd"] as? String == "append_extra")
+        #expect(object["id"] as? String == "x:9")
+        #expect(object["text"] as? String == "konuşma metni")
+    }
 }

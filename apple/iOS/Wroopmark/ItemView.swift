@@ -21,6 +21,8 @@ struct ItemView: View {
     @State private var picked: [PhotosPickerItem] = []
     @State private var attaching = false
     @State private var showingSnapshot = false
+    @State private var transcribing = false
+    @State private var speechError: String?
 
     var body: some View {
         ScrollView {
@@ -58,6 +60,50 @@ struct ItemView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .disabled(summarizing)
+                    }
+                    if item.media.contains(where: { $0.isVideo && $0.videoFile != nil }) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Button {
+                                speechError = nil
+                                transcribing = true
+                                Task {
+                                    defer { transcribing = false }
+                                    do {
+                                        let text = try await model.transcribeVideo(for: item)
+                                        if !text.isEmpty, let updated = await model.refresh(id) {
+                                            self.item = updated
+                                        }
+                                    } catch {
+                                        speechError = error.localizedDescription
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if transcribing { ProgressView().controlSize(.small) } else { Image(systemName: "waveform.badge.magnifyingglass") }
+                                    Text(transcribing ? "Konuşma okunuyor…" : "Videodaki konuşmayı metne dök")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(transcribing)
+                            if let speechError {
+                                Text(speechError).font(.caption).foregroundStyle(.red)
+                            }
+                        }
+                    }
+                    if let extra = item.extra, !extra.isEmpty {
+                        DisclosureGroup {
+                            Text(extra)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 4)
+                        } label: {
+                            Label("Konuşma ve ek metin", systemImage: "waveform")
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     tagsSection(item)
                     folderSection(item)

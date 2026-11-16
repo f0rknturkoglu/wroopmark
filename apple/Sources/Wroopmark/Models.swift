@@ -730,6 +730,15 @@ enum LinkCategory: String, CaseIterable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// A batch AI/rule suggestion returned by `suggest_batch`.
+struct BatchSuggestion: Decodable, Identifiable, Hashable, Sendable {
+    let id: String
+    let item: Item
+    let tags: [String]
+    let folderId: Int64?
+    let folderName: String?
+}
+
 private extension String {
     /// This host is `domain` or one of its subdomains.
     func isDomain(_ domain: String) -> Bool { self == domain || hasSuffix("." + domain) }
