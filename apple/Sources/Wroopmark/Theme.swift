@@ -1,12 +1,37 @@
 import AppKit
 import SwiftUI
 
+/// Light, dark, or whatever the system uses (Settings → Appearance).
+enum AppTheme: String, CaseIterable {
+    case system, light, dark
+
+    static let key = "appTheme"
+
+    static var current: AppTheme {
+        UserDefaults.standard.string(forKey: key).flatMap(AppTheme.init(rawValue:)) ?? .system
+    }
+
+    @MainActor
+    static func apply(_ theme: AppTheme = current) {
+        switch theme {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 enum Theme {
     /// The app's single accent. Everything tintable uses it; nothing else
     /// defines its own palette.
     static let accent = Color(red: 0.47, green: 0.29, blue: 0.93)
-    /// The UI is Turkish, so dates are too, whatever the system language.
-    static let locale = Locale(identifier: "tr_TR")
+    /// Dates speak the language the UI is shown in (Turkish or English),
+    /// with the person's region for everything else.
+    static let locale: Locale = {
+        let language = Bundle.main.preferredLocalizations.first ?? "en"
+        guard let region = Locale.current.region?.identifier else { return Locale(identifier: language) }
+        return Locale(identifier: "\(language)_\(region)")
+    }()
 
     /// Strict 4pt / 8pt spatial rhythm across all views.
     enum Spacing {

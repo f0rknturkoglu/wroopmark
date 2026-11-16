@@ -60,6 +60,7 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("settingsTab") private var activeTab: SettingsTab = .general
     @AppStorage("menuBarIcon") private var menuBarIcon = true
+    @AppStorage(AppTheme.key) private var appTheme = AppTheme.system.rawValue
     @State private var hotKeyOn = QuickSave.shared.hotKeyEnabled
     @State private var extensionStatus = ExtensionStatus.empty
     @State private var extensionError: String?
@@ -179,6 +180,19 @@ struct SettingsView: View {
         @Bindable var model = model
         return Form {
             Section {
+                Picker("Tema", selection: $appTheme) {
+                    Text("Sistem").tag(AppTheme.system.rawValue)
+                    Text("Açık").tag(AppTheme.light.rawValue)
+                    Text("Koyu").tag(AppTheme.dark.rawValue)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: appTheme) { _, value in AppTheme.apply(AppTheme(rawValue: value) ?? .system) }
+            } footer: {
+                Text("Sistem, Mac'in açık ya da koyu ayarını izler.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Picker("Varsayılan düzen", selection: $model.layout) {
                     Label("Kart Izgarası", systemImage: "square.grid.2x2").tag(LibraryLayout.grid)
                     Label("Detaylı Liste", systemImage: "list.bullet").tag(LibraryLayout.list)
@@ -187,9 +201,6 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             } header: {
                 Text("Kütüphane Görünümü")
-            } footer: {
-                Text("Görünüm sistem ayarını izler; uygulama ayrı bir tema tutmaz.")
-                    .foregroundStyle(.secondary)
             }
 
             Section {

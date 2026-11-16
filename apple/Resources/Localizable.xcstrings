@@ -3651,16 +3651,6 @@
         }
       }
     },
-    "Görünüm sistem ayarını izler; uygulama ayrı bir tema tutmaz.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Appearance follows the system setting; the app has no theme of its own."
-          }
-        }
-      }
-    },
     "Göster": {
       "localizations": {
         "en": {
@@ -6531,6 +6521,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Delete…"
+          }
+        }
+      }
+    },
+    "Sistem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        }
+      }
+    },
+    "Sistem, Mac'in açık ya da koyu ayarını izler.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System follows your Mac's light or dark setting."
           }
         }
       }

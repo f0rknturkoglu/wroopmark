@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
+        AppTheme.apply()
     }
 
     /// macOS Services ("Servisler → wroopmark'a Kaydet"): saves a selected URL
