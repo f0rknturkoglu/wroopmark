@@ -1,0 +1,7366 @@
+{
+  "sourceLanguage": "tr",
+  "strings": {
+    "\"%@\" klasörüne taşı ve sakla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to “%@” and keep"
+          }
+        }
+      }
+    },
+    "\"%@\" klasörüne taşı ve sakla (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to “%@” and keep (%lld)"
+          }
+        }
+      }
+    },
+    "\"%@\" klasörünü silmek istediğine emin misin?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the folder “%@”?"
+          }
+        }
+      }
+    },
+    "\"%@\" klasörünün altına yeni alt klasör ekle.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a new subfolder inside “%@”."
+          }
+        }
+      }
+    },
+    "#%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "#%@"
+          }
+        }
+      }
+    },
+    "#%@ (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "#%@ (%lld)"
+          }
+        }
+      }
+    },
+    "#%@ etiketini ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add the tag #%@"
+          }
+        }
+      }
+    },
+    "#okunacak": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "#to-read"
+          }
+        }
+      }
+    },
+    "%%%lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%%%lld"
+          }
+        }
+      }
+    },
+    "%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@"
+          }
+        }
+      }
+    },
+    "%@  (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@  (%lld)"
+          }
+        }
+      }
+    },
+    "%@ (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (%lld)"
+          }
+        }
+      }
+    },
+    "%@ ile panodaki linki kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the copied link with %@"
+          }
+        }
+      }
+    },
+    "%@ linki yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No %@ links"
+          }
+        }
+      }
+    },
+    "%@ linkleri": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ links"
+          }
+        }
+      }
+    },
+    "%@ okunuyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading %@…"
+          }
+        }
+      }
+    },
+    "%@: %lld kayıt bulundu, %lld yeni": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$lld found, %3$lld new"
+          }
+        }
+      }
+    },
+    "%@: panodaki linki kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: save the copied link"
+          }
+        }
+      }
+    },
+    "%@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@…"
+          }
+        }
+      }
+    },
+    "%lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld"
+          }
+        }
+      }
+    },
+    "%lld / %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld"
+          }
+        }
+      }
+    },
+    "%lld / %lld kayıt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld items"
+          }
+        }
+      }
+    },
+    "%lld başarısız": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld failed"
+          }
+        }
+      }
+    },
+    "%lld bekliyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld waiting"
+          }
+        }
+      }
+    },
+    "%lld değişiklik geldi.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld change came in."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changes came in."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld dk okuma": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld min read"
+          }
+        }
+      }
+    },
+    "%lld dosya: %lld yeni kayıt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld files: %lld new items"
+          }
+        }
+      }
+    },
+    "%lld etkin indirme": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld active download"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld active downloads"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld eşleşme": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld match"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld matches"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld filtre": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld filter"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld filters"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld filtre açık": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld filter on"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld filters on"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld filtre daha": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more filter"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more filters"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld fotoğraf — tıkla, ← → ile gez": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld photo — click, browse with ← →"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld photos — click, browse with ← →"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kaldı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld left"
+          }
+        }
+      }
+    },
+    "%lld kaydı etiketle": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Tag %lld item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Tag %lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kaydı etiketle…": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Tag %lld item…"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Tag %lld items…"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kaydı silmek istediğine emin misin?": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld item?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld items?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kaydı sil…": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld item…"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld items…"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kaydın medyası iniyor": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Downloading media of %lld item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Downloading media of %lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kayıt": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kayıt (şu anki görünüm ve arama) %@ olarak bu klasöre yazılacak": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld items (the current view and search) will be written to this folder as %2$@"
+          }
+        }
+      }
+    },
+    "%lld kayıt aktarıldı": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item exported"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items exported"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kayıt geldi.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item came in."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items came in."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kayıt seçili": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item selected"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items selected"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kayıt tek sayfada": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item on one page"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items on one page"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kayıt · %lld medya dosyası (%lld yeni, %@ kopyalandı)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld items · %2$lld media files (%3$lld new, %4$@ copied)"
+          }
+        }
+      }
+    },
+    "%lld kayıtta yazı okunuyor": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Reading text in %lld item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Reading text in %lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld silindi, %lld saklandı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld deleted, %lld kept"
+          }
+        }
+      }
+    },
+    "%lld sırada": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld queued"
+          }
+        }
+      }
+    },
+    "%lld tamamlandı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld done"
+          }
+        }
+      }
+    },
+    "%lld video iniyor": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Downloading %lld video"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Downloading %lld videos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld video telefondan kaldırıldı, %@ boşaldı. İzlediğinde iCloud'dan yeniden iner.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed %1$lld videos from the phone, freed %2$@. They come back from iCloud when you watch them."
+          }
+        }
+      }
+    },
+    "+ #%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+ #%@"
+          }
+        }
+      }
+    },
+    "+ %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+ %@"
+          }
+        }
+      }
+    },
+    "+%lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%lld"
+          }
+        }
+      }
+    },
+    ", %lld getirilemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", %lld could not be fetched"
+          }
+        }
+      }
+    },
+    ", %lld görsel": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": ", %lld picture"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": ", %lld pictures"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    ", %lld medya dosyası": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": ", %lld media file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": ", %lld media files"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    ", %lld okunamadı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", %lld could not be read"
+          }
+        }
+      }
+    },
+    ", %lld tanesi arşivdeki gönderisine bağlandı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", %lld matched to their posts in the archive"
+          }
+        }
+      }
+    },
+    ", %lld zaten vardı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", %lld were already there"
+          }
+        }
+      }
+    },
+    ". Ayrıntılar arka planda gelecek.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". Details will follow in the background."
+          }
+        }
+      }
+    },
+    ". Metin, yazar ve medya arka planda gelecek.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". Text, author and media will follow in the background."
+          }
+        }
+      }
+    },
+    "1. Aşağıdan tarayıcını seç: eklentiler sayfası ve eklenti klasörü açılır (yolu panoda).\n2. Sağ üstte Geliştirici modu'nu aç.\n3. \"Paketlenmemiş öğe yükle\" → açılan klasörü seç.\nGüncellemelerden sonra eklentide ↻ yeniden yükle yeterli.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Pick your browser below: its extensions page and the extension folder open (the path is on the clipboard).\n2. Turn on Developer mode at the top right.\n3. “Load unpacked” → choose the folder that opened.\nAfter updates, just press ↻ reload on the extension."
+          }
+        }
+      }
+    },
+    "15 dakikada bir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every 15 minutes"
+          }
+        }
+      }
+    },
+    "1–%lld önerilen klasöre taşı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–%lld move to a suggested folder"
+          }
+        }
+      }
+    },
+    "3 saatte bir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every 3 hours"
+          }
+        }
+      }
+    },
+    "30 dakikada bir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every 30 minutes"
+          }
+        }
+      }
+    },
+    "@%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "@%@"
+          }
+        }
+      }
+    },
+    "@kisi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "@someone"
+          }
+        }
+      }
+    },
+    "@kisi, @diger": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "@someone, @another"
+          }
+        }
+      }
+    },
+    "Ad": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name"
+          }
+        }
+      }
+    },
+    "Ad (alt klasör için: Ders/Matematik)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name (for a subfolder: School/Math)"
+          }
+        }
+      }
+    },
+    "Adlandır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename"
+          }
+        }
+      }
+    },
+    "Ajanlar (MCP)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agents (MCP)"
+          }
+        }
+      }
+    },
+    "Akış": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed"
+          }
+        }
+      }
+    },
+    "Akış görünümü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed view"
+          }
+        }
+      }
+    },
+    "Alan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Field"
+          }
+        }
+      }
+    },
+    "Alt etiketler de taşınır: %@/… → yeni/…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtags move too: %@/… → new/…"
+          }
+        }
+      }
+    },
+    "Alt klasör adı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subfolder name"
+          }
+        }
+      }
+    },
+    "Alt klasör ekle…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Subfolder…"
+          }
+        }
+      }
+    },
+    "Alıntı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quote"
+          }
+        }
+      }
+    },
+    "Anlam araması": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meaning search"
+          }
+        }
+      }
+    },
+    "Anlam vektörleri (NaturalLanguage)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meaning vectors (NaturalLanguage)"
+          }
+        }
+      }
+    },
+    "Anlamsal arama": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic search"
+          }
+        }
+      }
+    },
+    "Anlamına göre": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By meaning"
+          }
+        }
+      }
+    },
+    "Anlamına göre ara": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search by meaning"
+          }
+        }
+      }
+    },
+    "Anlamına göre ara (⇧⌘M): birebir geçmeyen ama aynı şeyden bahseden kayıtları da bul": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search by meaning (⇧⌘M): also find items about the same thing in other words"
+          }
+        }
+      }
+    },
+    "Anlamına göre arama açık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search by meaning is on"
+          }
+        }
+      }
+    },
+    "Anlamına göre arama açık: yazdığın kelimelerin yanında ilgili kelimeler ve benzer içerikler de gelir (cihazda)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search by meaning is on: related words and similar items come along with what you typed (on device)"
+          }
+        }
+      }
+    },
+    "Apple Intelligence kapalı (Ayarlar → Apple Intelligence ve Siri)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence is off (Settings → Apple Intelligence & Siri)"
+          }
+        }
+      }
+    },
+    "Ara": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        }
+      }
+    },
+    "Ara: kelime, tag:dev, from:@kişi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search: words, tag:dev, from:@someone"
+          }
+        }
+      }
+    },
+    "Arama": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        }
+      }
+    },
+    "Arama anlamı ve özetler cihazda çalışır; internete veri gönderilmez.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meaning search and summaries run on the device; nothing is sent to the internet."
+          }
+        }
+      }
+    },
+    "Arama ifadesi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search query"
+          }
+        }
+      }
+    },
+    "Arama kutusundaki ✦ düğmesiyle açılır. Yazdığın kelimelerin yanına cihazdaki dil modeli eş anlamlıları ve diğer dildeki karşılıkları ekler; ayrıca her kaydın anlam vektörüne bakılır. Dizin kayıt başına ~0,5 KB, modeller yalnızca iş varken ayrı bir süreçte çalışır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turned on with the ✦ button in the search field. The on-device language model adds synonyms and translations to your words, and each item's meaning vector is compared too. The index takes ~0.5 KB per item; the models run in a separate process only when there is work."
+          }
+        }
+      }
+    },
+    "Arama varsa en uygun sonuç önce, yoksa son kaydedilen önce": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Best match first when searching, otherwise the latest saved first"
+          }
+        }
+      }
+    },
+    "Aramayı kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Search"
+          }
+        }
+      }
+    },
+    "Aramayı kaydet…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Search…"
+          }
+        }
+      }
+    },
+    "Aramayı sil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Search"
+          }
+        }
+      }
+    },
+    "Aramayı temizle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear search"
+          }
+        }
+      }
+    },
+    "Aramayı yeniden adlandır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Search"
+          }
+        }
+      }
+    },
+    "Araçlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tools"
+          }
+        }
+      }
+    },
+    "Ara…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search…"
+          }
+        }
+      }
+    },
+    "Arka planda anlam dizini oluştur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build the meaning index in the background"
+          }
+        }
+      }
+    },
+    "Arşivde arar ve bulunan kayıtların bağlantılarını döndürür (başka kısayollarda kullanmak için).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searches the archive and returns the links of what it finds (for use in other shortcuts)."
+          }
+        }
+      }
+    },
+    "Arşivde arar, bulunan kayıtların bağlantılarını döndürür.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searches the archive and returns the links of what it finds."
+          }
+        }
+      }
+    },
+    "Arşivde aynı şeyin iki kaydı yok.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The archive has nothing saved twice."
+          }
+        }
+      }
+    },
+    "Arşivden bugün için": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From the archive for today"
+          }
+        }
+      }
+    },
+    "Arşivinde arar ve sonuçları gösterir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searches your archive and shows the results."
+          }
+        }
+      }
+    },
+    "Arşivinde arar ve sonuçları wroopmark'ta gösterir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searches your archive and shows the results in wroopmark."
+          }
+        }
+      }
+    },
+    "Arşivinden": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From Your Archive"
+          }
+        }
+      }
+    },
+    "Ayarlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        }
+      }
+    },
+    "Ayarlar (⌘,)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings (⌘,)"
+          }
+        }
+      }
+    },
+    "Aynı görsel ya da video": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same picture or video"
+          }
+        }
+      }
+    },
+    "Aynı görsel/video, aynı metin ya da çok benzer içerik. Birini tut, diğerleri silinir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same picture/video, same text or very similar content. Keep one; the others are deleted."
+          }
+        }
+      }
+    },
+    "Aynı görseli/videoyu ya da aynı metni taşıyan, ya da anlamca neredeyse aynı olan kayıtlar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items with the same picture/video or the same text, or almost the same meaning."
+          }
+        }
+      }
+    },
+    "Aynı metin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same text"
+          }
+        }
+      }
+    },
+    "Aynı sonucu arama kutusuna bunu yazarak da alırsın": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You get the same result by typing this in the search field"
+          }
+        }
+      }
+    },
+    "Ayrıntılar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details"
+          }
+        }
+      }
+    },
+    "Ayıkla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Triage"
+          }
+        }
+      }
+    },
+    "Aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open"
+          }
+        }
+      }
+    },
+    "Açık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light"
+          }
+        }
+      }
+    },
+    "Açıkken Mac'ten gelen videolar telefona kopyalanmaz: izlediğinde iCloud'dan iner, iOS yer gerektiğinde onları kendisi siler. Kapatırsan hepsi yeniden telefona iner.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When on, videos from the Mac are not copied to the phone: they download from iCloud when you watch them, and iOS removes them when it needs space. Turn it off and they all come to the phone again."
+          }
+        }
+      }
+    },
+    "Bağlantı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link"
+          }
+        }
+      }
+    },
+    "Bağlantı ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Link"
+          }
+        }
+      }
+    },
+    "Bağlantı ekle…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Link…"
+          }
+        }
+      }
+    },
+    "Bağlantı hazır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link ready"
+          }
+        }
+      }
+    },
+    "Bağlantı kaydedildi; ayrıntılar wroopmark açılınca gelecek.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link saved; the details come when you open wroopmark."
+          }
+        }
+      }
+    },
+    "Bağlantı kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Link"
+          }
+        }
+      }
+    },
+    "Bağlantılar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Links"
+          }
+        }
+      }
+    },
+    "Bağlantıyı kopyala": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Link"
+          }
+        }
+      }
+    },
+    "Bağlantıyı yenile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Link"
+          }
+        }
+      }
+    },
+    "Başarısız (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed (%lld)"
+          }
+        }
+      }
+    },
+    "Başarısız indirme yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No failed downloads"
+          }
+        }
+      }
+    },
+    "Başka bir klasör seç…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Another Folder…"
+          }
+        }
+      }
+    },
+    "Başlangıç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From"
+          }
+        }
+      }
+    },
+    "Başlıkları getir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch titles"
+          }
+        }
+      }
+    },
+    "Başlığı olmayan linklerin sayfa başlığını indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download page titles for links that have none"
+          }
+        }
+      }
+    },
+    "Benzerleri": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Similar"
+          }
+        }
+      }
+    },
+    "Bilinmeyen hata": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown error"
+          }
+        }
+      }
+    },
+    "Bir bağlantı kopyala, sonra %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy a link, then %@"
+          }
+        }
+      }
+    },
+    "Bir bağlantıyı metni ve görselleriyle arşive kaydeder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saves a link to the archive with its text and pictures."
+          }
+        }
+      }
+    },
+    "Bir bağlantıyı metni ve görselleriyle arşive kaydeder. Paylaşım sayfasından da kullanılabilir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saves a link to the archive with its text and pictures. Also works from the share sheet."
+          }
+        }
+      }
+    },
+    "Bir kayıt seç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select an Item"
+          }
+        }
+      }
+    },
+    "Bir kısmı henüz indirilmedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some are not downloaded yet"
+          }
+        }
+      }
+    },
+    "Bitiş": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To"
+          }
+        }
+      }
+    },
+    "Bitti": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "Bu Mac'teki modeller": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Models on this Mac"
+          }
+        }
+      }
+    },
+    "Bu aramayı kenar çubuğuna ekle (⌘⇧S)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add this search to the sidebar (⌘⇧S)"
+          }
+        }
+      }
+    },
+    "Bu bağlantıya atıf yapan arşivlenmiş bir gönderi bulunmuyor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No archived post refers to this link."
+          }
+        }
+      }
+    },
+    "Bu bölüm hakkında…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About this section…"
+          }
+        }
+      }
+    },
+    "Bu cihaz": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device"
+          }
+        }
+      }
+    },
+    "Bu cihaz Apple Intelligence desteklemiyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device does not support Apple Intelligence"
+          }
+        }
+      }
+    },
+    "Bu cihazın kütüphanesi ve klasördeki dosyalar yerinde kalır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device's library and the files in the folder stay where they are."
+          }
+        }
+      }
+    },
+    "Bu grubu bir daha gösterme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't show this group again"
+          }
+        }
+      }
+    },
+    "Bu hafta kontrol edilmemiş linklerin hâlâ açılıp açılmadığına bak": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check whether links not checked this week still open"
+          }
+        }
+      }
+    },
+    "Bu iPhone'da gömme modeli yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone has no embedding model"
+          }
+        }
+      }
+    },
+    "Bu işlem geri alınamaz.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This can't be undone."
+          }
+        }
+      }
+    },
+    "Bu kategoride kayıtlı link bulunmuyor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No saved links in this category."
+          }
+        }
+      }
+    },
+    "Bu kaydı silmek istediğine emin misin?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this item?"
+          }
+        }
+      }
+    },
+    "Bu kayıt silinsin mi?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this item?"
+          }
+        }
+      }
+    },
+    "Bu klasörde ya da süzgeçte kayıt yok.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing in this folder or filter."
+          }
+        }
+      }
+    },
+    "Bu klasörü kullan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use This Folder"
+          }
+        }
+      }
+    },
+    "Bu kuralı arşivdeki tüm kayıtlara şimdi uygula": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply this rule to every item in the archive now"
+          }
+        }
+      }
+    },
+    "Bu link kayıt havuzundan kaldırılır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This link is removed from the link pool."
+          }
+        }
+      }
+    },
+    "Bu linki havuzdan silmek istediğine emin misin?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this link from the pool?"
+          }
+        }
+      }
+    },
+    "Bu seçimde kayıt yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing matches this choice"
+          }
+        }
+      }
+    },
+    "Bu video telefonda yok. Kaynağında izlemek için ⋯ → Kaynağında aç.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This video is not on the phone. To watch it at its source: ⋯ → Open at Source."
+          }
+        }
+      }
+    },
+    "Bugün": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        }
+      }
+    },
+    "Bunu tut": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep This"
+          }
+        }
+      }
+    },
+    "Burada gönderi yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No posts here"
+          }
+        }
+      }
+    },
+    "Burada video yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No videos here"
+          }
+        }
+      }
+    },
+    "Buraya aktar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export Here"
+          }
+        }
+      }
+    },
+    "Bütün linkler, kategorilere ayrılmış": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All links, sorted into categories"
+          }
+        }
+      }
+    },
+    "Büyüt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enlarge"
+          }
+        }
+      }
+    },
+    "CSV (tablo)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CSV (spreadsheet)"
+          }
+        }
+      }
+    },
+    "Chromium": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chromium"
+          }
+        }
+      }
+    },
+    "Chromium (Chrome, Brave, Arc, Edge…)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chromium (Chrome, Brave, Arc, Edge…)"
+          }
+        }
+      }
+    },
+    "Cihazdaki zeka": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On-device intelligence"
+          }
+        }
+      }
+    },
+    "Cihazlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devices"
+          }
+        }
+      }
+    },
+    "Cihazlar arası senkron": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync between devices"
+          }
+        }
+      }
+    },
+    "Claude Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code"
+          }
+        }
+      }
+    },
+    "Claude Desktop, Cursor ve diğerleri": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Desktop, Cursor and others"
+          }
+        }
+      }
+    },
+    "Claude Desktop: Ayarlar → Geliştirici → Yapılandırmayı düzenle. Yalnızca okuma izni için \"args\": [\"mcp\", \"--read-only\"].": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Desktop: Settings → Developer → Edit Config. For read-only access: \"args\": [\"mcp\", \"--read-only\"]."
+          }
+        }
+      }
+    },
+    "Claude, Cursor gibi ajanlar arşivinde arama yapabilir, kaydı okuyabilir (görsellerin dosya yolları dahil), link kaydedip etiketleyebilir. Sunucu yalnızca ajan bağlanınca çalışır ve ajanla birlikte kapanır; uygulamanın açık olması gerekmez.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agents such as Claude and Cursor can search your archive, read items (including the file paths of pictures), and save and tag links. The server runs only while an agent is connected and quits with it; the app does not need to be open."
+          }
+        }
+      }
+    },
+    "Dar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Narrow"
+          }
+        }
+      }
+    },
+    "Destek ve geri bildirim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support and feedback"
+          }
+        }
+      }
+    },
+    "Detay paneli": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detail panel"
+          }
+        }
+      }
+    },
+    "Detay panelinde “Özetle ve etiket öner”, ayıklama ekranında her kart kendiliğinden özetlenir. Önerilen etiketler tek tıkla eklenir; hiçbir şey otomatik etiketlenmez. Hepsi cihazda, internete bir şey gitmez.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Summarize and suggest tags” in the detail panel; in Triage every card is summarized on its own. Suggested tags are added with one click; nothing is tagged automatically. All on the device, nothing goes to the internet."
+          }
+        }
+      }
+    },
+    "Detay panelini gizle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide detail panel"
+          }
+        }
+      }
+    },
+    "Detay panelini gizle (⌘I)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide detail panel (⌘I)"
+          }
+        }
+      }
+    },
+    "Detay panelini göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show detail panel"
+          }
+        }
+      }
+    },
+    "Detay panelini göster (⌘I)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show detail panel (⌘I)"
+          }
+        }
+      }
+    },
+    "Detaylar yüklenemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load details"
+          }
+        }
+      }
+    },
+    "Detaylı Liste": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detailed List"
+          }
+        }
+      }
+    },
+    "Değişsin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes"
+          }
+        }
+      }
+    },
+    "Dil modeli (Apple Intelligence)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language model (Apple Intelligence)"
+          }
+        }
+      }
+    },
+    "Diskteki medya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media on disk"
+          }
+        }
+      }
+    },
+    "Dizin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Index"
+          }
+        }
+      }
+    },
+    "Dizini yeniden oluştur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebuild Index"
+          }
+        }
+      }
+    },
+    "Diğer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other"
+          }
+        }
+      }
+    },
+    "Diğer cihazlardan %lld değişiklik geldi.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld change came from other devices."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changes came from other devices."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Diğer cihazların da gördüğü bir klasör seç (iCloud Drive, Syncthing, Dropbox…).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a folder your other devices also see (iCloud Drive, Syncthing, Dropbox…)."
+          }
+        }
+      }
+    },
+    "Dosya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File"
+          }
+        }
+      }
+    },
+    "Dosya ya da klasör seç…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose File or Folder…"
+          }
+        }
+      }
+    },
+    "Dosyadan içe aktar…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import from File…"
+          }
+        }
+      }
+    },
+    "Dosyalar kopyalanıyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copying files…"
+          }
+        }
+      }
+    },
+    "Dosyalardan içe aktar…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import from Files…"
+          }
+        }
+      }
+    },
+    "Dosyaları pencereye sürükleyip bırakmak da olur.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can also drag files onto the window."
+          }
+        }
+      }
+    },
+    "Duraklat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "Durdur (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop (%lld)"
+          }
+        }
+      }
+    },
+    "Durum": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
+    "Dışa aktar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        }
+      }
+    },
+    "Dışa aktarılıyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting…"
+          }
+        }
+      }
+    },
+    "Ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        }
+      }
+    },
+    "Eklenti": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extension"
+          }
+        }
+      }
+    },
+    "Eklenti kimliği": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extension ID"
+          }
+        }
+      }
+    },
+    "Eklenti klasörünü göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Extension Folder"
+          }
+        }
+      }
+    },
+    "Eksik medyaları şimdi tara ve indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find and download missing media now"
+          }
+        }
+      }
+    },
+    "Eksik videoları şimdi indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download missing videos now"
+          }
+        }
+      }
+    },
+    "Elle eklendi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added by hand"
+          }
+        }
+      }
+    },
+    "En çok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Most"
+          }
+        }
+      }
+    },
+    "Etiket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag"
+          }
+        }
+      }
+    },
+    "Etiket ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Tag"
+          }
+        }
+      }
+    },
+    "Etiket ekle (Enter)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add tag (Enter)"
+          }
+        }
+      }
+    },
+    "Etiket yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tags"
+          }
+        }
+      }
+    },
+    "Etiketi kaldır: #%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove tag: #%@"
+          }
+        }
+      }
+    },
+    "Etiketi yeniden adlandır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Tag"
+          }
+        }
+      }
+    },
+    "Etiketle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag"
+          }
+        }
+      }
+    },
+    "Etiketler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tags"
+          }
+        }
+      }
+    },
+    "Etiketler (virgülle)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tags (comma-separated)"
+          }
+        }
+      }
+    },
+    "Etiketler, notlar ve medya tek bakışta.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tags, notes and media at a glance."
+          }
+        }
+      }
+    },
+    "Etiketleri düzenle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Tags"
+          }
+        }
+      }
+    },
+    "Etiketle…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag…"
+          }
+        }
+      }
+    },
+    "Etiketli": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tagged"
+          }
+        }
+      }
+    },
+    "Etiketsiz": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untagged"
+          }
+        }
+      }
+    },
+    "Etkin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active"
+          }
+        }
+      }
+    },
+    "Eşleşen %@ yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching %@"
+          }
+        }
+      }
+    },
+    "Fark etmez": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any"
+          }
+        }
+      }
+    },
+    "Filtre": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        }
+      }
+    },
+    "Filtre panelini aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the filter panel"
+          }
+        }
+      }
+    },
+    "Filtreler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filters"
+          }
+        }
+      }
+    },
+    "Filtreleri temizle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Filters"
+          }
+        }
+      }
+    },
+    "Filtreler…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filters…"
+          }
+        }
+      }
+    },
+    "Finder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder"
+          }
+        }
+      }
+    },
+    "Finder'da Göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show in Finder"
+          }
+        }
+      }
+    },
+    "Finder'da göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show in Finder"
+          }
+        }
+      }
+    },
+    "Fotoğraf yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No photos"
+          }
+        }
+      }
+    },
+    "Fotoğraflar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photos"
+          }
+        }
+      }
+    },
+    "Fotoğraflı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With photos"
+          }
+        }
+      }
+    },
+    "Galeri": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gallery"
+          }
+        }
+      }
+    },
+    "Galeri yüklenemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the gallery"
+          }
+        }
+      }
+    },
+    "Gelişmiş filtreler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced filters"
+          }
+        }
+      }
+    },
+    "Genel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
+          }
+        }
+      }
+    },
+    "Geniş": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wide"
+          }
+        }
+      }
+    },
+    "Geniş Akış": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wide Feed"
+          }
+        }
+      }
+    },
+    "Genişlik": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Width"
+          }
+        }
+      }
+    },
+    "Geri al": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        }
+      }
+    },
+    "Geri yüklemek için: uygulamayı kapat, yedekteki library.sqlite ile media klasörünü kütüphane klasörüne kopyala (Kütüphane sekmesindeki konum).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To restore: quit the app, then copy library.sqlite and the media folder from the backup into the library folder (its location is in the Library tab)."
+          }
+        }
+      }
+    },
+    "Geçersiz tutamaç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid handle"
+          }
+        }
+      }
+    },
+    "Geçmiş yıllarda bugün kaydettiklerin ve arşivden 5 kayıt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you saved on this day in past years, and 5 items from the archive"
+          }
+        }
+      }
+    },
+    "Geçmişte bugün": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On this day"
+          }
+        }
+      }
+    },
+    "Geçtiği kayıtlar (%lld%@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items containing it (%lld%@)"
+          }
+        }
+      }
+    },
+    "GitHub'da aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open on GitHub"
+          }
+        }
+      }
+    },
+    "Gizlilik politikası": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy policy"
+          }
+        }
+      }
+    },
+    "Gönderi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Post"
+          }
+        }
+      }
+    },
+    "Gönderilmeyi bekleyen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting to be sent"
+          }
+        }
+      }
+    },
+    "Görselde yazı (OCR)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text in pictures (OCR)"
+          }
+        }
+      }
+    },
+    "Görseldeki yazı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text in the picture"
+          }
+        }
+      }
+    },
+    "Görseller (önerilen)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pictures (recommended)"
+          }
+        }
+      }
+    },
+    "Görseller klasöre kopyalanır, öbür cihaz hemen gösterir. Videolar her cihazda kendi iner; “Görseller ve videolar” iCloud'da birkaç GB tutabilir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pictures are copied to the folder and show up on the other device right away. Videos download on each device on their own; “Pictures and videos” can take a few GB in iCloud."
+          }
+        }
+      }
+    },
+    "Görseller ve video kapakları her zaman indirilir. Kapalıyken videolar tek tek detay ekranından veya görüntüleyiciden indirilebilir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pictures and video posters are always downloaded. When off, videos can be downloaded one by one from the detail view or the viewer."
+          }
+        }
+      }
+    },
+    "Görseller ve videolar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pictures and videos"
+          }
+        }
+      }
+    },
+    "Görsellerdeki yazıyı tanı ve aranabilir yap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognize text in pictures and make it searchable"
+          }
+        }
+      }
+    },
+    "Görüntüle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View"
+          }
+        }
+      }
+    },
+    "Görüntüleyiciyi kapat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the viewer"
+          }
+        }
+      }
+    },
+    "Görünüm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        }
+      }
+    },
+    "Görünüm sistem ayarını izler; uygulama ayrı bir tema tutmaz.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance follows the system setting; the app has no theme of its own."
+          }
+        }
+      }
+    },
+    "Göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show"
+          }
+        }
+      }
+    },
+    "Gösterilen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown"
+          }
+        }
+      }
+    },
+    "Gözden geçirilecek kayıt kalmadı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing left to review"
+          }
+        }
+      }
+    },
+    "Hakkında": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About"
+          }
+        }
+      }
+    },
+    "Harici video indirici": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "External video downloader"
+          }
+        }
+      }
+    },
+    "Hata": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error"
+          }
+        }
+      }
+    },
+    "Havuza link ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a link to the pool"
+          }
+        }
+      }
+    },
+    "Havuzdan sil…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from Pool…"
+          }
+        }
+      }
+    },
+    "Hazır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        }
+      }
+    },
+    "Hazırlanıyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing"
+          }
+        }
+      }
+    },
+    "Hedef": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target"
+          }
+        }
+      }
+    },
+    "Henüz etiket yok — bir kaydı seçip etiket ekle ya da kartın üstündeki # düğmesini kullan.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tags yet — select an item and add a tag, or use the # button on a card."
+          }
+        }
+      }
+    },
+    "Henüz indirilmedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not downloaded yet"
+          }
+        }
+      }
+    },
+    "Henüz klasör yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folders yet"
+          }
+        }
+      }
+    },
+    "Henüz kural yok.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No rules yet."
+          }
+        }
+      }
+    },
+    "Hepsi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        }
+      }
+    },
+    "Her gün otomatik yedekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back up automatically every day"
+          }
+        }
+      }
+    },
+    "Her uygulamadan kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save from any app"
+          }
+        }
+      }
+    },
+    "Her şey güncel.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything is up to date."
+          }
+        }
+      }
+    },
+    "Her şeyi bul": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find anything"
+          }
+        }
+      }
+    },
+    "Herhangi bir klasörde": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In any folder"
+          }
+        }
+      }
+    },
+    "Herhangi bir medya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any media"
+          }
+        }
+      }
+    },
+    "Hiçbir kayıtta geçmiyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in any item"
+          }
+        }
+      }
+    },
+    "Hızlı kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick save"
+          }
+        }
+      }
+    },
+    "JSON satırları": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JSON lines"
+          }
+        }
+      }
+    },
+    "Kaldır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        }
+      }
+    },
+    "Kapalı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        }
+      }
+    },
+    "Kapalıyken uygulama yalnızca Dock ve uygulama menüsünden açılır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When off, the app opens only from the Dock and the app menu."
+          }
+        }
+      }
+    },
+    "Kapat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "Kapat (Esc)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close (Esc)"
+          }
+        }
+      }
+    },
+    "Kart": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Card"
+          }
+        }
+      }
+    },
+    "Kart / liste / akış görünümü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Card / list / feed view"
+          }
+        }
+      }
+    },
+    "Kart Izgarası": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Card Grid"
+          }
+        }
+      }
+    },
+    "Kart görünümü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Card view"
+          }
+        }
+      }
+    },
+    "Karıştır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffle"
+          }
+        }
+      }
+    },
+    "Karışık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffled"
+          }
+        }
+      }
+    },
+    "Kategorileri gizler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hides the categories"
+          }
+        }
+      }
+    },
+    "Kategorileri gösterir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the categories"
+          }
+        }
+      }
+    },
+    "Kaydedildi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved"
+          }
+        }
+      }
+    },
+    "Kaydedildi %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved %@"
+          }
+        }
+      }
+    },
+    "Kaydedildi: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved: %@"
+          }
+        }
+      }
+    },
+    "Kaydedildiği hâli · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As saved · %@"
+          }
+        }
+      }
+    },
+    "Kaydedilemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save"
+          }
+        }
+      }
+    },
+    "Kaydedilen gönderilerdeki linkler burada toplanır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Links from your saved posts gather here."
+          }
+        }
+      }
+    },
+    "Kaydediliyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving…"
+          }
+        }
+      }
+    },
+    "Kaydedilme tarihi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date saved"
+          }
+        }
+      }
+    },
+    "Kaydedilme: eskiden yeniye": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved: oldest first"
+          }
+        }
+      }
+    },
+    "Kaydedilme: yeniden eskiye": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved: newest first"
+          }
+        }
+      }
+    },
+    "Kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        }
+      }
+    },
+    "Kaydettiklerin, çevrimdışı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you saved, offline"
+          }
+        }
+      }
+    },
+    "Kaydettiklerin, çevrimdışı ve aranabilir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you saved, offline and searchable."
+          }
+        }
+      }
+    },
+    "Kaydettiklerinden biri burada.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One of your saves shows here."
+          }
+        }
+      }
+    },
+    "Kaydettiklerinden biri.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One of your saves."
+          }
+        }
+      }
+    },
+    "Kaydettiklerinden biri. Uzun bas → Widget'ı Düzenle: ne gösterileceği, klasör, sıklık.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One of your saves. Long-press → Edit Widget: what to show, folder, how often."
+          }
+        }
+      }
+    },
+    "Kaydettiğin her sayfa (makale, GitHub, arXiv…) görünmez bir tarayıcıda açılıp olduğu gibi saklanır; site değişse ya da kapansa da detaydaki “Sayfanın kopyası”ndan açılır. Çerez tutulmaz, sayfa başına genelde 1–5 MB.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every page you save (articles, GitHub, arXiv…) is opened in an invisible browser and kept as it is; even if the site changes or goes away, it opens from “Page copy” in the details. No cookies are kept; usually 1–5 MB per page."
+          }
+        }
+      }
+    },
+    "Kaydettiğiniz TikTok veya web videolarının indirme ilerlemeleri burada görünür.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download progress of your saved TikTok and web videos shows here."
+          }
+        }
+      }
+    },
+    "Kaydı sil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Item"
+          }
+        }
+      }
+    },
+    "Kaynağında aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open at Source"
+          }
+        }
+      }
+    },
+    "Kayıt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items"
+          }
+        }
+      }
+    },
+    "Kayıtla ilgili not ekle…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a note about this item…"
+          }
+        }
+      }
+    },
+    "Kayıtla ilgili not…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A note about this item…"
+          }
+        }
+      }
+    },
+    "Kayıtlar yüklenemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load items"
+          }
+        }
+      }
+    },
+    "Kayıtlar, etiketler, klasörler, notlar ve kayıtlı aramalar seçtiğin klasör üzerinden diğer cihazlara (iPhone, başka Mac) gider. Veritabanı klasöre konmaz; her cihaz yalnızca kendi değişikliklerini ekler, aynı şeyi iki yerde değiştirirsen son yapılan geçerli olur. Sunucu yok, hesap yok.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items, tags, folders, notes and saved searches go to your other devices (iPhone, another Mac) through the folder you choose. The database never goes in the folder; each device only adds its own changes, and if you change the same thing in two places, the latest wins. No server, no account."
+          }
+        }
+      }
+    },
+    "Kayıtları Spotlight'ta göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show items in Spotlight"
+          }
+        }
+      }
+    },
+    "Kayıtları bu klasörde toplayabilirsin.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can gather items in this folder."
+          }
+        }
+      }
+    },
+    "Kayıtları tek tek gözden geçir: ← sil, → sakla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review items one by one: ← delete, → keep"
+          }
+        }
+      }
+    },
+    "Kayıtları tek tıkla bu klasöre taşıyabilirsin.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can move items to this folder with one click."
+          }
+        }
+      }
+    },
+    "Kayıtlı aramalar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved Searches"
+          }
+        }
+      }
+    },
+    "Kelimeler ve süzgeçler, ör. tag:dev from:@jack": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Words and filters, e.g. tag:dev from:@jack"
+          }
+        }
+      }
+    },
+    "Kenar Çubuğu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidebar"
+          }
+        }
+      }
+    },
+    "Kenar Çubuğunu Gizle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Sidebar"
+          }
+        }
+      }
+    },
+    "Kenar Çubuğunu Göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Sidebar"
+          }
+        }
+      }
+    },
+    "Kenar çubuğunda \"%@\" klasörü açık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The folder “%@” is open in the sidebar"
+          }
+        }
+      }
+    },
+    "Kenar çubuğunda durur, her açılışta güncel sonuçları gösterir.\n%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stays in the sidebar and shows current results each time.\n%@"
+          }
+        }
+      }
+    },
+    "Kenar çubuğunu gizle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide sidebar"
+          }
+        }
+      }
+    },
+    "Kenar çubuğunu gizle (⌃⌘S)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide sidebar (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Kenar çubuğunu göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show sidebar"
+          }
+        }
+      }
+    },
+    "Kenar çubuğunu göster (⌃⌘S)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show sidebar (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Kişi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Person"
+          }
+        }
+      }
+    },
+    "Kişiye göre (A–Z)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By person (A–Z)"
+          }
+        }
+      }
+    },
+    "Klasör": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder"
+          }
+        }
+      }
+    },
+    "Klasör Seç…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Folder…"
+          }
+        }
+      }
+    },
+    "Klasör adı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder name"
+          }
+        }
+      }
+    },
+    "Klasör filtresini kaldır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the folder filter"
+          }
+        }
+      }
+    },
+    "Klasör oluştur…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Folder…"
+          }
+        }
+      }
+    },
+    "Klasör seçilmedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folder chosen"
+          }
+        }
+      }
+    },
+    "Klasör silinir ancak içindeki kayıtlar kütüphanenizde kalmaya devam eder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The folder is deleted, but its items stay in your library."
+          }
+        }
+      }
+    },
+    "Klasör yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folder"
+          }
+        }
+      }
+    },
+    "Klasör:": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder:"
+          }
+        }
+      }
+    },
+    "Klasörden çıkar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from Folder"
+          }
+        }
+      }
+    },
+    "Klasöre Git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go to Folder"
+          }
+        }
+      }
+    },
+    "Klasöre göre süz (alt klasörler dahil)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter by folder (subfolders included)"
+          }
+        }
+      }
+    },
+    "Klasöre koy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put in Folder"
+          }
+        }
+      }
+    },
+    "Klasöre taşı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Folder"
+          }
+        }
+      }
+    },
+    "Klasöre taşı:": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to folder:"
+          }
+        }
+      }
+    },
+    "Klasöre taşı…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Folder…"
+          }
+        }
+      }
+    },
+    "Klasörler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folders"
+          }
+        }
+      }
+    },
+    "Klasörsüz": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folder"
+          }
+        }
+      }
+    },
+    "Klasörü seç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Folder"
+          }
+        }
+      }
+    },
+    "Klasörü sil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Folder"
+          }
+        }
+      }
+    },
+    "Klasörü yeniden adlandır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Folder"
+          }
+        }
+      }
+    },
+    "Kontrol edilen linklerin hepsi açılıyor. \"Kırıkları bul\" yeni kontrol başlatır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every checked link opens. “Find broken” starts a new check."
+          }
+        }
+      }
+    },
+    "Konum": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location"
+          }
+        }
+      }
+    },
+    "Kopya bulunamadı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No duplicates found"
+          }
+        }
+      }
+    },
+    "Kopya değil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not a Duplicate"
+          }
+        }
+      }
+    },
+    "Kopyala": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy"
+          }
+        }
+      }
+    },
+    "Kopyalandı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        }
+      }
+    },
+    "Kopyalar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicates"
+          }
+        }
+      }
+    },
+    "Kopyaları bul…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find Duplicates…"
+          }
+        }
+      }
+    },
+    "Kopyası olan sayfa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page with a copy"
+          }
+        }
+      }
+    },
+    "Koyu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        }
+      }
+    },
+    "Kullanılamıyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        }
+      }
+    },
+    "Kural ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Rule"
+          }
+        }
+      }
+    },
+    "Kurallar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rules"
+          }
+        }
+      }
+    },
+    "Kuralı sil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Rule"
+          }
+        }
+      }
+    },
+    "Kurulu değil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not installed"
+          }
+        }
+      }
+    },
+    "Kütüphane": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library"
+          }
+        }
+      }
+    },
+    "Kütüphane Görünümü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library View"
+          }
+        }
+      }
+    },
+    "Kütüphane açık değil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The library is not open"
+          }
+        }
+      }
+    },
+    "Kütüphane açılamadı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open the library"
+          }
+        }
+      }
+    },
+    "Kütüphane açılamadı: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open the library: %@"
+          }
+        }
+      }
+    },
+    "Kütüphane boş": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The library is empty"
+          }
+        }
+      }
+    },
+    "Kütüphane görünümü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library view"
+          }
+        }
+      }
+    },
+    "Kütüphane klasörünü aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Library Folder"
+          }
+        }
+      }
+    },
+    "Kütüphane yüklenemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the library"
+          }
+        }
+      }
+    },
+    "Kütüphaneyi yenile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Library"
+          }
+        }
+      }
+    },
+    "Küçült": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shrink"
+          }
+        }
+      }
+    },
+    "Kırık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Broken"
+          }
+        }
+      }
+    },
+    "Kırık (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Broken (%lld)"
+          }
+        }
+      }
+    },
+    "Kırık link yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No broken links"
+          }
+        }
+      }
+    },
+    "Kırıkları bul": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find Broken"
+          }
+        }
+      }
+    },
+    "Kısayol her uygulamada çalışır. Spotlight'ta metin, yazar, etiketler ve görsellerdeki yazı aranır; hiçbir şey cihazdan çıkmaz.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The shortcut works in every app. Spotlight searches the text, author, tags and text in pictures; nothing leaves the device."
+          }
+        }
+      }
+    },
+    "Link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link"
+          }
+        }
+      }
+    },
+    "Link havuzu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link Pool"
+          }
+        }
+      }
+    },
+    "Link havuzu yüklenemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the link pool"
+          }
+        }
+      }
+    },
+    "Link kontrolünü durdur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop the link check"
+          }
+        }
+      }
+    },
+    "Link yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No links"
+          }
+        }
+      }
+    },
+    "Linkler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Links"
+          }
+        }
+      }
+    },
+    "Lisans": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "License"
+          }
+        }
+      }
+    },
+    "Liste": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List"
+          }
+        }
+      }
+    },
+    "Liste görünümü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List view"
+          }
+        }
+      }
+    },
+    "Mac'le birlikte (isteğe bağlı)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With your Mac (optional)"
+          }
+        }
+      }
+    },
+    "Mac'le eşitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync with Mac"
+          }
+        }
+      }
+    },
+    "Mac'te wroopmark kullanıyorsan iCloud Drive üzerinden iki yönlü eşitlenir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you use wroopmark on a Mac, it syncs both ways through iCloud Drive."
+          }
+        }
+      }
+    },
+    "Mac'te wroopmark → Ayarlar → Senkron → “iCloud Drive ile başlat” de, sonra burada iCloud Drive içindeki “wroopmark” klasörünü seç. Kayıtlar, etiketler, klasörler ve notlar iki yönlü eşitlenir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the Mac, choose wroopmark → Settings → Sync → “Start with iCloud Drive”, then pick the “wroopmark” folder in iCloud Drive here. Items, tags, folders and notes sync both ways."
+          }
+        }
+      }
+    },
+    "Mac'teki kütüphane indiriliyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the Mac's library…"
+          }
+        }
+      }
+    },
+    "Medya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media"
+          }
+        }
+      }
+    },
+    "Medya %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media %lld"
+          }
+        }
+      }
+    },
+    "Medyasız": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No media"
+          }
+        }
+      }
+    },
+    "Medyayı indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download Media"
+          }
+        }
+      }
+    },
+    "Menü Çubuğu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menu Bar"
+          }
+        }
+      }
+    },
+    "Menü çubuğunda göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show in the menu bar"
+          }
+        }
+      }
+    },
+    "Metin ve görseller telefona iner; sayfa silinse de arşivde kalır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text and pictures come to the phone; they stay in the archive even if the page is deleted."
+          }
+        }
+      }
+    },
+    "Metin ve görseller wroopmark'ı açınca gelir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text and pictures come when you open wroopmark."
+          }
+        }
+      }
+    },
+    "Metin, görseller, linkler, etiketler ve not burada görünür.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text, pictures, links, tags and the note show here."
+          }
+        }
+      }
+    },
+    "Metinde, notlarında, etiketlerinde ara: tag:okunacak, from:@kişi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search text, your notes and tags: tag:to-read, from:@someone."
+          }
+        }
+      }
+    },
+    "Mevcut kayıtlara da uygula": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also apply to existing items"
+          }
+        }
+      }
+    },
+    "Model henüz hazır değil (indiriliyor olabilir)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model is not ready yet (it may be downloading)"
+          }
+        }
+      }
+    },
+    "Model kullanılamıyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model is unavailable"
+          }
+        }
+      }
+    },
+    "Not": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note"
+          }
+        }
+      }
+    },
+    "Not ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Note"
+          }
+        }
+      }
+    },
+    "Oku": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read"
+          }
+        }
+      }
+    },
+    "Okumak, izlemek, sonra bulmak istediğin her şey tek yerde, telefonunda.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything you want to read, watch and find later, in one place on your phone."
+          }
+        }
+      }
+    },
+    "Okunmayı bekleyen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting to be read"
+          }
+        }
+      }
+    },
+    "Okuyucuda aç: sade, çevrimdışı; tema, yazı boyutu, sesli okuma (⌥⌘R)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in the reader: clean and offline; theme, text size, read aloud (⌥⌘R)"
+          }
+        }
+      }
+    },
+    "Oluştur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create"
+          }
+        }
+      }
+    },
+    "Oluştur ve taşı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create and Move"
+          }
+        }
+      }
+    },
+    "Otomatik": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        }
+      }
+    },
+    "Oynat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play"
+          }
+        }
+      }
+    },
+    "Panoda bir bağlantı var": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is a link on the clipboard"
+          }
+        }
+      }
+    },
+    "Panoda link yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No link on the clipboard"
+          }
+        }
+      }
+    },
+    "Paylaş": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share"
+          }
+        }
+      }
+    },
+    "Paylaşılan şeyde bağlantı yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you shared has no link"
+          }
+        }
+      }
+    },
+    "Paylaşılma tarihi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date posted"
+          }
+        }
+      }
+    },
+    "Paylaşılma: eskiden yeniye": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posted: oldest first"
+          }
+        }
+      }
+    },
+    "Paylaşılma: yeniden eskiye": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posted: newest first"
+          }
+        }
+      }
+    },
+    "Platform": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Platform"
+          }
+        }
+      }
+    },
+    "Platformlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Platforms"
+          }
+        }
+      }
+    },
+    "Renk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Color"
+          }
+        }
+      }
+    },
+    "Saatte bir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every hour"
+          }
+        }
+      }
+    },
+    "Safari": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safari"
+          }
+        }
+      }
+    },
+    "Safari'de aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Safari"
+          }
+        }
+      }
+    },
+    "Safari'de, X'te, her yerde Paylaş → wroopmark. Listede yoksa paylaşım satırının sonundaki “Diğer”den ekle. Bağlantı hemen kaydedilir; metin ve görseller uygulamayı açınca gelir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In Safari, in X, anywhere: Share → wroopmark. If it's not listed, add it from “More” at the end of the share row. The link is saved right away; text and pictures come when you open the app."
+          }
+        }
+      }
+    },
+    "Safari, X, Reddit… Paylaş → wroopmark. Listede yoksa paylaşım satırının sonundaki “Diğer”den ekle.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safari, X, Reddit… Share → wroopmark. If it's not listed, add it from “More” at the end of the share row."
+          }
+        }
+      }
+    },
+    "Sakla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep"
+          }
+        }
+      }
+    },
+    "Sakla (→)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep (→)"
+          }
+        }
+      }
+    },
+    "Sakladıkların buraya bir daha gelmez. Bu oturumda %lld silindi, %lld saklandı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you keep won't come back here. This session: %lld deleted, %lld kept."
+          }
+        }
+      }
+    },
+    "Sakladıkların buraya bir daha gelmez. Filtreleri değiştirebilir ya da saklananları yeniden gözden geçirebilirsin.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you keep won't come back here. You can change the filters or review the kept items again."
+          }
+        }
+      }
+    },
+    "Saklananları yeniden göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Kept Items Again"
+          }
+        }
+      }
+    },
+    "Sans": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans"
+          }
+        }
+      }
+    },
+    "Sayfa hazırlanıyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing the page…"
+          }
+        }
+      }
+    },
+    "Sayfa indiriliyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the page…"
+          }
+        }
+      }
+    },
+    "Sayfanın kaydedildiği hâli; site değişse ya da kapansa da açılır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The page as it was saved; opens even if the site changes or goes away"
+          }
+        }
+      }
+    },
+    "Sayfanın kopyası": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page copy"
+          }
+        }
+      }
+    },
+    "Sayfaya ulaşılamadı; bağlantı kaydedildi, ayrıntılar sonra gelecek.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't reach the page; the link is saved and the details will come later."
+          }
+        }
+      }
+    },
+    "Senkron": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync"
+          }
+        }
+      }
+    },
+    "Senkron açık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync is on"
+          }
+        }
+      }
+    },
+    "Senkron açık.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync is on."
+          }
+        }
+      }
+    },
+    "Senkron açıksa diğer cihazlardan da silinir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With sync on, it is deleted from your other devices too."
+          }
+        }
+      }
+    },
+    "Senkron açıldı: %lld kayıt gönderildi, %lld değişiklik alındı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync is on: sent %lld items, received %lld changes."
+          }
+        }
+      }
+    },
+    "Senkron klasörü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync folder"
+          }
+        }
+      }
+    },
+    "Senkronu kapat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn Off Sync"
+          }
+        }
+      }
+    },
+    "Sepya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sepia"
+          }
+        }
+      }
+    },
+    "Serif": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serif"
+          }
+        }
+      }
+    },
+    "Sesi aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unmute"
+          }
+        }
+      }
+    },
+    "Sesi kapat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute"
+          }
+        }
+      }
+    },
+    "Sesli oku": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read Aloud"
+          }
+        }
+      }
+    },
+    "Seç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose"
+          }
+        }
+      }
+    },
+    "Seçilen dosya okunamadı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't read the chosen file."
+          }
+        }
+      }
+    },
+    "Seçilenlerden herhangi biri": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any of the selected"
+          }
+        }
+      }
+    },
+    "Seçilenlere etiket ekle, klasöre taşı ya da sil.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag, move or delete the selected items."
+          }
+        }
+      }
+    },
+    "Seçilenleri etiketle…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag Selected…"
+          }
+        }
+      }
+    },
+    "Seçilenleri sil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Selected"
+          }
+        }
+      }
+    },
+    "Sil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        }
+      }
+    },
+    "Sil (←)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete (←)"
+          }
+        }
+      }
+    },
+    "Sil…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete…"
+          }
+        }
+      }
+    },
+    "Sistem Entegrasyonu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Integration"
+          }
+        }
+      }
+    },
+    "Soldan bir kapsam, ortadan bir kayıt.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A scope on the left, an item in the middle."
+          }
+        }
+      }
+    },
+    "Son kararı geri al": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo the last decision"
+          }
+        }
+      }
+    },
+    "Son kararı geri al (⌘Z)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo the last decision (⌘Z)"
+          }
+        }
+      }
+    },
+    "Son kaydedilenler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recently saved"
+          }
+        }
+      }
+    },
+    "Son kontrolde sayfa açılmadı. Gönderinin kendisi arşivde duruyor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The page didn't open at the last check. The post itself is still in the archive."
+          }
+        }
+      }
+    },
+    "Son yedek: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last backup: %@"
+          }
+        }
+      }
+    },
+    "Sonraki": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        }
+      }
+    },
+    "Sonraki kayıt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next item"
+          }
+        }
+      }
+    },
+    "Sonraki medya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next media"
+          }
+        }
+      }
+    },
+    "Sunucu, hesap ve bulut yok; arşiv yalnızca bu Mac'te durur.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No server, no account, no cloud; the archive lives only on this Mac."
+          }
+        }
+      }
+    },
+    "Sürüm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        }
+      }
+    },
+    "Sürüm %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@"
+          }
+        }
+      }
+    },
+    "Süzgeç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        }
+      }
+    },
+    "SİL": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DELETE"
+          }
+        }
+      }
+    },
+    "Sıfırla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        }
+      }
+    },
+    "Sıklık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequency"
+          }
+        }
+      }
+    },
+    "Sırada bekliyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queued"
+          }
+        }
+      }
+    },
+    "Sırala": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sort"
+          }
+        }
+      }
+    },
+    "Sıralama: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sort: %@"
+          }
+        }
+      }
+    },
+    "Sırayla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In order"
+          }
+        }
+      }
+    },
+    "Tamam": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "Tamamlanan indirme yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No finished downloads"
+          }
+        }
+      }
+    },
+    "Tamamlananlar (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finished (%lld)"
+          }
+        }
+      }
+    },
+    "Tamamlandı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finished"
+          }
+        }
+      }
+    },
+    "Tanıma": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognition"
+          }
+        }
+      }
+    },
+    "Tarayıcı eklentisiyle X yer imlerini içe aktar ya da ⌘N ile bir bağlantı ekle.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import your X bookmarks with the browser extension, or add a link with ⌘N."
+          }
+        }
+      }
+    },
+    "Tarayıcıda aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Browser"
+          }
+        }
+      }
+    },
+    "Tarayıcıların wroopmark'ı bulması için gereken kaydı yeniden yazar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rewrites the record browsers need to find wroopmark"
+          }
+        }
+      }
+    },
+    "Tarayıcıyla indiriliyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading with the browser…"
+          }
+        }
+      }
+    },
+    "Tarih": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
+          }
+        }
+      }
+    },
+    "Tek sayfa (HTML)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Single page (HTML)"
+          }
+        }
+      }
+    },
+    "Tek sayfa olarak dışa aktar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export as a Single Page"
+          }
+        }
+      }
+    },
+    "Tek sayfa olarak dışa aktar…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export as a Single Page…"
+          }
+        }
+      }
+    },
+    "Tek sayfa olarak paylaş": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share as a Single Page"
+          }
+        }
+      }
+    },
+    "Tekrar Dene": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        }
+      }
+    },
+    "Telefonda boş alan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free space on phone"
+          }
+        }
+      }
+    },
+    "Telefonda olan videolar burada akar. Mac'ten gelen videolar iCloud indirdikçe eklenir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videos on the phone play here. Videos from the Mac are added as iCloud downloads them."
+          }
+        }
+      }
+    },
+    "Telefonda yer az (1 GB'tan az): yeni görseller yer açılana kadar indirilmiyor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Low on space (under 1 GB): new pictures won't download until there is room."
+          }
+        }
+      }
+    },
+    "Telefondaki %lld videoyu kaldır (%@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove %1$lld videos from the phone (%2$@)"
+          }
+        }
+      }
+    },
+    "Telefondan kaydetmek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving from the phone"
+          }
+        }
+      }
+    },
+    "Telif": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copyright"
+          }
+        }
+      }
+    },
+    "Tema": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme"
+          }
+        }
+      }
+    },
+    "Temizlik": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleanup"
+          }
+        }
+      }
+    },
+    "TikTok, Instagram, Threads, X veya Reddit veri paketi (.zip ya da klasör), tarayıcı bookmarks.html, Pocket/Raindrop CSV, ya da video ve görseller.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A TikTok, Instagram, Threads, X or Reddit data download (.zip or folder), a browser bookmarks.html, a Pocket/Raindrop CSV, or videos and pictures."
+          }
+        }
+      }
+    },
+    "Toplam kayıt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total items"
+          }
+        }
+      }
+    },
+    "Tüm gönderiler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All posts"
+          }
+        }
+      }
+    },
+    "Tüm kütüphane": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole library"
+          }
+        }
+      }
+    },
+    "Tüm videolar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All videos"
+          }
+        }
+      }
+    },
+    "Tümü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        }
+      }
+    },
+    "Tümü (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All (%lld)"
+          }
+        }
+      }
+    },
+    "Tümünü Yeniden Dene": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry All"
+          }
+        }
+      }
+    },
+    "URL kaydet (⌘N)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save URL (⌘N)"
+          }
+        }
+      }
+    },
+    "Uygula": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply"
+          }
+        }
+      }
+    },
+    "Uygulamanın içinde gelir. İmzasız kurulumda önce Safari → Ayarlar → Geliştirici → \"İmzasız eklentilere izin ver\" gerekir (Safari her açılışta sıfırlar).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comes inside the app. For an unsigned build, first turn on Safari → Settings → Developer → “Allow unsigned extensions” (Safari resets it on every launch)."
+          }
+        }
+      }
+    },
+    "Uygulamayı her açışında ve aşağı çekince eşitlenir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syncs every time you open the app and when you pull down."
+          }
+        }
+      }
+    },
+    "Var": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "Varsayılan düzen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default layout"
+          }
+        }
+      }
+    },
+    "Vazgeç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Veri paketi (.zip ya da klasör), bookmarks.html, Pocket/Raindrop CSV, ya da video ve görseller": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A data download (.zip or folder), bookmarks.html, a Pocket/Raindrop CSV, or videos and pictures"
+          }
+        }
+      }
+    },
+    "Veri paketi (.zip), yer imleri (bookmarks.html), CSV ya da video/görsel.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A data download (.zip), bookmarks (bookmarks.html), a CSV, or videos/pictures."
+          }
+        }
+      }
+    },
+    "Veritabanı ve Medya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database and Media"
+          }
+        }
+      }
+    },
+    "Veritabanı, tüm medya ve her programın okuyabileceği bir dışa aktarım (items.jsonl) kopyalanır. İlk yedek her şeyi, sonrakiler yalnızca yenileri taşır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The database, all media and an export any program can read (items.jsonl) are copied. The first backup copies everything, later ones only what is new."
+          }
+        }
+      }
+    },
+    "Video henüz indirilmedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video is not downloaded yet"
+          }
+        }
+      }
+    },
+    "Video ilerlemesi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video progress"
+          }
+        }
+      }
+    },
+    "Video telefona inmedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video is not on the phone"
+          }
+        }
+      }
+    },
+    "Video yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No video"
+          }
+        }
+      }
+    },
+    "Video şu an indirilemiyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video can't be downloaded right now"
+          }
+        }
+      }
+    },
+    "Video: uygulamada oynatılır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video: plays in the app"
+          }
+        }
+      }
+    },
+    "Videolar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videos"
+          }
+        }
+      }
+    },
+    "Videolar telefondan kaldırılsın mı?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the videos from the phone?"
+          }
+        }
+      }
+    },
+    "Videoları açınca indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download videos when opened"
+          }
+        }
+      }
+    },
+    "Videoları otomatik indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download videos automatically"
+          }
+        }
+      }
+    },
+    "Videolu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With video"
+          }
+        }
+      }
+    },
+    "Videoyu lokale indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the Video"
+          }
+        }
+      }
+    },
+    "Vurgu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlight"
+          }
+        }
+      }
+    },
+    "Vurgula": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlight"
+          }
+        }
+      }
+    },
+    "Vurgular": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
+          }
+        }
+      }
+    },
+    "Vurgular ve notlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights and notes"
+          }
+        }
+      }
+    },
+    "Vurguyu kaldır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Highlight"
+          }
+        }
+      }
+    },
+    "Web sayfalarının kopyasını sakla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep a copy of web pages"
+          }
+        }
+      }
+    },
+    "X, TikTok, Pinterest ya da herhangi bir sayfa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "X, TikTok, Pinterest or any page"
+          }
+        }
+      }
+    },
+    "Yalnızca iCloud'da da olan videolar kaldırılır; kayıtlar ve kapaklar kalır. İzlediğinde iCloud'dan yeniden iner.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only videos that are also in iCloud are removed; the items and posters stay. They download from iCloud again when you watch them."
+          }
+        }
+      }
+    },
+    "Yalnızca klasör": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder only"
+          }
+        }
+      }
+    },
+    "Yalnızca kırık linkleri göster": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show only broken links"
+          }
+        }
+      }
+    },
+    "Yalnızca link · ayrıntılar arka planda gelecek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link only · details will follow in the background"
+          }
+        }
+      }
+    },
+    "Yalnızca metin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text only"
+          }
+        }
+      }
+    },
+    "Yanıtlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replies"
+          }
+        }
+      }
+    },
+    "Yanıtlar · %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replies · %lld"
+          }
+        }
+      }
+    },
+    "Yardımcı bulunamadı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helper not found"
+          }
+        }
+      }
+    },
+    "Yazı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text"
+          }
+        }
+      }
+    },
+    "Yazı Tanıma": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text Recognition"
+          }
+        }
+      }
+    },
+    "Yedek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backup"
+          }
+        }
+      }
+    },
+    "Yedek klasörü şu an yok (disk takılı mı?): %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The backup folder isn't there right now (is the disk connected?): %@"
+          }
+        }
+      }
+    },
+    "Yedekleniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backing up…"
+          }
+        }
+      }
+    },
+    "Yedeğin konacağı klasörü seç. İçinde bir \"wroopmark-yedek\" klasörü oluşur.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the folder for backups. A “wroopmark-yedek” folder is made inside it."
+          }
+        }
+      }
+    },
+    "Yeni Alt Klasör": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Subfolder"
+          }
+        }
+      }
+    },
+    "Yeni ad": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New name"
+          }
+        }
+      }
+    },
+    "Yeni ad, alt klasörlerin yolunu da günceller.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new name updates the paths of subfolders too."
+          }
+        }
+      }
+    },
+    "Yeni arama": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New search"
+          }
+        }
+      }
+    },
+    "Yeni kaydedilen her şey kurallardan geçer: aramaya uyan kayda etiket eklenir, klasörü yoksa klasöre konur. Arama kutusundaki her terim kullanılabilir (site:, from:, platform:, has:video, kelimeler…).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything newly saved goes through the rules: an item that matches the search gets the tag, and goes into the folder if it has none. Any search term works (site:, from:, platform:, has:video, words…)."
+          }
+        }
+      }
+    },
+    "Yeni klasör": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Folder"
+          }
+        }
+      }
+    },
+    "Yeni klasör ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a new folder"
+          }
+        }
+      }
+    },
+    "Yeni klasör…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Folder…"
+          }
+        }
+      }
+    },
+    "Yeni kural": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New rule"
+          }
+        }
+      }
+    },
+    "Yeniden adlandır…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename…"
+          }
+        }
+      }
+    },
+    "Yeniden dene": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        }
+      }
+    },
+    "Yeniden karıştır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffle Again"
+          }
+        }
+      }
+    },
+    "Yenile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        }
+      }
+    },
+    "Yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "Zaten arşivdeydi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already in the archive"
+          }
+        }
+      }
+    },
+    "Zeka": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intelligence"
+          }
+        }
+      }
+    },
+    "Zincir · %lld gönderi": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Thread · %lld post"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Thread · %lld posts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "aynı kişi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "same person"
+          }
+        }
+      }
+    },
+    "aynı site": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "same site"
+          }
+        }
+      }
+    },
+    "benzer etiket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "similar tag"
+          }
+        }
+      }
+    },
+    "bilinmeyen işlem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "unknown operation"
+          }
+        }
+      }
+    },
+    "bu oturumda %lld silindi, %lld saklandı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this session: %lld deleted, %lld kept"
+          }
+        }
+      }
+    },
+    "denetleniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "checking…"
+          }
+        }
+      }
+    },
+    "dev/github": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dev/github"
+          }
+        }
+      }
+    },
+    "dev/rust, okunacak": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dev/rust, to-read"
+          }
+        }
+      }
+    },
+    "ekle…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "add…"
+          }
+        }
+      }
+    },
+    "etiketler (virgülle)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tags (comma-separated)"
+          }
+        }
+      }
+    },
+    "geliştirme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "development"
+          }
+        }
+      }
+    },
+    "genişletilemedi: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "couldn't expand: %@"
+          }
+        }
+      }
+    },
+    "geçersiz istek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "invalid request"
+          }
+        }
+      }
+    },
+    "gömme modeli indirilemedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the embedding model could not be downloaded"
+          }
+        }
+      }
+    },
+    "gömme modeli yüklenemedi: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the embedding model could not be loaded: %@"
+          }
+        }
+      }
+    },
+    "hazır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ready"
+          }
+        }
+      }
+    },
+    "https://…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "https://…"
+          }
+        }
+      }
+    },
+    "iCloud Drive ile başlat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start with iCloud Drive"
+          }
+        }
+      }
+    },
+    "iCloud'dan inen görsel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picture downloading from iCloud"
+          }
+        }
+      }
+    },
+    "iCloud'dan iniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading from iCloud…"
+          }
+        }
+      }
+    },
+    "isteğe bağlı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "optional"
+          }
+        }
+      }
+    },
+    "kırık · %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "broken · %lld"
+          }
+        }
+      }
+    },
+    "kırık · sunucu yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "broken · no server"
+          }
+        }
+      }
+    },
+    "macOS'un yerel Apple Vision altyapısı kullanılır. Tüm işlemler çevrimdışı ve cihazınızda gerçekleşir; Türkçe ve İngilizce metinleri tanır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses macOS's built-in Apple Vision. Everything happens offline on your device; it recognizes Turkish and English text."
+          }
+        }
+      }
+    },
+    "model yanıt vermedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the model did not answer"
+          }
+        }
+      }
+    },
+    "search (filtreler ve anlamsal arama) · get_item · related · search_links · list_tags · list_folders · stats · save_url · tag_items · move_to_folder · set_note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "search (filters and semantic search) · get_item · related · search_links · list_tags · list_folders · stats · save_url · tag_items · move_to_folder · set_note"
+          }
+        }
+      }
+    },
+    "site:github.com  ya da  from:@karpathy  ya da  \"yapay zeka\"": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "site:github.com  or  from:@karpathy  or  \"machine learning\""
+          }
+        }
+      }
+    },
+    "son 10 karar geri alınabilir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the last 10 decisions can be undone"
+          }
+        }
+      }
+    },
+    "tek tıkla klasöre taşı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "move to a folder with one click"
+          }
+        }
+      }
+    },
+    "virgülle ayır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "separate with commas"
+          }
+        }
+      }
+    },
+    "wroopmark": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'a Kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save to wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'a kaydedildi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved to wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'ta Ara": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'ta Bul": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find in wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'ı aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'ı bir kez aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open wroopmark once"
+          }
+        }
+      }
+    },
+    "wroopmark://item/<id> · wroopmark://search?q=… · wroopmark://add?url=…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wroopmark://item/<id> · wroopmark://search?q=… · wroopmark://add?url=…"
+          }
+        }
+      }
+    },
+    "yeni ad": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "new name"
+          }
+        }
+      }
+    },
+    "· %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· %@"
+          }
+        }
+      }
+    },
+    "· %@ kaldı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· %@ left"
+          }
+        }
+      }
+    },
+    "· %lld kayıtta": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· in %lld item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "· in %lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Çekirdek boş yanıt döndürdü": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The core returned an empty answer"
+          }
+        }
+      }
+    },
+    "Çekirdek yanıt vermedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The core did not answer"
+          }
+        }
+      }
+    },
+    "Çekirdek yanıtı geçersiz": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The core's answer is invalid"
+          }
+        }
+      }
+    },
+    "Çevrimdışı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline"
+          }
+        }
+      }
+    },
+    "Çok benzer içerik": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Very similar content"
+          }
+        }
+      }
+    },
+    "Çık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit"
+          }
+        }
+      }
+    },
+    "Önceki medya": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous media"
+          }
+        }
+      }
+    },
+    "Önerilen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggested"
+          }
+        }
+      }
+    },
+    "Önizleme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview"
+          }
+        }
+      }
+    },
+    "Özet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summary"
+          }
+        }
+      }
+    },
+    "Özet ve etiket önerisi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summary and tag suggestions"
+          }
+        }
+      }
+    },
+    "Özetle ve etiket öner": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summarize and Suggest Tags"
+          }
+        }
+      }
+    },
+    "Özetleniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summarizing…"
+          }
+        }
+      }
+    },
+    "özetlenemedi: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "couldn't summarize: %@"
+          }
+        }
+      }
+    },
+    "İlk eşitleme: kütüphane klasöre yazılıyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First sync: writing the library to the folder…"
+          }
+        }
+      }
+    },
+    "İndir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download"
+          }
+        }
+      }
+    },
+    "İndirici başaramadı; gönderi tarayıcıda arka planda açıldı, video gelince burada oynar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The downloader failed; the post was opened in the browser in the background, and the video plays here once it arrives."
+          }
+        }
+      }
+    },
+    "İndirilemedi (%lld/3 deneme yapıldı)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't download (%lld/3 tries)"
+          }
+        }
+      }
+    },
+    "İndiriliyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading…"
+          }
+        }
+      }
+    },
+    "İndirilmeyi bekleyen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting to download"
+          }
+        }
+      }
+    },
+    "İndirme kuyruğu boş": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The download queue is empty"
+          }
+        }
+      }
+    },
+    "İndirme paneli (⌘J)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloads panel (⌘J)"
+          }
+        }
+      }
+    },
+    "İndirme yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No downloads"
+          }
+        }
+      }
+    },
+    "İndirmeler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloads"
+          }
+        }
+      }
+    },
+    "İndirmeler sürüyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloads in progress…"
+          }
+        }
+      }
+    },
+    "İndirmelerde ara…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search downloads…"
+          }
+        }
+      }
+    },
+    "İnen video yok": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No videos downloading"
+          }
+        }
+      }
+    },
+    "İnenler (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading (%lld)"
+          }
+        }
+      }
+    },
+    "İnternetsiz oku": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read offline"
+          }
+        }
+      }
+    },
+    "İstatistik": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statistics"
+          }
+        }
+      }
+    },
+    "İstatistikler yükleniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading statistics…"
+          }
+        }
+      }
+    },
+    "İzlendi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watched"
+          }
+        }
+      }
+    },
+    "İzlenenleri gizle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Watched"
+          }
+        }
+      }
+    },
+    "İçe / Dışa Aktar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import / Export"
+          }
+        }
+      }
+    },
+    "İçe aktar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import"
+          }
+        }
+      }
+    },
+    "İçe aktarılan linkler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imported links"
+          }
+        }
+      }
+    },
+    "İçe aktar…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import…"
+          }
+        }
+      }
+    },
+    "İçerik": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content"
+          }
+        }
+      }
+    },
+    "İçermesin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluding"
+          }
+        }
+      }
+    },
+    "İçersin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Including"
+          }
+        }
+      }
+    },
+    "İşlem sürüyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working"
+          }
+        }
+      }
+    },
+    "Şimdi eşitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync Now"
+          }
+        }
+      }
+    },
+    "Şimdi indir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download Now"
+          }
+        }
+      }
+    },
+    "Şimdi yedekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back Up Now"
+          }
+        }
+      }
+    },
+    "Şu an %lld kayıt bu aramaya uyuyor.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item matches this search right now."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items match this search right now."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Şu an ekranda olan görünüm ve arama aktarılır (her şey için kenar çubuğunda Tümü'nü seç). Markdown her kaydı ayrı not yapar, görseller yanına kopyalanır; Obsidian kasasına doğrudan konabilir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The view and search on screen are exported (choose All in the sidebar for everything). Markdown makes each item a note and copies the pictures next to it; it can go straight into an Obsidian vault."
+          }
+        }
+      }
+    },
+    "Şu kişiler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These people"
+          }
+        }
+      }
+    },
+    "Şunlar hariç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Except these"
+          }
+        }
+      }
+    },
+    "• Pocket, Raindrop ve benzeri CSV dışa aktarımları": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Pocket, Raindrop and similar CSV exports"
+          }
+        }
+      }
+    },
+    "• Tarayıcı yer imleri: bookmarks.html (klasörler “Yer imleri” altına)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Browser bookmarks: bookmarks.html (folders go under “Bookmarks”)"
+          }
+        }
+      }
+    },
+    "• TikTok / Instagram / X veri paketi (.zip ya da açılmış klasör): favoriler, beğeniler, kaydedilenler; izleme geçmişi alınmaz": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• TikTok / Instagram / X data download (.zip or unzipped folder): favorites, likes, saved; watch history is left out"
+          }
+        }
+      }
+    },
+    "• Video ve görseller: eski indirdiğin TikTok videoları dosya adındaki numarayla gönderisine bağlanır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Videos and pictures: TikTok videos you downloaded earlier are matched to their posts by the number in the file name"
+          }
+        }
+      }
+    },
+    "← sil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "← delete"
+          }
+        }
+      }
+    },
+    "→ sakla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "→ keep"
+          }
+        }
+      }
+    },
+    "⌘Z geri al": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘Z undo"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

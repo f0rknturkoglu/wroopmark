@@ -44,6 +44,11 @@ cp "$CORE/target/release/wroopmark" "$APP/Contents/Helpers/wroopmark"
 if [ -f "$APP_PKG/Resources/AppIcon.icns" ]; then
   cp "$APP_PKG/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 fi
+# Turkish is the source (the strings in the code); English comes from the
+# catalog. tr.lproj only marks Turkish as a language the app speaks.
+xcrun xcstringstool compile "$APP_PKG/Resources/Localizable.xcstrings" --output-directory "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/Resources/tr.lproj"
+: > "$APP/Contents/Resources/tr.lproj/Localizable.strings"
 VERSION="$(grep -m1 '^version' "$CORE/Cargo.toml" | cut -d'"' -f2)"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -52,7 +57,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key><string>wroopmark</string>
   <key>CFBundleDisplayName</key><string>wroopmark</string>
-  <key>CFBundleDevelopmentRegion</key><string>tr</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>tr</string></array>
   <key>CFBundleIdentifier</key><string>com.f0rknturkoglu.wroopmark</string>
   <key>CFBundleExecutable</key><string>wroopmark</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>

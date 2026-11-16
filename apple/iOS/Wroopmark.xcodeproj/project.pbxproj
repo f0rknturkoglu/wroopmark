@@ -15,6 +15,9 @@
 		A10000000000000000000103 /* Spotlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* Spotlight.swift */; };
 		A10000000000000000000104 /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000204 /* ReaderView.swift */; };
 		A30000000000000000000103 /* WroopmarkWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000301 /* WroopmarkWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A10000000000000000000190 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000290 /* Localizable.xcstrings */; };
+		A20000000000000000000190 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000290 /* Localizable.xcstrings */; };
+		A30000000000000000000190 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000290 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +28,7 @@
 		A10000000000000000000204 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReaderView.swift; path = ../Sources/Wroopmark/ReaderView.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000301 /* wroopmark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = wroopmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000301 /* WroopmarkWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WroopmarkWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000290 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Resources/Localizable.xcstrings; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -108,6 +112,7 @@
 				A10000000000000000000202 /* Models.swift */,
 				A10000000000000000000203 /* Spotlight.swift */,
 				A10000000000000000000204 /* ReaderView.swift */,
+				A10000000000000000000290 /* Localizable.xcstrings */,
 			);
 			name = Shared;
 			sourceTree = "<group>";
@@ -216,6 +221,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				tr,
+				en,
 				Base,
 			);
 			mainGroup = A10000000000000000000601;
@@ -237,6 +243,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000190 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -244,6 +251,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000190 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,6 +259,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A30000000000000000000190 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

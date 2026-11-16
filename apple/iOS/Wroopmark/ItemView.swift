@@ -230,7 +230,7 @@ struct ItemView: View {
                     Button(f.name.replacingOccurrences(of: "/", with: " › ")) { Task { await move(f.id) } }
                 }
             } label: {
-                Text(model.folders.first { $0.id == item.folderId }?.name.replacingOccurrences(of: "/", with: " › ") ?? "Klasör seçilmedi")
+                Text(model.folders.first { $0.id == item.folderId }?.name.replacingOccurrences(of: "/", with: " › ") ?? String(localized: "Klasör seçilmedi"))
             }
         }
     }
