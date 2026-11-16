@@ -979,8 +979,35 @@ pub fn merge_thread_media(item: &mut Item) {
     item.media.extend(extra);
 }
 
+/// Before v0.9 a Reddit comment link was saved under its post's id
+/// (`reddit:<post>`); now it has its own (`reddit:t1_<comment>`). A comment
+/// saved the old way keeps its id, so saving it again finds it.
+fn keep_legacy_reddit_id(tx: &Connection, item: &mut Item) -> Result<()> {
+    if item.platform != Platform::Reddit || !item.id.starts_with("reddit:t1_") {
+        return Ok(());
+    }
+    let Some(own) = normalize_url(&item.url) else { return Ok(()) };
+    let Some(post) = url::Url::parse(&own).ok().and_then(|u| {
+        let segs: Vec<String> = u.path_segments()?.map(str::to_string).collect();
+        let i = segs.iter().position(|s| s == "comments")?;
+        segs.get(i + 1).cloned()
+    }) else {
+        return Ok(());
+    };
+    let legacy = format!("reddit:{post}");
+    if tx.query_row("SELECT 1 FROM items WHERE id = ?1", [&item.id], |_| Ok(())).optional()?.is_some() {
+        return Ok(());
+    }
+    let old_url: Option<String> = tx.query_row("SELECT url FROM items WHERE id = ?1", [&legacy], |r| r.get(0)).optional()?;
+    if old_url.and_then(|u| normalize_url(&u)).is_some_and(|u| u == own) {
+        item.id = legacy;
+    }
+    Ok(())
+}
+
 fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
     let ts = now();
+    keep_legacy_reddit_id(tx, item)?;
     drop_foreign_files(&mut item.media);
     if let Some(q) = item.quote.as_mut() {
         drop_foreign_files(&mut q.media);
@@ -2061,6 +2088,25 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_reddit_comment_keeps_its_id() {
+        let mut store = Store::open_in_memory().unwrap();
+        let url = "https://www.reddit.com/r/rust/comments/abc12/baslik/c9x/";
+        // Saved before v0.9: the post's id on the comment's link.
+        let old = Item { id: "reddit:abc12".into(), platform: Platform::Reddit, url: url.into(), text: "eski".into(), ..Default::default() };
+        store.upsert(&old).unwrap();
+        let (_, id) = crate::text::item_id_for_url(url);
+        assert_eq!(id, "reddit:t1_c9x");
+        let again = Item { id, platform: Platform::Reddit, url: url.into(), text: "yeni".into(), ..Default::default() };
+        let saved = store.upsert(&again).unwrap();
+        assert_eq!((saved.id.as_str(), saved.created), ("reddit:abc12", false));
+        assert_eq!(store.conn.query_row("SELECT count(*) FROM items", [], |r| r.get::<_, i64>(0)).unwrap(), 1);
+        // The post itself, saved by its own link, is still the post.
+        let post = "https://www.reddit.com/r/rust/comments/zz9/baska/";
+        let p = Item { id: crate::text::item_id_for_url(post).1, platform: Platform::Reddit, url: post.into(), ..Default::default() };
+        assert_eq!(store.upsert(&p).unwrap().id, "reddit:zz9");
+    }
 
     fn post(id: &str, text: &str) -> Item {
         Item {

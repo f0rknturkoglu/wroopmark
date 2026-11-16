@@ -24,6 +24,9 @@ enum PhoneAI {
         private static let lock = NSLock()
         nonisolated(unsafe) static var model: NLContextualEmbedding?
         nonisolated(unsafe) static var loadError: String?
+        /// When loading last failed: tried again after ten minutes (the
+        /// download may have needed Wi-Fi or space that is there now).
+        nonisolated(unsafe) static var failedAt: Date?
 
         static func load() -> NLContextualEmbedding? {
             lock.withLock { loadLocked() }
@@ -31,9 +34,11 @@ enum PhoneAI {
 
         private static func loadLocked() -> NLContextualEmbedding? {
             if let model { return model }
-            if loadError != nil { return nil }
+            if loadError != nil, let failedAt, Date.now.timeIntervalSince(failedAt) < 600 { return nil }
+            loadError = nil
+            failedAt = nil
             guard let m = NLContextualEmbedding(script: .latin) else {
-                loadError = "Bu iPhone'da gömme modeli yok"
+                fail("Bu iPhone'da gömme modeli yok")
                 return nil
             }
             if !m.hasAvailableAssets {
@@ -44,18 +49,23 @@ enum PhoneAI {
                     done.signal()
                 }
                 if done.wait(timeout: .now() + 120) == .timedOut || (box.get()["ok"] as? Bool) != true {
-                    loadError = "gömme modeli indirilemedi"
+                    fail("gömme modeli indirilemedi")
                     return nil
                 }
             }
             do {
                 try m.load()
             } catch {
-                loadError = "gömme modeli yüklenemedi: \(error.localizedDescription)"
+                fail("gömme modeli yüklenemedi: \(error.localizedDescription)")
                 return nil
             }
             model = m
             return m
+        }
+
+        private static func fail(_ message: String) {
+            loadError = message
+            failedAt = .now
         }
 
         static func unload() {
