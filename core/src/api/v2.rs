@@ -239,6 +239,20 @@ impl Library {
         Ok(report)
     }
 
+    /// A video or picture the user has (saved from the app, a screen
+    /// recording) put on an existing post: the video goes in its empty
+    /// video slot, a picture after its pictures. True if it changed.
+    pub fn attach_file(&self, id: &str, path: &Path) -> Result<bool> {
+        let kind = localfile::kind_of(path).ok_or(CoreError::NothingToImport)?;
+        if self.lock_store()?.existing_ids(&[id.to_string()])?.is_empty() {
+            return Err(CoreError::ItemNotFound);
+        }
+        let f = std::fs::File::open(path).map_err(|source| CoreError::IoPath { path: path.display().to_string(), source })?;
+        let name = self.media.put_reader(f, localfile::content_type(path))?;
+        let mut store = self.lock_store()?;
+        Ok(if kind == MediaKind::Image { store.attach_image(id, &name)? } else { store.attach_video(id, &name)? })
+    }
+
     fn import_file(&self, path: &Path, tags: &[String], folder: Option<i64>) -> Result<(FileOutcome, String)> {
         let kind = localfile::kind_of(path).ok_or(CoreError::NothingToImport)?;
         let f = std::fs::File::open(path).map_err(|source| CoreError::IoPath { path: path.display().to_string(), source })?;
@@ -771,6 +785,16 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             let paths: Vec<PathBuf> = a.paths.iter().map(PathBuf::from).collect();
             S::ok(lib.import_files(&paths, &a.tags, a.folder_id)?)
         }
+        "attach_file" => {
+            #[derive(Deserialize)]
+            struct AttachFile {
+                id: String,
+                path: String,
+            }
+            let a: AttachFile = req.parse()?;
+            S::ok(lib.attach_file(&a.id, Path::new(&a.path))?)
+        }
+        "needs_video" => S::ok(lib.lock_store()?.needs_video(req.parse::<Limit>()?.limit.clamp(1, 200))?),
         "fill_stubs" => S::ok(lib.fill_stubs(req.parse::<Limit>()?.limit.clamp(1, 50))?),
         "pause" => {
             lib.pause();

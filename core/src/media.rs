@@ -56,12 +56,17 @@ pub fn ext_for(content_type: &str, bytes: &[u8]) -> &'static str {
     if ct.eq_ignore_ascii_case("video/mp4") {
         return "mp4";
     }
+    // iPhone recordings and videos saved from apps.
+    if ct.eq_ignore_ascii_case("video/quicktime") {
+        return "mov";
+    }
     match bytes {
         [0xFF, 0xD8, 0xFF, ..] => "jpg",
         [0x89, b'P', b'N', b'G', ..] => "png",
         [b'G', b'I', b'F', b'8', ..] => "gif",
         [b'R', b'I', b'F', b'F', _, _, _, _, b'W', b'E', b'B', b'P', ..] => "webp",
         [_, _, _, _, b'f', b't', b'y', b'p', b'a', b'v', b'i', b'f', ..] => "avif",
+        [_, _, _, _, b'f', b't', b'y', b'p', b'q', b't', b' ', b' ', ..] => "mov",
         [_, _, _, _, b'f', b't', b'y', b'p', ..] => "mp4",
         _ => "bin",
     }

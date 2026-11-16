@@ -257,6 +257,38 @@ impl Store {
         Ok(true)
     }
 
+    /// Adds a picture already in the media store to an item, after the
+    /// ones it has. False if the item is missing or already shows it.
+    pub fn attach_image(&mut self, id: &str, file: &str) -> Result<bool> {
+        let Some(mut item) = self.get(id)? else { return Ok(false) };
+        if item.media.iter().any(|m| m.file.as_deref() == Some(file)) {
+            return Ok(false);
+        }
+        // A picture slot that never downloaded takes it first.
+        if let Some(m) = item.media.iter_mut().find(|m| m.kind == MediaKind::Image && m.file.is_none()) {
+            m.file = Some(file.to_string());
+        } else {
+            let mut m = Media::image(format!("{}#{}", item.url, file));
+            m.file = Some(file.to_string());
+            item.media.push(m);
+        }
+        self.set_media(id, &item.media, item.quote.as_deref())?;
+        Ok(true)
+    }
+
+    /// Posts with a video that is not on this device, newest first: what a
+    /// video shared from Photos most likely belongs to.
+    pub fn needs_video(&self, limit: i64) -> Result<Vec<Item>> {
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT {ITEM_COLS} FROM items i
+              WHERE i.has_video = 1 AND EXISTS (SELECT 1 FROM json_each(i.media) m
+                    WHERE json_extract(m.value, '$.kind') != 'image' AND json_extract(m.value, '$.video_file') IS NULL)
+              ORDER BY i.saved_at DESC LIMIT ?1"
+        ))?;
+        let rows = stmt.query_map([limit], read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        self.attach(rows)
+    }
+
     /// Videos on disk without a poster image: the app draws one.
     pub fn posterless(&self, limit: i64) -> Result<Vec<(String, String)>> {
         let mut stmt = self.conn.prepare_cached(

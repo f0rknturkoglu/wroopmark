@@ -283,6 +283,44 @@ mod tests {
     }
 
     #[test]
+    fn own_video_and_picture_attach_to_a_post() {
+        let root = std::env::temp_dir().join(format!("wm-attach-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let lib = Library::open(&root.join("lib")).unwrap_or_else(|_| std::process::abort());
+        let call = |req: Value| -> Value {
+            let r = handle_value(&lib, req);
+            assert_eq!(r.get("ok"), Some(&json!(true)), "{r}");
+            r.get("data").cloned().unwrap_or(Value::Null)
+        };
+        call(json!({"cmd": "import_items", "items": [
+            {"platform": "tiktok", "url": "https://www.tiktok.com/@a/video/123", "text": "tarif",
+             "media": [{"kind": "video", "url": "https://v.example/123.mp4"}]},
+            {"platform": "web", "url": "https://example.com/yazi", "text": "yazı"}]}));
+        let waiting = call(json!({"cmd": "needs_video", "limit": 10}));
+        assert_eq!(waiting.pointer("/0/id"), Some(&json!("tiktok:123")), "{waiting}");
+        assert_eq!(waiting.as_array().map(Vec::len), Some(1));
+
+        let video = root.join("IMG_0001.MOV");
+        std::fs::write(&video, b"not really a movie").unwrap_or_default();
+        assert_eq!(call(json!({"cmd": "attach_file", "id": "tiktok:123", "path": video})), json!(true));
+        let got = call(json!({"cmd": "get", "id": "tiktok:123"}));
+        assert!(got.pointer("/media/0/video_file").and_then(Value::as_str).is_some_and(|f| f.ends_with(".mov")), "{got}");
+        assert_eq!(call(json!({"cmd": "needs_video", "limit": 10})), json!([]));
+
+        let web = item_id_for_url("https://example.com/yazi").1;
+        let pic = root.join("ekran.png");
+        std::fs::write(&pic, b"\x89PNG fake").unwrap_or_default();
+        assert_eq!(call(json!({"cmd": "attach_file", "id": web, "path": pic})), json!(true));
+        assert_eq!(call(json!({"cmd": "attach_file", "id": web, "path": pic})), json!(false));
+        let page = call(json!({"cmd": "get", "id": web}));
+        assert_eq!(page.pointer("/media").and_then(Value::as_array).map(Vec::len), Some(1), "{page}");
+        let r = handle_value(&lib, json!({"cmd": "attach_file", "id": "yok:1", "path": pic}));
+        assert_eq!(r.get("ok"), Some(&json!(false)));
+        lib.shutdown();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn today_finds_past_years_and_rediscover() {
         let root = std::env::temp_dir().join(format!("wm-today-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
