@@ -11,6 +11,7 @@ struct PadLibrary: View {
     @State private var showFeed = false
     @State private var showTriage = false
     @State private var activeTool: PhoneTool?
+    @State private var readingTarget: ReadingTarget?
     @State private var savingSearch = false
     @State private var searchName = ""
 
@@ -21,15 +22,13 @@ struct PadLibrary: View {
         } content: {
             List(selection: $selection) {
                 LibraryBanners()
-                if model.scope == .today && model.query.isEmpty {
+                if model.scope == .today && model.effectiveQuery.isEmpty && model.sort.isEmpty {
                     if !model.onThisDay.isEmpty {
                         Section("Geçmişte bugün") {
                             ForEach(model.onThisDay) { item in
                                 ItemRowView(item: item)
                                     .tag(item.id)
-                                    .swipeActions {
-                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
-                                    }
+                                    .modifier(ItemRowActions(item: item) { readingTarget = ReadingTarget(id: $0) })
                             }
                         }
                     }
@@ -38,9 +37,7 @@ struct PadLibrary: View {
                             ForEach(model.rediscover) { item in
                                 ItemRowView(item: item)
                                     .tag(item.id)
-                                    .swipeActions {
-                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
-                                    }
+                                    .modifier(ItemRowActions(item: item) { readingTarget = ReadingTarget(id: $0) })
                             }
                         }
                     }
@@ -49,13 +46,11 @@ struct PadLibrary: View {
                         ItemRowView(item: item)
                             .tag(item.id)
                             .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
-                            .swipeActions {
-                                Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
-                            }
+                            .modifier(ItemRowActions(item: item) { readingTarget = ReadingTarget(id: $0) })
                     }
                 }
                 if model.items.isEmpty && !model.isLoading {
-                    if model.query.isEmpty && model.scope == .all {
+                    if model.effectiveQuery.isEmpty && model.scope == .all {
                         WelcomeView(add: { showAdd = true }, sync: { showSettings = true })
                             .listRowSeparator(.hidden)
                     } else {
@@ -64,14 +59,36 @@ struct PadLibrary: View {
                 }
             }
             .listStyle(.plain)
+            .dropDestination(for: URL.self) { urls, _ in
+                let valid = urls.filter { $0.scheme == "http" || $0.scheme == "https" }
+                guard !valid.isEmpty else { return false }
+                Task {
+                    for u in valid { _ = await model.addURL(u.absoluteString, tags: []) }
+                }
+                return true
+            }
             .navigationTitle(model.scope.title)
             .navigationSubtitle(model.total > 0 ? "\(model.total) kayıt" : "")
             .searchable(text: $model.query, prompt: "Ara: kelime, tag:dev, from:@kişi")
+            .searchSuggestions {
+                Button { model.filterTokens.insert("has:video") } label: { Label("Videolu kayıtlar", systemImage: "play.rectangle") }
+                Button { model.filterTokens.insert("has:highlight") } label: { Label("Vurgulu kayıtlar", systemImage: "highlighter") }
+                Button { model.filterTokens.insert("is:untagged") } label: { Label("Etiketsiz kayıtlar", systemImage: "tag.slash") }
+                ForEach(model.tags.prefix(5), id: \.key) { t in
+                    Button("#\(t.name) (\(t.count))") { model.query = "tag:\(t.key)" }
+                }
+            }
             .refreshable {
                 await model.syncNow()
                 await model.reload()
             }
             .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { activeTool = .filters } label: {
+                        Image(systemName: model.filterTokens.isEmpty && model.sort.isEmpty ? "arrow.up.arrow.down.circle" : "arrow.up.arrow.down.circle.fill")
+                    }
+                    .accessibilityLabel("Süz ve Sırala")
+                }
                 if !model.searchToSave.isEmpty {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
@@ -93,7 +110,8 @@ struct PadLibrary: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
-                        .accessibilityLabel("Bağlantı ekle")
+                        .keyboardShortcut("n", modifiers: .command)
+                        .accessibilityLabel("Bağlantı veya not ekle")
                 }
             }
         } detail: {
@@ -108,7 +126,19 @@ struct PadLibrary: View {
             }
         }
         .onChange(of: model.query) { _, _ in model.queryChanged() }
+        .onChange(of: model.sort) { _, _ in Task { await model.reload() } }
+        .onChange(of: model.filterTokens) { _, _ in Task { await model.reload() } }
         .onChange(of: model.semanticSearch) { _, _ in Task { await model.reload() } }
+        .onChange(of: model.activeModal) { _, modal in
+            guard let modal else { return }
+            model.activeModal = nil
+            switch modal {
+            case "add": showAdd = true
+            case "triage": showTriage = true
+            case "feed": showFeed = true
+            default: break
+            }
+        }
         .onChange(of: model.scope) { _, _ in
             selection = nil
             Task { await model.reload() }
@@ -126,6 +156,7 @@ struct PadLibrary: View {
         .sheet(isPresented: $showAdd) { AddURLView() }
         .sheet(isPresented: $showSettings) { PhoneSettingsView() }
         .sheet(item: $activeTool) { PhoneToolSheet(tool: $0) }
+        .fullScreenCover(item: $readingTarget) { ReaderView(id: $0.id) }
         .alert("Aramayı kaydet", isPresented: $savingSearch) {
             TextField("Arama adı", text: $searchName)
             Button("Kaydet") {
@@ -154,6 +185,7 @@ struct PadLibrary: View {
                 Button { showTriage = true } label: { Label("Ayıkla", systemImage: "rectangle.stack.badge.minus") }
             }
             Section("Araçlar") {
+                Button { activeTool = .foldersTags } label: { Label("Klasörler ve Etiketler", systemImage: "folder.badge.gearshape") }
                 Button { activeTool = .gallery } label: { Label("Galeri", systemImage: "photo.on.rectangle") }
                 Button { activeTool = .links } label: { Label("Link Havuzu", systemImage: "link") }
                 Button { activeTool = .rules } label: { Label("Kurallar", systemImage: "slider.horizontal.3") }
@@ -197,6 +229,14 @@ struct PadLibrary: View {
                                     Task { await model.sharePage(query: PhoneScope.folder(f.id, f.name).filter, title: PhoneScope.folder(f.id, f.name).title) }
                                 } label: {
                                     Label("Tek sayfa olarak paylaş", systemImage: "square.and.arrow.up")
+                                }
+                                Button { activeTool = .foldersTags } label: {
+                                    Label("Klasörleri yönet…", systemImage: "folder.badge.gearshape")
+                                }
+                                Button(role: .destructive) {
+                                    Task { await model.deleteFolder(id: f.id) }
+                                } label: {
+                                    Label("Klasörü sil", systemImage: "trash")
                                 }
                             }
                     }

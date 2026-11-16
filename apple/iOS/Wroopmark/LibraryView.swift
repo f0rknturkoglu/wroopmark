@@ -33,6 +33,80 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }
 
+struct ReadingTarget: Identifiable {
+    let id: String
+}
+
+/// Rich per-row context menu + swipe actions shared between iPhone and iPad lists.
+struct ItemRowActions: ViewModifier {
+    @Environment(PhoneModel.self) private var model
+    let item: Item
+    let onRead: (String) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button {
+                    onRead(item.id)
+                } label: {
+                    Label("Oku", systemImage: "book")
+                }
+                .tint(.indigo)
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button("Sil", role: .destructive) {
+                    Task { await model.delete(item.id) }
+                }
+            }
+            .contextMenu {
+                Button {
+                    onRead(item.id)
+                } label: {
+                    Label("Oku", systemImage: "book")
+                }
+                if let u = URL(string: item.url), u.scheme?.hasPrefix("http") == true {
+                    Link(destination: u) {
+                        Label("Kaynağında aç", systemImage: "safari")
+                    }
+                    Button {
+                        UIPasteboard.general.string = item.url
+                    } label: {
+                        Label("Bağlantıyı kopyala", systemImage: "doc.on.doc")
+                    }
+                    ShareLink(item: u) {
+                        Label("Paylaş", systemImage: "square.and.arrow.up")
+                    }
+                }
+                Menu {
+                    if item.folderId != nil {
+                        Button {
+                            Task { await model.moveItems([item.id], to: nil) }
+                        } label: {
+                            Label("Klasörden çıkar", systemImage: "tray")
+                        }
+                        if !model.folders.isEmpty { Divider() }
+                    }
+                    ForEach(model.folders) { f in
+                        Button {
+                            Task { await model.moveItems([item.id], to: f.id) }
+                        } label: {
+                            HStack {
+                                Text(f.name.replacingOccurrences(of: "/", with: " › "))
+                                if item.folderId == f.id { Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Klasöre taşı", systemImage: "folder")
+                }
+                Divider()
+                Button("Sil", role: .destructive) {
+                    Task { await model.delete(item.id) }
+                }
+            }
+    }
+}
+
 struct PhoneLibrary: View {
     @Environment(PhoneModel.self) private var model
     @State private var showAdd = false
@@ -40,21 +114,25 @@ struct PhoneLibrary: View {
     @State private var showFeed = false
     @State private var showTriage = false
     @State private var activeTool: PhoneTool?
+    @State private var readingTarget: ReadingTarget?
+    @State private var editMode: EditMode = .inactive
+    @State private var selection = Set<String>()
+    @State private var showBatchTags = false
+    @State private var batchTagsInput = ""
     @State private var path: [String] = []
 
     var body: some View {
         @Bindable var model = model
         NavigationStack(path: $path) {
-            List {
+            List(selection: $selection) {
                 LibraryBanners()
-                if model.scope == .today && model.query.isEmpty {
+                if model.scope == .today && model.effectiveQuery.isEmpty && model.sort.isEmpty {
                     if !model.onThisDay.isEmpty {
                         Section("Geçmişte bugün") {
                             ForEach(model.onThisDay) { item in
                                 NavigationLink(value: item.id) { ItemRowView(item: item) }
-                                    .swipeActions {
-                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
-                                    }
+                                    .tag(item.id)
+                                    .modifier(ItemRowActions(item: item) { readingTarget = ReadingTarget(id: $0) })
                             }
                         }
                     }
@@ -62,23 +140,21 @@ struct PhoneLibrary: View {
                         Section("Arşivden bugün için") {
                             ForEach(model.rediscover) { item in
                                 NavigationLink(value: item.id) { ItemRowView(item: item) }
-                                    .swipeActions {
-                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
-                                    }
+                                    .tag(item.id)
+                                    .modifier(ItemRowActions(item: item) { readingTarget = ReadingTarget(id: $0) })
                             }
                         }
                     }
                 } else {
                     ForEach(model.items) { item in
                         NavigationLink(value: item.id) { ItemRowView(item: item) }
+                            .tag(item.id)
                             .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
-                            .swipeActions {
-                                Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
-                            }
+                            .modifier(ItemRowActions(item: item) { readingTarget = ReadingTarget(id: $0) })
                     }
                 }
                 if model.items.isEmpty && !model.isLoading {
-                    if model.query.isEmpty && model.scope == .all {
+                    if model.effectiveQuery.isEmpty && model.scope == .all {
                         WelcomeView(add: { showAdd = true }, sync: { showSettings = true })
                             .listRowSeparator(.hidden)
                     } else {
@@ -87,17 +163,35 @@ struct PhoneLibrary: View {
                 }
             }
             .listStyle(.plain)
+            .environment(\.editMode, $editMode)
             .navigationTitle(model.scope.title)
             .navigationSubtitle(model.total > 0 ? "\(model.total) kayıt" : "")
             .searchable(text: $model.query, prompt: "Ara: kelime, tag:dev, from:@kişi")
+            .searchSuggestions {
+                Button { model.filterTokens.insert("has:video") } label: { Label("Videolu kayıtlar", systemImage: "play.rectangle") }
+                Button { model.filterTokens.insert("has:highlight") } label: { Label("Vurgulu kayıtlar", systemImage: "highlighter") }
+                Button { model.filterTokens.insert("is:untagged") } label: { Label("Etiketsiz kayıtlar", systemImage: "tag.slash") }
+                ForEach(model.tags.prefix(5), id: \.key) { t in
+                    Button("#\(t.name) (\(t.count))") {
+                        model.query = "tag:\(t.key)"
+                    }
+                }
+            }
             .onChange(of: model.query) { _, _ in model.queryChanged() }
             .onChange(of: model.scope) { _, _ in Task { await model.reload() } }
+            .onChange(of: model.sort) { _, _ in Task { await model.reload() } }
+            .onChange(of: model.filterTokens) { _, _ in Task { await model.reload() } }
             .onChange(of: model.semanticSearch) { _, _ in Task { await model.reload() } }
             .refreshable {
                 await model.syncNow()
                 await model.reload()
             }
             .navigationDestination(for: String.self) { id in ItemView(id: id) }
+            .safeAreaInset(edge: .bottom) {
+                if editMode == .active {
+                    batchActionBar
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showSettings = true } label: {
@@ -122,9 +216,28 @@ struct PhoneLibrary: View {
                         .accessibilityLabel(model.semanticSearch ? "Anlamına göre arama açık" : "Anlamına göre ara")
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { activeTool = .filters } label: {
+                        Image(systemName: model.filterTokens.isEmpty && model.sort.isEmpty ? "arrow.up.arrow.down.circle" : "arrow.up.arrow.down.circle.fill")
+                    }
+                    .accessibilityLabel("Süz ve Sırala")
+                }
                 ToolbarItem(placement: .topBarTrailing) { ScopeMenu() }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button {
+                            withAnimation {
+                                if editMode == .active {
+                                    editMode = .inactive
+                                    selection.removeAll()
+                                } else {
+                                    editMode = .active
+                                }
+                            }
+                        } label: {
+                            Label(editMode == .active ? "Seçimi bitir" : "Çoklu seç", systemImage: "checklist")
+                        }
+                        Button { activeTool = .foldersTags } label: { Label("Klasörler ve Etiketler", systemImage: "folder.badge.gearshape") }
                         Button { activeTool = .gallery } label: { Label("Galeri", systemImage: "photo.on.rectangle") }
                         Button { activeTool = .links } label: { Label("Link Havuzu", systemImage: "link") }
                         Button { activeTool = .rules } label: { Label("Kurallar", systemImage: "slider.horizontal.3") }
@@ -138,21 +251,111 @@ struct PhoneLibrary: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
-                        .accessibilityLabel("Bağlantı ekle")
+                        .accessibilityLabel("Bağlantı veya not ekle")
                 }
+            }
+            .alert("Seçilenleri etiketle", isPresented: $showBatchTags) {
+                TextField("Etiketler (virgülle)", text: $batchTagsInput)
+                    .textInputAutocapitalization(.never)
+                Button("Ekle") {
+                    let tags = phoneTags(batchTagsInput)
+                    let ids = Array(selection)
+                    Task {
+                        await model.tagItems(ids, add: tags)
+                        editMode = .inactive
+                        selection.removeAll()
+                    }
+                }
+                Button("Vazgeç", role: .cancel) {}
             }
             .sheet(isPresented: $showAdd) { AddURLView() }
             .sheet(item: $activeTool) { PhoneToolSheet(tool: $0) }
+            .fullScreenCover(item: $readingTarget) { ReaderView(id: $0.id) }
             .onChange(of: model.openRequest) { _, id in
                 if let id {
                     path = [id]
                     model.openRequest = nil
                 }
             }
+            .onChange(of: model.activeModal) { _, modal in
+                guard let modal else { return }
+                model.activeModal = nil
+                switch modal {
+                case "add": showAdd = true
+                case "triage": showTriage = true
+                case "feed": showFeed = true
+                default: break
+                }
+            }
             .sheet(isPresented: $showSettings) { PhoneSettingsView() }
             .fullScreenCover(isPresented: $showFeed) { VideoFeedView(scope: model.scope, query: model.query) }
             .fullScreenCover(isPresented: $showTriage) { PhoneTriageView(scope: model.scope, query: model.query) }
         }
+    }
+
+    private var batchActionBar: some View {
+        HStack(spacing: 14) {
+            Text("\(selection.count) seçili")
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+            Spacer()
+            Menu {
+                Button("Klasörden çıkar") {
+                    let ids = Array(selection)
+                    Task {
+                        await model.moveItems(ids, to: nil)
+                        editMode = .inactive
+                        selection.removeAll()
+                    }
+                }
+                ForEach(model.folders) { f in
+                    Button(f.name.replacingOccurrences(of: "/", with: " › ")) {
+                        let ids = Array(selection)
+                        Task {
+                            await model.moveItems(ids, to: f.id)
+                            editMode = .inactive
+                            selection.removeAll()
+                        }
+                    }
+                }
+            } label: {
+                Label("Klasör", systemImage: "folder")
+            }
+            .disabled(selection.isEmpty)
+
+            Button {
+                batchTagsInput = ""
+                showBatchTags = true
+            } label: {
+                Label("Etiketle", systemImage: "tag")
+            }
+            .disabled(selection.isEmpty)
+
+            Button(role: .destructive) {
+                let ids = Array(selection)
+                Task {
+                    await model.deleteItems(ids)
+                    editMode = .inactive
+                    selection.removeAll()
+                }
+            } label: {
+                Label("Sil", systemImage: "trash")
+            }
+            .disabled(selection.isEmpty)
+
+            Button("Bitti") {
+                withAnimation {
+                    editMode = .inactive
+                    selection.removeAll()
+                }
+            }
+            .fontWeight(.semibold)
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial)
+        .overlay(alignment: .top) { Divider() }
     }
 }
 
@@ -335,34 +538,88 @@ struct ItemRowView: View {
 struct AddURLView: View {
     @Environment(PhoneModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var isNote = false
     @State private var url = ""
+    @State private var noteTitle = ""
+    @State private var noteBody = ""
     @State private var tags = ""
+    @State private var folderID: Int64?
     @State private var saving = false
     @State private var pickingImport = false
     @State private var pickingPhotos = false
     @State private var pickedPhotos: [PhotosPickerItem] = []
 
+    private var canSave: Bool {
+        if isNote {
+            return !noteBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !noteTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Bağlantı") {
-                    HStack {
-                        TextField("https://…", text: $url)
-                            .keyboardType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        // The system paste button: no "allow paste" prompt.
-                        PasteButton(payloadType: String.self) { texts in
-                            if let link = texts.lazy.compactMap { firstLink(in: $0) }.first { url = link }
+                Picker("Tür", selection: $isNote) {
+                    Text("Bağlantı").tag(false)
+                    Text("Not Kartı").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+
+                if isNote {
+                    Section("Not") {
+                        TextField("Başlık (isteğe bağlı)", text: $noteTitle)
+                        TextField("Aklındakini, alıntıyı veya fikri yaz…", text: $noteBody, axis: .vertical)
+                            .lineLimit(4...10)
+                    }
+                } else {
+                    Section("Bağlantı") {
+                        HStack {
+                            TextField("https://…", text: $url)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            // The system paste button: no "allow paste" prompt.
+                            PasteButton(payloadType: String.self) { texts in
+                                if let link = texts.lazy.compactMap { firstLink(in: $0) }.first { url = link }
+                            }
+                            .labelStyle(.iconOnly)
+                            .buttonBorderShape(.capsule)
+                            .accessibilityLabel("Panodan yapıştır")
                         }
-                        .labelStyle(.iconOnly)
-                        .buttonBorderShape(.capsule)
-                        .accessibilityLabel("Panodan yapıştır")
+                    }
+                }
+
+                Section("Düzenle") {
+                    Picker("Klasör", selection: $folderID) {
+                        Text("Klasör yok").tag(Int64?.none)
+                        ForEach(model.folders) { f in
+                            Text(f.name.replacingOccurrences(of: "/", with: " › ")).tag(Int64?.some(f.id))
+                        }
                     }
                     TextField("Etiketler (virgülle)", text: $tags)
                         .textInputAutocapitalization(.never)
-                    if saving { HStack { ProgressView(); Text("Sayfa indiriliyor…") } }
+                    if !model.tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(model.tags.prefix(12), id: \.key) { t in
+                                    Button("#\(t.name)") {
+                                        var list = phoneTags(tags)
+                                        if !list.contains(t.name) {
+                                            list.append(t.name)
+                                            tags = list.joined(separator: ", ")
+                                        }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.mini)
+                                }
+                            }
+                        }
+                    }
+                    if saving { HStack { ProgressView(); Text("Kaydediliyor…") } }
                 }
+
                 Section {
                     Button {
                         pickingImport = true
@@ -398,24 +655,29 @@ struct AddURLView: View {
                     Task { await model.importURLs(urls) }
                 }
             }
-            .navigationTitle("Bağlantı")
+            .navigationTitle(isNote ? "Yeni Not" : "Bağlantı")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Vazgeç") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Kaydet") {
                         saving = true
+                        let tagList = phoneTags(tags)
                         Task {
-                            let ok = await model.addURL(url.trimmingCharacters(in: .whitespaces), tags: phoneTags(tags))
+                            let ok = if isNote {
+                                await model.addNote(title: noteTitle, text: noteBody, tags: tagList, folderID: folderID)
+                            } else {
+                                await model.addURL(url.trimmingCharacters(in: .whitespaces), tags: tagList, folderID: folderID)
+                            }
                             saving = false
                             if ok { dismiss() }
                         }
                     }
-                    .disabled(url.isEmpty || saving)
+                    .disabled(!canSave || saving)
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 }
 

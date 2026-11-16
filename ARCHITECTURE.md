@@ -346,5 +346,11 @@ hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
 **v1.4: Cila** ✅
 - Akışta Resim İçinde Resim (`AVPictureInPictureController`) ve AirPlay (`AVRoutePickerView`), okuyucuda sesli okuma hızı (`0.75x–2x`), kilit ekranı / Denetim Merkezi `ControlWidget` hızlı kaydetme düğmesi (`wroopmark://add-clipboard`), tarayıcı eklentisinde Pinterest pano/pin yakalama ve VoiceOver erişilebilirlik turu.
 
+**v1.5: Tam Native iOS ve Ergonomi** ✅
+- Listede uzun basma bağlam menüsü, sağa/sola kaydırma eylemleri (`Oku` / `Sil`), çoklu seçimle toplu klasöre taşıma / etiketleme / silme, sıralama & görsel filtre sayfası (`PhoneFilterSheet`) ve arama önerileri.
+- Telefonda hiyerarşik klasör ve etiket yönetimi (`PhoneFoldersTagsView`: oluşturma, alt klasör, yeniden adlandırma, silme) ve bağlantı olmadan hızlı not kartı (`add_note`).
+- Zengin Paylaşım Eklentisi (`ShareExtension`): klasör seçici, etiket çipleri, seçili metni vurgu olarak ekleme ve saf metinden not kartı oluşturma.
+- Medya görüntüleyicide yakınlaştırma (`UIScrollView`) ve iOS Canlı Metin (`VisionKit` `ImageAnalysisInteraction`); sesli okumada Kilit Ekranı / Dinamik Ada kontrolleri (`MPNowPlayingInfoCenter`), vurgudan görsel alıntı kartı paylaşımı (`QuoteShot`), Handoff, Spotlight'a konuşma dökümü + özet indeksleme, Ana Ekran Quick Actions ve gelişmiş Kısayollar (`FolderAppEntity`, `SaveNoteIntent`, `OpenRandomItemIntent`).
+
 **Şimdilik yok**: RSS ve bültenler, EPUB, hesap ve sunucu, Raycast eklentisi (MCP çoğunu karşılar), harici API
 anahtarıyla AI (cihazdaki model yetmezse).

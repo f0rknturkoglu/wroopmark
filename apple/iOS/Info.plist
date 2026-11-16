@@ -26,5 +26,44 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.f0rknturkoglu.wroopmark.viewItem</string>
+	</array>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>add</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Bağlantı Ekle</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>plus.circle</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>clipboard</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Panodan Kaydet</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>doc.on.clipboard</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>triage</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Ayıkla</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>rectangle.stack.badge.minus</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>feed</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Akış</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>play.rectangle.on.rectangle</string>
+		</dict>
+	</array>
 </dict>
 </plist>

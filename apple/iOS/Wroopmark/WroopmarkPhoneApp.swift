@@ -1,8 +1,38 @@
 import CoreSpotlight
 import SwiftUI
+import UIKit
+
+@MainActor
+final class PhoneAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        if let type = options.shortcutItem?.type {
+            PhoneModel.pendingAction = type
+        }
+        let cfg = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        cfg.delegateClass = PhoneSceneDelegate.self
+        return cfg
+    }
+}
+
+@MainActor
+final class PhoneSceneDelegate: NSObject, UIWindowSceneDelegate {
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        PhoneModel.pendingAction = shortcutItem.type
+        completionHandler(true)
+    }
+}
 
 @main
 struct WroopmarkPhoneApp: App {
+    @UIApplicationDelegateAdaptor(PhoneAppDelegate.self) private var appDelegate
     @State private var model: PhoneModel
 
     init() {
@@ -32,9 +62,12 @@ struct WroopmarkPhoneApp: App {
                 .tint(PhoneTheme.accent)
                 .task { await model.start() }
                 .onOpenURL { model.open($0) }
-                // A post chosen in Spotlight.
+                // A post chosen in Spotlight or via Handoff.
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.openRequest = id }
+                }
+                .onContinueUserActivity("com.f0rknturkoglu.wroopmark.viewItem") { activity in
+                    if let id = activity.userInfo?["id"] as? String { model.openRequest = id }
                 }
                 .onChange(of: phase) { _, now in
                     // Coming back: the Mac may have saved things meanwhile.

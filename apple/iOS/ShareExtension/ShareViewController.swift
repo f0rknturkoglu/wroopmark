@@ -36,11 +36,22 @@ private struct ShareView: View {
     @State private var link = ""
     @State private var tags = ""
     @State private var note = ""
+    @State private var folderID: Int64?
+    @State private var folders: [Folder] = []
+    @State private var topTags: [TagCount] = []
+    @State private var selectedQuote: String?
+    @State private var saveQuoteHighlight = true
     @State private var files: [URL] = []
     @State private var candidates: [Item] = []
     @State private var attaching = false
 
     private var hasVideo: Bool { files.contains { Self.isVideo($0) } }
+
+    private var parsedTags: [String] {
+        tags.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#")) }
+            .filter { !$0.isEmpty }
+    }
 
     var body: some View {
         NavigationStack {
@@ -51,10 +62,44 @@ private struct ShareView: View {
                     status
                 }
                 if case .saved = phase {
+                    if let q = selectedQuote, !q.isEmpty {
+                        Section("Seçili metin") {
+                            Toggle("Vurgu olarak kaydet", isOn: $saveQuoteHighlight)
+                            Text("“\(q)”")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
+                    }
                     Section {
+                        if !folders.isEmpty {
+                            Picker("Klasör", selection: $folderID) {
+                                Text("Klasör yok").tag(Int64?.none)
+                                ForEach(folders) { f in
+                                    Text(f.name.replacingOccurrences(of: "/", with: " › ")).tag(Int64?.some(f.id))
+                                }
+                            }
+                        }
                         TextField("Etiketler (virgülle)", text: $tags)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                        if !topTags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(topTags.prefix(10), id: \.key) { t in
+                                        Button("#\(t.name)") {
+                                            var cur = parsedTags
+                                            if !cur.contains(t.name) {
+                                                cur.append(t.name)
+                                                tags = cur.joined(separator: ", ")
+                                            }
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.mini)
+                                    }
+                                }
+                            }
+                        }
                         TextField("Not", text: $note, axis: .vertical)
                             .lineLimit(1...4)
                     }
@@ -76,7 +121,11 @@ private struct ShareView: View {
                 }
             }
         }
-        .task { await save() }
+        .task {
+            async let meta: Void = loadMeta()
+            await save()
+            _ = await meta
+        }
     }
 
     @ViewBuilder
@@ -135,10 +184,28 @@ private struct ShareView: View {
         let new: Bool
     }
 
+    private func loadMeta() async {
+        folders = (try? await Core.shared.call(.folders)) ?? []
+        topTags = ((try? await Core.shared.call(.tags)) ?? []).sorted { $0.count > $1.count }
+    }
+
     private func save() async {
         let shared = await sharedContent()
         files = shared.files
+        selectedQuote = shared.quote
         guard let (url, title) = shared.link else {
+            if let textNote = shared.note, files.isEmpty {
+                do {
+                    let saved: Item = try await Core.shared.call(.call("add_note", ["text": .string(textNote)]))
+                    savedID = saved.id
+                    link = textNote
+                    selectedQuote = nil
+                    phase = .saved(new: true)
+                } catch {
+                    phase = .failed(error.localizedDescription)
+                }
+                return
+            }
             if files.isEmpty {
                 phase = .failed(String(localized: "Paylaşılan şeyde bağlantı yok"))
             } else {
@@ -202,10 +269,15 @@ private struct ShareView: View {
 
     private func finish() async {
         if let id = savedID {
-            let add = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#")) }.filter { !$0.isEmpty }
+            let add = parsedTags
             if !add.isEmpty { _ = try? await Core.shared.run(.editTags(ids: [id], add: add, remove: [])) }
+            if let folderID { _ = try? await Core.shared.run(.moveToFolder(id: id, folderID: folderID)) }
             let n = note.trimmingCharacters(in: .whitespacesAndNewlines)
             if !n.isEmpty { _ = try? await Core.shared.run(.setNote(id: id, note: n)) }
+            if saveQuoteHighlight, let q = selectedQuote, !q.isEmpty {
+                struct HighlightRef: Decodable { let id: String }
+                let _: [HighlightRef]? = try? await Core.shared.call(.call("highlight", ["id": .string(id), "quote": .string(q)]))
+            }
         }
         await close()
     }
@@ -220,32 +292,51 @@ private struct ShareView: View {
 
     private struct Shared {
         var link: (URL, String?)?
+        var note: String?
+        var quote: String?
         var files: [URL] = []
     }
 
     /// The URL in what was shared (a web URL, or the first link in text:
-    /// X and others share "text … https://…"), and copies of the videos and
-    /// pictures that came with it.
+    /// X and others share "text … https://…"), optional selected quote text
+    /// or pure note text, and copies of any attached media files.
     private func sharedContent() async -> Shared {
         let items = context?.inputItems.compactMap { $0 as? NSExtensionItem } ?? []
         let title = items.first?.attributedContentText?.string
         var out = Shared()
+        var texts: [String] = []
         for provider in items.flatMap({ $0.attachments ?? [] }) {
             if let type = [UTType.movie, .image].first(where: { provider.hasItemConformingToTypeIdentifier($0.identifier) }),
                let file = await Self.copy(provider, type: type) {
                 out.files.append(file)
                 continue
             }
-            guard out.link == nil else { continue }
             if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
                let url = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL,
-               url.scheme?.hasPrefix("http") == true {
+               url.scheme?.hasPrefix("http") == true,
+               out.link == nil {
                 out.link = (url, title)
             } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier),
-                      let text = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) as? String,
-                      let url = Self.firstLink(in: text) {
-                out.link = (url, nil)
+                      let text = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) as? String {
+                let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !clean.isEmpty { texts.append(clean) }
+                if out.link == nil, let url = Self.firstLink(in: text) {
+                    out.link = (url, nil)
+                }
             }
+        }
+        let rawText = texts.joined(separator: "\n")
+        if let (u, _) = out.link {
+            let stripped = rawText
+                .replacingOccurrences(of: u.absoluteString, with: "")
+                .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"“”")))
+            if stripped.count >= 8 && stripped != title {
+                out.quote = stripped
+            }
+        } else if !rawText.isEmpty {
+            out.note = rawText
+        } else if let t = title?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty, out.link == nil {
+            out.note = t
         }
         return out
     }

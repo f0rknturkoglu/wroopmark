@@ -109,6 +109,16 @@ struct CoreDecodingTests {
         #expect(suggestions.first?.folderId == folder.id)
         #expect(suggestions.first?.folderName == "Klipler")
 
+        let noteItem: Item = try await core.call(.call("add_note", [
+            "title": .string("Fikir"),
+            "text": .string("Not içeriği"),
+            "tags": .strings(["not"]),
+            "folder_id": .int(folder.id),
+        ]))
+        #expect(noteItem.platform == "local")
+        #expect(noteItem.folderId == folder.id)
+        #expect(noteItem.tags == ["not"])
+
         await core.checkpointForQuit()
     }
 }

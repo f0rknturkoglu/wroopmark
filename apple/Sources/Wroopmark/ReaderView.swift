@@ -1,7 +1,10 @@
 import AVFoundation
+import ImageIO
+import MediaPlayer
 import NaturalLanguage
 import Speech
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 // The reader, shared by the Mac and the iPhone: a saved page's readable
@@ -436,18 +439,34 @@ final class ReaderSpeech: NSObject, AVSpeechSynthesizerDelegate {
     private let synth = AVSpeechSynthesizer()
     private(set) var speaking = false
     private(set) var paused = false
+    private var currentTitle: String?
+    private var currentAuthor: String?
+    private var registeredRemote = false
 
     override init() {
         super.init()
         synth.delegate = self
     }
 
-    func toggle(_ text: String, speed: Double = 1.0) {
+    func toggle(_ text: String, title: String? = nil, author: String? = nil, speed: Double = 1.0) {
         if synth.isSpeaking {
-            if synth.isPaused { synth.continueSpeaking() } else { synth.pauseSpeaking(at: .word) }
+            if synth.isPaused {
+                synth.continueSpeaking()
+            } else {
+                synth.pauseSpeaking(at: .word)
+            }
             paused = synth.isPaused
+            updateNowPlaying(rate: paused ? 0 : speed)
             return
         }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
+        registerRemoteIfNeeded()
+        currentTitle = title
+        currentAuthor = author
         let u = AVSpeechUtterance(string: text)
         let lang = NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue ?? "tr"
         u.voice = AVSpeechSynthesisVoice(language: lang)
@@ -456,18 +475,74 @@ final class ReaderSpeech: NSObject, AVSpeechSynthesizerDelegate {
         synth.speak(u)
         speaking = true
         paused = false
+        updateNowPlaying(rate: speed)
     }
 
     func stop() {
         synth.stopSpeaking(at: .immediate)
         speaking = false
         paused = false
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
+    private func registerRemoteIfNeeded() {
+        guard !registeredRemote else { return }
+        registeredRemote = true
+        let cc = MPRemoteCommandCenter.shared()
+        cc.playCommand.isEnabled = true
+        cc.pauseCommand.isEnabled = true
+        cc.togglePlayPauseCommand.isEnabled = true
+        cc.playCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.synth.isPaused else { return }
+                self.synth.continueSpeaking()
+                self.paused = false
+                self.updateNowPlaying(rate: 1)
+            }
+            return .success
+        }
+        cc.pauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.synth.isSpeaking, !self.synth.isPaused else { return }
+                self.synth.pauseSpeaking(at: .word)
+                self.paused = true
+                self.updateNowPlaying(rate: 0)
+            }
+            return .success
+        }
+        cc.togglePlayPauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.synth.isSpeaking else { return }
+                if self.synth.isPaused {
+                    self.synth.continueSpeaking()
+                    self.paused = false
+                    self.updateNowPlaying(rate: 1)
+                } else {
+                    self.synth.pauseSpeaking(at: .word)
+                    self.paused = true
+                    self.updateNowPlaying(rate: 0)
+                }
+            }
+            return .success
+        }
+    }
+
+    private func updateNowPlaying(rate: Double) {
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: currentTitle?.isEmpty == false ? currentTitle! : "wroopmark",
+            MPNowPlayingInfoPropertyPlaybackRate: rate,
+        ]
+        if let a = currentAuthor, !a.isEmpty {
+            info[MPMediaItemPropertyArtist] = a
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) {
         Task { @MainActor in
             self.speaking = false
             self.paused = false
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         }
     }
 }
@@ -624,7 +699,14 @@ struct ReaderView: View {
                     }
                     .help("Vurgular ve notlar")
                     .disabled(highlights.isEmpty)
-                    Button { speech.toggle(spokenText, speed: speechRate) } label: {
+                    Button {
+                        speech.toggle(
+                            spokenText,
+                            title: item?.title ?? item?.headline,
+                            author: item?.authorName ?? item?.author,
+                            speed: speechRate
+                        )
+                    } label: {
                         Image(systemName: speech.speaking && !speech.paused ? "pause.circle" : "speaker.wave.2")
                     }
                     .help("Sesli oku")
@@ -634,10 +716,10 @@ struct ReaderView: View {
                 }
             }
             .sheet(item: $editing) { h in
-                HighlightEditor(highlight: h) { change in Task { await apply(change, to: h) } }
+                HighlightEditor(highlight: h, item: item) { change in Task { await apply(change, to: h) } }
             }
             .sheet(isPresented: $showList) {
-                HighlightList(highlights: highlights) { h in
+                HighlightList(highlights: highlights, item: item) { h in
                     showList = false
                     bridge.show(h.id)
                 }
@@ -752,12 +834,65 @@ struct ReaderView: View {
     }
 }
 
+/// Renders a highlight passage as a crisp PNG quote card ("Quoteshot") for sharing.
+enum QuoteShot {
+    @MainActor
+    static func render(_ h: ReaderHighlight, item: Item?) -> URL? {
+        let card = VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(ReaderHighlight.swatch(h.color))
+                    .frame(width: 6)
+                Text("“\(h.quote)”")
+                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .foregroundStyle(.primary)
+                    .lineSpacing(5)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let note = h.note, !note.isEmpty {
+                Text(note)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            Divider()
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let title = item?.title, !title.isEmpty {
+                        Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    }
+                    if let author = item?.authorName ?? item?.author {
+                        Text(author).font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Label("wroopmark", systemImage: "bookmark.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.47, green: 0.29, blue: 0.93))
+            }
+        }
+        .padding(28)
+        .frame(width: 540, alignment: .leading)
+        .background(Color.white)
+        .environment(\.colorScheme, .light)
+
+        let renderer = ImageRenderer(content: card)
+        renderer.scale = 2.0
+        guard let cg = renderer.cgImage else { return nil }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("wroopmark-quote-\(h.id).png")
+        guard let dst = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dst, cg, nil)
+        return CGImageDestinationFinalize(dst) ? url : nil
+    }
+}
+
 /// One highlight: its passage, a note, a color, or remove it.
 private struct HighlightEditor: View {
     @Environment(\.dismiss) private var dismiss
     let highlight: ReaderHighlight
+    let item: Item?
     let change: (ReaderView.Change) -> Void
     @State private var note = ""
+    @State private var shotURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -777,6 +912,13 @@ private struct HighlightEditor: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(c)
+                        }
+                    }
+                }
+                if let shotURL {
+                    Section {
+                        ShareLink(item: shotURL) {
+                            Label("Görsel kart olarak paylaş", systemImage: "photo.on.rectangle")
                         }
                     }
                 }
@@ -800,7 +942,10 @@ private struct HighlightEditor: View {
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 420)
         #endif
-        .onAppear { note = highlight.note ?? "" }
+        .onAppear {
+            note = highlight.note ?? ""
+            shotURL = QuoteShot.render(highlight, item: item)
+        }
     }
 }
 
@@ -808,21 +953,33 @@ private struct HighlightEditor: View {
 private struct HighlightList: View {
     @Environment(\.dismiss) private var dismiss
     let highlights: [ReaderHighlight]
+    let item: Item?
     let open: (ReaderHighlight) -> Void
 
     var body: some View {
         NavigationStack {
             List(highlights) { h in
-                Button { open(h) } label: {
-                    HStack(alignment: .top, spacing: 10) {
-                        RoundedRectangle(cornerRadius: 2).fill(ReaderHighlight.swatch(h.color)).frame(width: 4)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(h.quote).font(.callout).lineLimit(4)
-                            if let n = h.note, !n.isEmpty { Text(n).font(.footnote).foregroundStyle(.secondary) }
+                HStack(alignment: .top, spacing: 10) {
+                    Button { open(h) } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            RoundedRectangle(cornerRadius: 2).fill(ReaderHighlight.swatch(h.color)).frame(width: 4)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(h.quote).font(.callout).lineLimit(4)
+                                if let n = h.note, !n.isEmpty { Text(n).font(.footnote).foregroundStyle(.secondary) }
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
+                    Spacer(minLength: 4)
+                    if let url = QuoteShot.render(h, item: item) {
+                        ShareLink(item: url) {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Görsel kart olarak paylaş")
+                    }
                 }
-                .buttonStyle(.plain)
             }
             .navigationTitle("Vurgular")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Kapat") { dismiss() } } }

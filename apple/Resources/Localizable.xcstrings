@@ -709,6 +709,16 @@
         }
       }
     },
+    "%lld seçili": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld selected"
+          }
+        }
+      }
+    },
     "%lld silindi, %lld saklandı": {
       "localizations": {
         "en": {
@@ -1005,6 +1015,16 @@
         }
       }
     },
+    "Ad (ör. Ders/Matematik)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name (e.g. Study/Math)"
+          }
+        }
+      }
+    },
     "Adlandır": {
       "localizations": {
         "en": {
@@ -1021,6 +1041,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Agents (MCP)"
+          }
+        }
+      }
+    },
+    "Aklındakini, alıntıyı veya fikri yaz…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write a thought, quote, or note…"
           }
         }
       }
@@ -1435,6 +1465,16 @@
         }
       }
     },
+    "Arşivinden rastgele bir kayıt seçip açar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picks a random saved item from your library and opens it."
+          }
+        }
+      }
+    },
     "Ayarlar": {
       "localizations": {
         "en": {
@@ -1575,6 +1615,16 @@
         }
       }
     },
+    "Bağlantı Ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Link"
+          }
+        }
+      }
+    },
     "Bağlantı ekle": {
       "localizations": {
         "en": {
@@ -1591,6 +1641,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Add Link…"
+          }
+        }
+      }
+    },
+    "Bağlantı gerektirmeden hızlı bir metin veya not kartı kaydeder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saves a quick text or note card without needing a URL."
           }
         }
       }
@@ -1625,12 +1685,32 @@
         }
       }
     },
+    "Bağlantı veya not ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add link or note"
+          }
+        }
+      }
+    },
     "Bağlantılar": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Links"
+          }
+        }
+      }
+    },
+    "Bağlantılı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With links"
           }
         }
       }
@@ -1691,6 +1771,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "From"
+          }
+        }
+      }
+    },
+    "Başlık (isteğe bağlı)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title (optional)"
           }
         }
       }
@@ -2567,6 +2657,16 @@
         }
       }
     },
+    "Düzenle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organize"
+          }
+        }
+      }
+    },
     "Dışa Aktar": {
       "localizations": {
         "en": {
@@ -2847,6 +2947,16 @@
         }
       }
     },
+    "Etiketsiz kayıtlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untagged items"
+          }
+        }
+      }
+    },
     "Etiketsiz kayıtlar için klasör geçmişi veya yapay zekâ önerisi henüz oluşmadı.": {
       "localizations": {
         "en": {
@@ -2933,6 +3043,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Clear Filters"
+          }
+        }
+      }
+    },
+    "Filtreleri ve sıralamayı sıfırla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset filters & sort"
           }
         }
       }
@@ -3207,6 +3327,16 @@
         }
       }
     },
+    "Görsel kart olarak paylaş": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share as quote card"
+          }
+        }
+      }
+    },
     "Görsel kaydı": {
       "localizations": {
         "en": {
@@ -3223,6 +3353,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Text in pictures (OCR)"
+          }
+        }
+      }
+    },
+    "Görselde yazılı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With image text"
           }
         }
       }
@@ -4307,6 +4447,16 @@
         }
       }
     },
+    "Klasör silinsin mi? İçindeki kayıtlar silinmez.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this folder? Items inside are kept."
+          }
+        }
+      }
+    },
     "Klasör yok": {
       "localizations": {
         "en": {
@@ -4403,6 +4553,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Folders"
+          }
+        }
+      }
+    },
+    "Klasörler ve Etiketler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folders & Tags"
+          }
+        }
+      }
+    },
+    "Klasörleri yönet…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage folders…"
           }
         }
       }
@@ -5157,12 +5327,42 @@
         }
       }
     },
+    "Not Kartı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note Card"
+          }
+        }
+      }
+    },
     "Not ekle": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Add Note"
+          }
+        }
+      }
+    },
+    "Not kaydedildi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note saved."
+          }
+        }
+      }
+    },
+    "Notlu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With notes"
           }
         }
       }
@@ -5193,6 +5393,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Waiting to be read"
+          }
+        }
+      }
+    },
+    "Okuyucuda aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in reader"
           }
         }
       }
@@ -5757,6 +5967,16 @@
         }
       }
     },
+    "Seçilenleri etiketle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag selected"
+          }
+        }
+      }
+    },
     "Seçilenleri etiketle…": {
       "localizations": {
         "en": {
@@ -5773,6 +5993,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Delete Selected"
+          }
+        }
+      }
+    },
+    "Seçili metin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected text"
+          }
+        }
+      }
+    },
+    "Seçimi bitir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done selecting"
           }
         }
       }
@@ -5947,6 +6187,16 @@
         }
       }
     },
+    "Süz ve Sırala": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter & Sort"
+          }
+        }
+      }
+    },
     "Süzgeç": {
       "localizations": {
         "en": {
@@ -6003,6 +6253,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sort"
+          }
+        }
+      }
+    },
+    "Sıralama": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sort Order"
           }
         }
       }
@@ -6707,6 +6967,16 @@
         }
       }
     },
+    "Videolu kayıtlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items with video"
+          }
+        }
+      }
+    },
     "Videosu telefonda olmayan son kayıtlar. Gönderiyi önce bağlantısıyla kaydettiysen burada çıkar.": {
       "localizations": {
         "en": {
@@ -6757,6 +7027,16 @@
         }
       }
     },
+    "Vurgu olarak kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save as highlight"
+          }
+        }
+      }
+    },
     "Vurgula": {
       "localizations": {
         "en": {
@@ -6783,6 +7063,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Highlights and notes"
+          }
+        }
+      }
+    },
+    "Vurgulu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With highlights"
+          }
+        }
+      }
+    },
+    "Vurgulu kayıtlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items with highlights"
           }
         }
       }
@@ -6997,6 +7297,16 @@
         }
       }
     },
+    "Yeni Not": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Note"
+          }
+        }
+      }
+    },
     "Yeni ad": {
       "localizations": {
         "en": {
@@ -7175,6 +7485,16 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Zincirli": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With threads"
           }
         }
       }
@@ -7549,6 +7869,16 @@
         }
       }
     },
+    "wroopmark'a Not Ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Note to wroopmark"
+          }
+        }
+      }
+    },
     "wroopmark'a kaydedildi": {
       "localizations": {
         "en": {
@@ -7575,6 +7905,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Find in wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'tan Rastgele Kayıt Aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Random Item in wroopmark"
           }
         }
       }
@@ -7707,6 +8047,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Very similar content"
+          }
+        }
+      }
+    },
+    "Çoklu seç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select multiple"
           }
         }
       }
@@ -8067,6 +8417,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Content"
+          }
+        }
+      }
+    },
+    "İçerik süzgeçleri": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content filters"
           }
         }
       }

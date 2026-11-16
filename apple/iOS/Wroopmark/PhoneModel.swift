@@ -47,6 +47,9 @@ final class PhoneModel {
     var items: [Item] = []
     var total = 0
     var query = ""
+    var sort = ""
+    var filterTokens: Set<String> = []
+    var activeModal: String?
     var scope: PhoneScope = .all
     var tags: [TagCount] = []
     var folders: [Folder] = []
@@ -106,7 +109,7 @@ final class PhoneModel {
     /// An item to show (from a `wroopmark://item/<id>` link).
     var openRequest: String?
 
-    /// `wroopmark://item/<id>`, `wroopmark://search?q=…`, `wroopmark://add-clipboard`.
+    /// `wroopmark://item/<id>`, `wroopmark://search?q=…`, `wroopmark://add-clipboard`, `wroopmark://add`, `wroopmark://triage`, `wroopmark://feed`.
     func open(_ url: URL) {
         guard url.scheme == "wroopmark" else { return }
         let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -120,17 +123,27 @@ final class PhoneModel {
         case "add-clipboard":
             clipboardSaveTask?.cancel()
             clipboardSaveTask = Task { await saveFromClipboard() }
+        case "add", "triage", "feed":
+            activeModal = url.host
         default:
             break
         }
     }
 
-    /// Set by the "search wroopmark" shortcut before the app comes up.
+    /// Set by Shortcuts or Home Screen Quick Actions before the app comes up.
     static var pendingQuery: String?
+    static var pendingItemID: String?
+    static var pendingAction: String?
     @ObservationIgnored private var clipboardSaveTask: Task<Void, Never>?
 
     var effectiveQuery: String {
-        [scope.filter, query.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: " ")
+        [
+            scope.filter,
+            filterTokens.sorted().joined(separator: " "),
+            query.trimmingCharacters(in: .whitespacesAndNewlines),
+        ]
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
     }
 
     func start() async {
@@ -261,6 +274,19 @@ final class PhoneModel {
             scope = .all
             query = q
         }
+        if let id = Self.pendingItemID {
+            Self.pendingItemID = nil
+            openRequest = id
+        }
+        if let action = Self.pendingAction {
+            Self.pendingAction = nil
+            if action == "clipboard" {
+                clipboardSaveTask?.cancel()
+                clipboardSaveTask = Task { await saveFromClipboard() }
+            } else {
+                activeModal = action
+            }
+        }
     }
 
     /// Pictures can be downloaded again; only the database belongs in
@@ -386,7 +412,7 @@ final class PhoneModel {
         isLoading = true
         defer { if gen == generation { isLoading = false } }
         do {
-            if scope == .today && effectiveQuery.isEmpty {
+            if scope == .today && effectiveQuery.isEmpty && sort.isEmpty {
                 let r: TodayResult = try await core.call(.call("today", [:]))
                 guard gen == generation else { return }
                 onThisDay = r.onThisDay
@@ -396,7 +422,7 @@ final class PhoneModel {
                 reachedEnd = true
                 errorMessage = nil
             } else {
-                let r: SearchResult = try await core.call(searchCommand(q: effectiveQuery, sort: "", limit: pageSize, offset: 0))
+                let r: SearchResult = try await core.call(searchCommand(q: effectiveQuery, sort: sort, limit: pageSize, offset: 0))
                 guard gen == generation else { return }
                 onThisDay = []
                 rediscover = []
@@ -413,11 +439,11 @@ final class PhoneModel {
     }
 
     func loadMore() async {
-        guard !reachedEnd, !isLoading, !(scope == .today && effectiveQuery.isEmpty) else { return }
+        guard !reachedEnd, !isLoading, !(scope == .today && effectiveQuery.isEmpty && sort.isEmpty) else { return }
         let gen = generation
         isLoading = true
         defer { isLoading = false }
-        if let r: SearchResult = try? await core.call(searchCommand(q: effectiveQuery, sort: "", limit: pageSize, offset: items.count)), gen == generation {
+        if let r: SearchResult = try? await core.call(searchCommand(q: effectiveQuery, sort: sort, limit: pageSize, offset: items.count)), gen == generation {
             let known = Set(items.map(\.id))
             items += r.items.filter { !known.contains($0.id) }
             reachedEnd = r.items.count < pageSize
@@ -499,9 +525,9 @@ final class PhoneModel {
         }
     }
 
-    func addURL(_ url: String, tags: [String]) async -> Bool {
+    func addURL(_ url: String, tags: [String], folderID: Int64? = nil) async -> Bool {
         do {
-            let item: Item = try await core.call(.addURL(url: url, tags: tags, note: nil, folderID: nil), network: true)
+            let item: Item = try await core.call(.addURL(url: url, tags: tags, note: nil, folderID: folderID), network: true)
             items.removeAll { $0.id == item.id }
             items.insert(item, at: 0)
             total += 1
@@ -511,7 +537,7 @@ final class PhoneModel {
         } catch {
             // No network (or the site would not answer): keep the link now,
             // fetch the rest later, like the share sheet does.
-            if (try? await Self.saveLinkOnly(url, tags: tags)) != nil {
+            if (try? await Self.saveLinkOnly(url, tags: tags, folderID: folderID)) != nil {
                 notice = String(localized: "Sayfaya ulaşılamadı; bağlantı kaydedildi, ayrıntılar sonra gelecek.")
                 await reload()
                 syncSoon()
@@ -522,10 +548,37 @@ final class PhoneModel {
         }
     }
 
+    func addNote(title: String?, text: String, tags: [String], folderID: Int64? = nil) async -> Bool {
+        do {
+            var args: [String: CoreArg] = [
+                "text": .string(text),
+                "tags": .strings(tags),
+            ]
+            if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                args["title"] = .string(title.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            if let folderID {
+                args["folder_id"] = .int(folderID)
+            }
+            let item: Item = try await core.call(.call("add_note", args))
+            items.removeAll { $0.id == item.id }
+            items.insert(item, at: 0)
+            total += 1
+            syncSoon()
+            await refreshMeta()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     /// Stores just the link (no network); used offline and by the share sheet.
-    nonisolated static func saveLinkOnly(_ url: String, tags: [String]) async throws -> String {
+    nonisolated static func saveLinkOnly(_ url: String, tags: [String], folderID: Int64? = nil) async throws -> String {
         struct Saved: Decodable, Sendable { let id: String }
-        let r: Saved = try await Core.shared.call(.call("save_link", ["url": .string(url), "tags": .strings(tags)]))
+        var args: [String: CoreArg] = ["url": .string(url), "tags": .strings(tags)]
+        if let folderID { args["folder_id"] = .int(folderID) }
+        let r: Saved = try await Core.shared.call(.call("save_link", args))
         return r.id
     }
 
@@ -535,6 +588,82 @@ final class PhoneModel {
             items.removeAll { $0.id == id }
             total = max(0, total - 1)
             await refreshMeta()
+        }
+    }
+
+    func moveItems(_ ids: [String], to folderID: Int64?) async {
+        guard !ids.isEmpty else { return }
+        if await perform(.moveItemsToFolder(ids: ids, folderID: folderID)) {
+            syncSoon()
+            await reload()
+            await refreshMeta()
+        }
+    }
+
+    func tagItems(_ ids: [String], add: [String], remove: [String] = []) async {
+        guard !ids.isEmpty else { return }
+        if await perform(.editTags(ids: ids, add: add, remove: remove)) {
+            syncSoon()
+            await reload()
+            await refreshMeta()
+        }
+    }
+
+    func deleteItems(_ ids: [String]) async {
+        guard !ids.isEmpty else { return }
+        for id in ids { _ = await perform(.delete(id: id)) }
+        Spotlight.remove(ids)
+        let idSet = Set(ids)
+        items.removeAll { idSet.contains($0.id) }
+        total = max(0, total - ids.count)
+        syncSoon()
+        await refreshMeta()
+    }
+
+    @discardableResult
+    func addFolder(name: String) async -> Folder? {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+        let created: Folder? = try? await core.call(.addFolder(name: clean))
+        syncSoon()
+        await refreshMeta()
+        return created
+    }
+
+    func renameFolder(id: Int64, name: String) async {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        if await perform(.renameFolder(id: id, name: clean)) {
+            if case .folder(let fid, _) = scope, fid == id {
+                scope = .folder(id, clean)
+            }
+            syncSoon()
+            await refreshMeta()
+            await reload()
+        }
+    }
+
+    func deleteFolder(id: Int64) async {
+        if await perform(.deleteFolder(id: id)) {
+            if case .folder(let fid, _) = scope, fid == id {
+                scope = .all
+            }
+            syncSoon()
+            await refreshMeta()
+            await reload()
+        }
+    }
+
+    func renameTag(from: String, to: String) async {
+        let clean = to.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        if await perform(.renameTag(from: from, to: clean)) {
+            if case .tag(let cur) = scope, cur == from || cur.hasPrefix(from + "/") {
+                scope = .all
+            }
+            syncSoon()
+            await refreshMeta()
+            await reload()
         }
     }
 

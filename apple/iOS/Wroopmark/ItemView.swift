@@ -2,6 +2,7 @@ import AVKit
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
+import VisionKit
 
 struct ItemView: View {
     @Environment(PhoneModel.self) private var model
@@ -211,6 +212,12 @@ struct ItemView: View {
             related = await rel
         }
         .onDisappear(perform: saveNote)
+        .userActivity("com.f0rknturkoglu.wroopmark.viewItem") { activity in
+            let current = item
+            activity.title = current?.title ?? current?.headline ?? "wroopmark"
+            activity.isEligibleForHandoff = true
+            activity.userInfo = ["id": id]
+        }
     }
 
     private func header(_ item: Item) -> some View {
@@ -458,7 +465,8 @@ struct MediaViewerView: View {
                     }
                     .onDisappear { player?.pause() }
             } else if let f = media.file {
-                LocalImage(file: f, maxPixel: 2400, fill: false)
+                ZoomableLiveImage(file: f)
+                    .ignoresSafeArea()
             } else {
                 Text("Bu video telefonda yok. Kaynağında izlemek için ⋯ → Kaynağında aç.")
                     .foregroundStyle(.white).padding()
@@ -516,4 +524,82 @@ extension Media {
 extension Item {
     /// Has a video whose file is not on this device.
     var needsVideoFile: Bool { media.contains { $0.isVideo && $0.videoFile == nil } }
+}
+
+/// Full-screen photo viewer with pinch-to-zoom, double-tap zoom, and iOS Live Text.
+private struct ZoomableLiveImage: UIViewRepresentable {
+    let file: String
+
+    @MainActor
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        let imageView = UIImageView()
+        let interaction = ImageAnalysisInteraction()
+        var currentFile = ""
+        var analyzeTask: Task<Void, Never>?
+
+        override init() {
+            super.init()
+            imageView.contentMode = .scaleAspectFit
+            imageView.isUserInteractionEnabled = true
+            interaction.preferredInteractionTypes = .automatic
+            imageView.addInteraction(interaction)
+        }
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+
+        @objc func doubleTap(_ sender: UITapGestureRecognizer) {
+            guard let scroll = sender.view as? UIScrollView else { return }
+            if scroll.zoomScale > 1.05 {
+                scroll.setZoomScale(1.0, animated: true)
+            } else {
+                scroll.setZoomScale(2.5, animated: true)
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scroll = UIScrollView()
+        scroll.delegate = context.coordinator
+        scroll.minimumZoomScale = 1.0
+        scroll.maximumZoomScale = 4.0
+        scroll.showsVerticalScrollIndicator = false
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.backgroundColor = .clear
+
+        let iv = context.coordinator.imageView
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(iv)
+        NSLayoutConstraint.activate([
+            iv.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
+            iv.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
+            iv.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            iv.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            iv.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            iv.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+        ])
+
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
+        tap.numberOfTapsRequired = 2
+        scroll.addGestureRecognizer(tap)
+        return scroll
+    }
+
+    func updateUIView(_ uiView: UIScrollView, context: Context) {
+        guard context.coordinator.currentFile != file else { return }
+        context.coordinator.currentFile = file
+        context.coordinator.analyzeTask?.cancel()
+        context.coordinator.analyzeTask = Task {
+            guard let img = await Thumbs.shared.image(file, maxPixel: 2400), !Task.isCancelled else { return }
+            context.coordinator.imageView.image = img
+            if ImageAnalyzer.isSupported {
+                let analyzer = ImageAnalyzer()
+                let config = ImageAnalyzer.Configuration([.text, .machineReadableCode])
+                if let analysis = try? await analyzer.analyze(img, configuration: config), !Task.isCancelled {
+                    context.coordinator.interaction.analysis = analysis
+                }
+            }
+        }
+    }
 }

@@ -901,6 +901,7 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
                 tags: Vec<String>,
                 note: Option<String>,
                 title: Option<String>,
+                folder_id: Option<i64>,
             }
             let a: SaveLink = req.parse()?;
             let url = a.url.trim();
@@ -920,11 +921,46 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
                 if let Some(n) = item.note.as_deref() {
                     lib.lock_store()?.set_note(&id, Some(n))?;
                 }
+                if a.folder_id.is_some() {
+                    lib.lock_store()?.move_to_folder(&id, a.folder_id)?;
+                }
             } else {
-                lib.save_into(std::slice::from_mut(&mut item), &a.tags, None)?;
+                lib.save_into(std::slice::from_mut(&mut item), &a.tags, a.folder_id)?;
                 lib.lock_store()?.mark_stubs(std::slice::from_ref(&id))?;
             }
             S::ok(json!({"id": id, "new": !existed}))
+        }
+        "add_note" => {
+            #[derive(Deserialize)]
+            struct AddNote {
+                text: String,
+                title: Option<String>,
+                #[serde(default)]
+                tags: Vec<String>,
+                folder_id: Option<i64>,
+            }
+            let a: AddNote = req.parse()?;
+            let text = a.text.trim().to_string();
+            let title = a.title.map(|t| t.trim().to_string()).filter(|t| !t.is_empty());
+            if text.is_empty() && title.is_none() {
+                return Err(CoreError::InvalidUrl);
+            }
+            let now = chrono::Utc::now().timestamp();
+            let seed = format!("{}:{}:{now}", title.as_deref().unwrap_or(""), text);
+            let hash: String = crate::text::hash_hex(seed.as_bytes()).chars().take(16).collect();
+            let id = format!("local:{hash}");
+            let mut item = Item {
+                id: id.clone(),
+                platform: Platform::Local,
+                url: format!("https://wroopmark.local/note/{hash}"),
+                title,
+                text,
+                created_at: Some(now),
+                saved_at: now,
+                ..Default::default()
+            };
+            lib.save_into(std::slice::from_mut(&mut item), &a.tags, a.folder_id)?;
+            S::ok(lib.lock_store()?.get(&id)?)
         }
         "posterless" => {
             let rows = lib.lock_store()?.posterless(req.parse::<Limit>()?.limit.clamp(1, 200))?;
@@ -1234,6 +1270,34 @@ mod tests {
             suggestions.iter().map(|s| json!({"id": s.get("id"), "tags": ["örnek"], "folder_id": s.get("folder_id")})).collect();
         let applied = handle_value(&lib, json!({"cmd": "apply_batch", "items": entries}));
         assert_eq!(applied.pointer("/data"), Some(&json!(2)));
+
+        // add_note & save_link with folder_id
+        let note = handle_value(
+            &lib,
+            json!({
+                "cmd": "add_note",
+                "title": "Fikir",
+                "text": "Hızlı not içeriği",
+                "tags": ["notlar"],
+                "folder_id": fid
+            }),
+        );
+        assert_eq!(note.get("ok"), Some(&json!(true)), "{note}");
+        assert_eq!(note.pointer("/data/platform"), Some(&json!("local")));
+        assert_eq!(note.pointer("/data/folder_id"), Some(&json!(fid)));
+        let saved = handle_value(
+            &lib,
+            json!({
+                "cmd": "save_link",
+                "url": "https://example.com/with-folder",
+                "tags": ["web"],
+                "folder_id": fid
+            }),
+        );
+        assert_eq!(saved.pointer("/data/new"), Some(&json!(true)));
+        let saved_id = saved.pointer("/data/id").and_then(Value::as_str).unwrap_or_default();
+        let fetched = handle_value(&lib, json!({"cmd": "get", "id": saved_id}));
+        assert_eq!(fetched.pointer("/data/folder_id"), Some(&json!(fid)));
 
         lib.shutdown();
         let _ = std::fs::remove_dir_all(&dir);

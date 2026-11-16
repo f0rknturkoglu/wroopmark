@@ -70,6 +70,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>MIT — Furkan Türkoğlu</string>
   <key>NSSpeechRecognitionUsageDescription</key><string>Videolardaki konuşmayı cihazda aramak için yazıya döker.</string>
+  <key>NSUserActivityTypes</key><array><string>com.f0rknturkoglu.wroopmark.viewItem</string></array>
   <!-- wroopmark://item/<id>, wroopmark://search?q=…, wroopmark://add?url=… -->
   <key>CFBundleURLTypes</key>
   <array>

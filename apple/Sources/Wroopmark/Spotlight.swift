@@ -109,7 +109,10 @@ enum Spotlight {
         let firstLine = item.text.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init)
         a.title = item.title ?? firstLine.map { String($0.prefix(120)) } ?? who ?? item.url
         a.contentDescription = String(item.text.prefix(400))
-        a.textContent = [item.text, item.note, item.ocr].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
+        a.textContent = [item.title, item.text, item.summary, item.note, item.ocr, item.extra]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
         a.keywords = item.tags + [item.platform] + (item.authorHandle.map { [$0] } ?? [])
         if let who { a.authorNames = [who] }
         a.contentCreationDate = Date(timeIntervalSince1970: TimeInterval(item.createdAt ?? item.savedAt))

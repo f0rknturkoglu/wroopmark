@@ -92,6 +92,7 @@ struct PhoneSettingsView: View {
                 }
 
                 Section("Araçlar ve Dışa Aktarma") {
+                    NavigationLink { PhoneFoldersTagsView() } label: { Label("Klasörler ve Etiketler", systemImage: "folder.badge.gearshape") }
                     NavigationLink { PhoneGalleryView() } label: { Label("Galeri", systemImage: "photo.on.rectangle") }
                     NavigationLink { PhoneLinksView() } label: { Label("Link Havuzu", systemImage: "link") }
                     NavigationLink { PhoneRulesView() } label: { Label("Kurallar", systemImage: "slider.horizontal.3") }

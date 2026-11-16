@@ -44,9 +44,12 @@ struct WroopmarkApp: App {
                 .onOpenURL { model.open(url: $0) }
                 // …in this window, instead of opening a new one per link.
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
-                // A post picked in Spotlight.
+                // A post picked in Spotlight or via Handoff.
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.reveal(id: id) }
+                }
+                .onContinueUserActivity("com.f0rknturkoglu.wroopmark.viewItem") { activity in
+                    if let id = activity.userInfo?["id"] as? String { model.reveal(id: id) }
                 }
         }
         .defaultSize(width: 1440, height: 900)

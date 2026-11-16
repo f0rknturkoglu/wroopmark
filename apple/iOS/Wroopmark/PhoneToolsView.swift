@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum PhoneTool: String, Identifiable, CaseIterable {
-    case gallery, links, rules, duplicates, export
+    case gallery, links, rules, duplicates, export, foldersTags, filters
     var id: String { rawValue }
 }
 
@@ -19,6 +19,8 @@ struct PhoneToolSheet: View {
                 case .rules: PhoneRulesView()
                 case .duplicates: PhoneDuplicatesView()
                 case .export: PhoneExportSheet()
+                case .foldersTags: PhoneFoldersTagsView()
+                case .filters: PhoneFilterSheet()
                 }
             }
             .navigationDestination(for: String.self) { ItemView(id: $0) }
@@ -686,3 +688,260 @@ struct PhoneExportSheet: View {
         }
     }
 }
+
+// MARK: - Klasör ve Etiket Yönetimi
+
+struct PhoneFoldersTagsView: View {
+    @Environment(PhoneModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var addingFolder = false
+    @State private var newFolderName = ""
+    @State private var parentPrefix: String?
+    @State private var renamingFolder: Folder?
+    @State private var folderDraft = ""
+    @State private var deletingFolder: Folder?
+    @State private var renamingTag: TagCount?
+    @State private var tagDraft = ""
+
+    private var tree: [FolderNode] { FolderNode.tree(model.folders) }
+
+    var body: some View {
+        List {
+            Section {
+                Button {
+                    parentPrefix = nil
+                    newFolderName = ""
+                    addingFolder = true
+                } label: {
+                    Label("Yeni klasör…", systemImage: "folder.badge.plus")
+                }
+                if tree.isEmpty {
+                    Text("Henüz klasör yok.").foregroundStyle(.secondary)
+                } else {
+                    OutlineGroup(tree, children: \.children) { node in
+                        HStack {
+                            Button {
+                                if let f = node.folder {
+                                    model.scope = .folder(f.id, f.name)
+                                    dismiss()
+                                }
+                            } label: {
+                                Label {
+                                    Text(node.name)
+                                } icon: {
+                                    Image(systemName: "folder")
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                            Spacer()
+                            if node.count > 0 {
+                                Text("\(node.count)")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .contextMenu {
+                            if let f = node.folder {
+                                Button {
+                                    parentPrefix = f.name
+                                    newFolderName = ""
+                                    addingFolder = true
+                                } label: {
+                                    Label("Alt klasör ekle…", systemImage: "folder.badge.plus")
+                                }
+                                Button {
+                                    renamingFolder = f
+                                    folderDraft = f.name
+                                } label: {
+                                    Label("Yeniden adlandır…", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    deletingFolder = f
+                                } label: {
+                                    Label("Sil", systemImage: "trash")
+                                }
+                            }
+                        }
+                        .swipeActions {
+                            if let f = node.folder {
+                                Button("Sil", role: .destructive) { deletingFolder = f }
+                                Button("Adlandır") {
+                                    renamingFolder = f
+                                    folderDraft = f.name
+                                }
+                                .tint(.orange)
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Klasörler")
+            }
+
+            if !model.tags.isEmpty {
+                Section("Etiketler") {
+                    ForEach(model.tags, id: \.key) { tag in
+                        HStack {
+                            Button("#\(tag.name)") {
+                                model.scope = .tag(tag.key)
+                                dismiss()
+                            }
+                            .foregroundStyle(.primary)
+                            Spacer()
+                            Text("\(tag.count)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        .swipeActions {
+                            Button("Adlandır") {
+                                renamingTag = tag
+                                tagDraft = tag.name
+                            }
+                            .tint(.orange)
+                        }
+                        .contextMenu {
+                            Button {
+                                renamingTag = tag
+                                tagDraft = tag.name
+                            } label: {
+                                Label("Yeniden adlandır…", systemImage: "pencil")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Klasörler ve Etiketler")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert(parentPrefix == nil ? "Yeni klasör" : "Alt klasör ekle", isPresented: $addingFolder) {
+            TextField("Ad (ör. Ders/Matematik)", text: $newFolderName)
+            Button("Oluştur") {
+                let raw = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let full = parentPrefix.map { "\($0)/\(raw)" } ?? raw
+                Task { _ = await model.addFolder(name: full) }
+            }
+            Button("Vazgeç", role: .cancel) {}
+        }
+        .alert("Klasörü yeniden adlandır", isPresented: Binding(
+            get: { renamingFolder != nil },
+            set: { if !$0 { renamingFolder = nil } }
+        )) {
+            TextField("Klasör adı", text: $folderDraft)
+            Button("Kaydet") {
+                if let f = renamingFolder {
+                    let next = folderDraft
+                    Task { await model.renameFolder(id: f.id, name: next) }
+                }
+                renamingFolder = nil
+            }
+            Button("Vazgeç", role: .cancel) { renamingFolder = nil }
+        }
+        .alert("Etiketi yeniden adlandır", isPresented: Binding(
+            get: { renamingTag != nil },
+            set: { if !$0 { renamingTag = nil } }
+        )) {
+            TextField("Etiket adı", text: $tagDraft)
+                .textInputAutocapitalization(.never)
+            Button("Kaydet") {
+                if let t = renamingTag {
+                    let next = tagDraft
+                    Task { await model.renameTag(from: t.name, to: next) }
+                }
+                renamingTag = nil
+            }
+            Button("Vazgeç", role: .cancel) { renamingTag = nil }
+        }
+        .confirmationDialog(
+            "Klasör silinsin mi? İçindeki kayıtlar silinmez.",
+            isPresented: Binding(
+                get: { deletingFolder != nil },
+                set: { if !$0 { deletingFolder = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Klasörü sil", role: .destructive) {
+                if let f = deletingFolder {
+                    Task { await model.deleteFolder(id: f.id) }
+                }
+                deletingFolder = nil
+            }
+        }
+    }
+}
+
+// MARK: - Sıralama ve Filtreler
+
+struct PhoneFilterSheet: View {
+    @Environment(PhoneModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    private let chips: [(token: String, title: String, symbol: String)] = [
+        ("has:video", String(localized: "Videolu"), "play.rectangle"),
+        ("has:image", String(localized: "Fotoğraflı"), "photo"),
+        ("has:link", String(localized: "Bağlantılı"), "link"),
+        ("has:note", String(localized: "Notlu"), "note.text"),
+        ("has:ocr", String(localized: "Görselde yazılı"), "text.viewfinder"),
+        ("has:highlight", String(localized: "Vurgulu"), "highlighter"),
+        ("has:thread", String(localized: "Zincirli"), "text.line.first.and.arrowtriangle.forward"),
+        ("is:untagged", String(localized: "Etiketsiz"), "tag.slash"),
+        ("is:unfiled", String(localized: "Klasörsüz"), "tray"),
+    ]
+
+    private let sortOptions: [(id: String, label: String)] = [
+        ("", String(localized: "Önerilen")),
+        ("saved", String(localized: "Kaydedilme: yeniden eskiye")),
+        ("saved_asc", String(localized: "Kaydedilme: eskiden yeniye")),
+        ("posted", String(localized: "Paylaşılma: yeniden eskiye")),
+        ("posted_asc", String(localized: "Paylaşılma: eskiden yeniye")),
+        ("author", String(localized: "Kişiye göre (A–Z)")),
+        ("random", String(localized: "Karışık")),
+    ]
+
+    var body: some View {
+        @Bindable var model = model
+        Form {
+            Section("Sıralama") {
+                Picker("Sırala", selection: $model.sort) {
+                    ForEach(sortOptions, id: \.id) { opt in
+                        Text(opt.label).tag(opt.id)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+
+            Section("İçerik süzgeçleri") {
+                ForEach(chips, id: \.token) { chip in
+                    let active = model.filterTokens.contains(chip.token)
+                    Toggle(isOn: Binding(
+                        get: { active },
+                        set: { on in
+                            if on { model.filterTokens.insert(chip.token) } else { model.filterTokens.remove(chip.token) }
+                        }
+                    )) {
+                        Label(chip.title, systemImage: chip.symbol)
+                    }
+                }
+            }
+
+            if !model.filterTokens.isEmpty || !model.sort.isEmpty {
+                Section {
+                    Button("Filtreleri ve sıralamayı sıfırla", role: .destructive) {
+                        model.filterTokens.removeAll()
+                        model.sort = ""
+                    }
+                }
+            }
+        }
+        .navigationTitle("Süz ve Sırala")
+        .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: model.sort) { _, _ in Task { await model.reload() } }
+        .onChange(of: model.filterTokens) { _, _ in Task { await model.reload() } }
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Uygula") { dismiss() }
+            }
+        }
+    }
+}
+

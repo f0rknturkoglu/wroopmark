@@ -359,6 +359,11 @@ struct ItemDetailView: View {
             }
         }
         .onDisappear(perform: saveNote)
+        .userActivity("com.f0rknturkoglu.wroopmark.viewItem") { activity in
+            activity.title = liveItem.title ?? liveItem.headline
+            activity.isEligibleForHandoff = true
+            activity.userInfo = ["id": liveItem.id]
+        }
     }
 
     /// The list rows carry no OCR text; the detail loads it with the item.
