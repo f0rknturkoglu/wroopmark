@@ -315,5 +315,36 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
   görseller içinde, arama kutulu, açık/koyu.
 - Mağaza: iki dilde metin ve ekran görüntüleri (`apple/iOS/AppStore.md`).
 
-**Şimdilik yok**: EPUB, Raycast eklentisi (MCP çoğunu karşılar), harici API
+**İlke (v1.1 ve sonrası)**: Mac olmadan da her şey telefonda; Mac yalnızca
+hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
+(5.2.3); video telefona kullanıcının kendi dosyasıyla ya da Mac'ten iCloud
+üzerinden gelir, yoksa kaynağından akış olarak oynar.
+
+**v1.1: iPhone tek başına**
+- iOS Safari eklentisi: x.com yer imleri, Bluesky, Threads, Instagram
+  Kaydedilenler, Reddit, YouTube listeleri telefonda gezinirken arşive akar
+  (masaüstü eklentisinin `hook.js`'i; uygulama grubundaki gelen kutusu üzerinden).
+- Paylaşım eklentisi video ve fotoğraf dosyası da alır; bağlantıyla ya da dosya
+  adındaki numarayla gönderisine bağlanır. Fotoğraflar'dan toplu içe aktarma.
+- iPhone'da OCR (Vision) ve sayfanın tam kopyası (WKWebView webarchive).
+- Mac'siz iCloud yedeği: telefon tek başına bir iCloud Drive klasörüne eşitler;
+  yeni telefon aynı klasörü seçince arşiv geri gelir.
+- Swift tarafında çekirdek JSON'unu çözme testleri.
+
+**v1.2: Aramada derinlik**
+- Görsel içeriğiyle arama (Vision sınıflandırma) ve benzer görseller (görsel
+  parmak izi).
+- Videoda konuşulanı arama: hazır altyazı, yoksa cihazda konuşma tanıma.
+- Etiketsiz kayıtlara toplu etiket/klasör önerisi, tek ekranda onay.
+- Dışa aktarmaya (Markdown, HTML) vurgular ve X yanıtları.
+
+**v1.3: Mac'in araçları telefonda**
+- Kurallar, kopyalar, link havuzu ve kırık link taraması, kayıtlı aramalar,
+  sayfa kopyaları.
+
+**v1.4: Cila**
+- Akışta PiP ve AirPlay, sesli okumada hız, kilit ekranı / Denetim Merkezi
+  düğmesi, Pinterest panoları, VoiceOver turu.
+
+**Şimdilik yok**: RSS ve bültenler, EPUB, hesap ve sunucu, Raycast eklentisi (MCP çoğunu karşılar), harici API
 anahtarıyla AI (cihazdaki model yetmezse).
