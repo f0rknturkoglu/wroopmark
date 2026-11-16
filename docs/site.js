@@ -18,7 +18,7 @@
   root.classList.add("js");
 
   // Reveals, line drawings and counters, once each.
-  const once = document.querySelectorAll(".reveal, .reveal-fade, [data-draw], .stat");
+  const once = document.querySelectorAll(".reveal, .reveal-fade, [data-draw], .stat, .mask, .track, .fade, .blur, .flip, .rows, .pop");
   const reveal = (el) => {
     el.classList.add("in");
     el.querySelectorAll?.("[data-count]").forEach(count);
@@ -93,6 +93,7 @@
   const words = document.querySelector("[data-words]");
   const wordSpans = words ? [...words.querySelectorAll(".words span")] : [];
   const track = document.querySelector("[data-marquee]");
+  const progressed = [...document.querySelectorAll("[data-progress]")];
   let queued = false;
 
   function frame() {
@@ -112,6 +113,14 @@
     }
     if (reduce.matches) return;
 
+    // How far each [data-progress] element has come in: 0 as its top meets the
+    // bottom of the screen, 1 once it has risen data-progress × screen height.
+    for (const el of progressed) {
+      const r = el.getBoundingClientRect();
+      if (r.top > vh * 1.2 || r.bottom < -vh) continue;
+      const v = Math.min(1, Math.max(0, (vh - r.top) / (vh * (parseFloat(el.dataset.progress) || 0.85))));
+      el.style.setProperty("--vp", v.toFixed(3));
+    }
     if (hero) {
       const s = Math.min(1, Math.max(0, y / (hero.offsetHeight * 0.75)));
       hero.style.setProperty("--s", s.toFixed(4));

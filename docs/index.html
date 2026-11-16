@@ -57,7 +57,7 @@
 }
 </script>
 </head>
-<body>
+<body id="top">
 <div class="progress" aria-hidden="true"></div>
 <div class="bar"><div class="bar-in">
   <a class="brand" href="./"><img src="logo.png" alt="">wroopmark</a>
@@ -78,6 +78,7 @@
   <div class="orb b" data-speed="-70"></div>
   <div class="orb c" data-speed="-220"></div>
   <div class="hero-copy">
+    <div class="app-icon"><img src="logo.png" width="512" height="512" alt="wroopmark"></div>
     <h1>Everything you saved, in one archive you own.</h1>
     <p class="lead">Posts, videos, articles and pictures from X, TikTok, Instagram, Reddit, YouTube and the web, kept on your Mac, iPhone and iPad. Offline, searchable, and on nobody&#x27;s server, because there isn&#x27;t one.</p>
     <div class="cta">
@@ -99,22 +100,22 @@
 </section>
 
 <div class="stats">
-  <div class="stat reveal" style="--d:0"><b><span data-count="0.0">0.0</span>% CPU</b><span>when it sits open and idle on a Mac</span></div>
-  <div class="stat reveal" style="--d:1"><b>~<span data-count="110">110</span> MB</b><span>of memory with 50,000 posts in the library</span></div>
-  <div class="stat reveal" style="--d:2"><b>&lt; <span data-count="35">35</span> ms</b><span>at most to search 50,000 posts</span></div>
-  <div class="stat reveal" style="--d:3"><b><span data-count="0">0</span> servers</b><span>no account, no tracking, nothing to sign up for</span></div>
+  <div class="stat blur" style="--d:0"><b><span data-count="0.0">0.0</span>% CPU</b><span>when it sits open and idle on a Mac</span></div>
+  <div class="stat blur" style="--d:1"><b>~<span data-count="110">110</span> MB</b><span>of memory with 50,000 posts in the library</span></div>
+  <div class="stat blur" style="--d:2"><b>&lt; <span data-count="35">35</span> ms</b><span>at most to search 50,000 posts</span></div>
+  <div class="stat blur" style="--d:3"><b><span data-count="0">0</span> servers</b><span>no account, no tracking, nothing to sign up for</span></div>
 </div>
 
 <main>
   <section class="intro-block">
-    <p class="intro big reveal">You save things everywhere, and they scatter: five apps, half of them unsearchable, and the post you wanted is gone the day its author deletes it. <b>wroopmark keeps the text, the pictures and the videos on your own devices</b>, so they stay readable offline and outlive the original.</p>
+    <p class="intro big sweep" data-progress="0.75">You save things everywhere, and they scatter: five apps, half of them unsearchable, and the post you wanted is gone the day its author deletes it. <b>wroopmark keeps the text, the pictures and the videos on your own devices</b>, so they stay readable offline and outlive the original.</p>
   </section>
 
   <section class="chapter" id="mac">
     <div class="chapter-head">
-      <p class="eyebrow reveal">Tour · Mac</p>
-      <h2 class="reveal">A real Mac app, not a web page in a box.</h2>
-      <p class="intro reveal">Scroll, and the window below does what the app does.</p>
+      <p class="eyebrow track">Tour · Mac</p>
+      <h2 class="mask" aria-label="A real Mac app, not a web page in a box."><span aria-hidden="true"><span class="w"><span style="--i:0">A</span></span> <span class="w"><span style="--i:1">real</span></span> <span class="w"><span style="--i:2">Mac</span></span> <span class="w"><span style="--i:3">app,</span></span> <span class="w"><span style="--i:4">not</span></span> <span class="w"><span style="--i:5">a</span></span> <span class="w"><span style="--i:6">web</span></span> <span class="w"><span style="--i:7">page</span></span> <span class="w"><span style="--i:8">in</span></span> <span class="w"><span style="--i:9">a</span></span> <span class="w"><span style="--i:10">box.</span></span></span></h2>
+      <p class="intro fade">Scroll, and the window below does what the app does.</p>
     </div>
     <div class="tour mac-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -178,9 +179,9 @@
 
   <section class="chapter" id="iphone">
     <div class="chapter-head">
-      <p class="eyebrow reveal">Tour · iPhone</p>
-      <h2 class="reveal">Share → wroopmark, from any app.</h2>
-      <p class="intro reveal">It works on its own; the Mac only makes it faster.</p>
+      <p class="eyebrow track">Tour · iPhone</p>
+      <h2 class="mask" aria-label="Share → wroopmark, from any app."><span aria-hidden="true"><span class="w"><span style="--i:0">Share</span></span> <span class="w"><span style="--i:1">→</span></span> <span class="w"><span style="--i:2">wroopmark,</span></span> <span class="w"><span style="--i:3">from</span></span> <span class="w"><span style="--i:4">any</span></span> <span class="w"><span style="--i:5">app.</span></span></span></h2>
+      <p class="intro fade">It works on its own; the Mac only makes it faster.</p>
     </div>
     <div class="tour phone-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -234,8 +235,8 @@
 
   <section class="chapter" id="search">
     <div class="chapter-head">
-      <p class="eyebrow reveal">Search</p>
-      <h2 class="reveal">Find it again, however you remember it.</h2>
+      <p class="eyebrow track">Search</p>
+      <h2 class="mask" aria-label="Find it again, however you remember it."><span aria-hidden="true"><span class="w"><span style="--i:0">Find</span></span> <span class="w"><span style="--i:1">it</span></span> <span class="w"><span style="--i:2">again,</span></span> <span class="w"><span style="--i:3">however</span></span> <span class="w"><span style="--i:4">you</span></span> <span class="w"><span style="--i:5">remember</span></span> <span class="w"><span style="--i:6">it.</span></span></span></h2>
     </div>
     <div class="tour search-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -287,8 +288,8 @@
 
   <section class="chapter" id="sync">
     <div class="chapter-head">
-      <p class="eyebrow reveal">Sync</p>
-      <h2 class="reveal">Every device, no server.</h2>
+      <p class="eyebrow track">Sync</p>
+      <h2 class="mask" aria-label="Every device, no server."><span aria-hidden="true"><span class="w"><span style="--i:0">Every</span></span> <span class="w"><span style="--i:1">device,</span></span> <span class="w"><span style="--i:2">no</span></span> <span class="w"><span style="--i:3">server.</span></span></span></h2>
     </div>
     <div class="tour sync-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -338,8 +339,9 @@
     </div>
   </section>
 
-  <section class="private" id="private" data-words>
+  <section class="private" id="private" data-words data-progress="0.9">
     <div class="private-in">
+      <img class="vault" src="logo.png" width="512" height="512" alt="">
       <p class="eyebrow">Privacy</p>
       <p class="words"><span>No</span> <span>account.</span> <span>No</span> <span>server.</span> <span>No</span> <span>ads.</span> <span>No</span> <span>tracking.</span> <span>Your</span> <span>archive</span> <span>is</span> <span>a</span> <span>folder</span> <span>on</span> <span>your</span> <span>own</span> <span>disk,</span> <span>and</span> <span>it</span> <span>stays</span> <span>readable</span> <span>even</span> <span>if</span> <span>every</span> <span>site</span> <span>it</span> <span>came</span> <span>from</span> <span>goes</span> <span>away.</span></p>
       <a class="more" href="privacy.html">Read the privacy policy →</a>
@@ -347,11 +349,11 @@
   </section>
 
   <section id="light">
-    <div class="light reveal">
+    <div class="light" data-progress="0.55">
       <div class="orb" data-speed="-90"></div>
-      <p class="eyebrow">Light &amp; fast</p>
-      <h2>Idle means idle.</h2>
-      <p class="intro">No Electron, no background service, no browser engine kept warm. When the window is open and you aren&#x27;t doing anything, wroopmark uses no CPU. Text recognition and on-device AI run in small helper processes only while they have work, and you can pause them in Settings.</p>
+      <p class="eyebrow track">Light &amp; fast</p>
+      <h2 class="mask" aria-label="Idle means idle."><span aria-hidden="true"><span class="w"><span style="--i:0">Idle</span></span> <span class="w"><span style="--i:1">means</span></span> <span class="w"><span style="--i:2">idle.</span></span></span></h2>
+      <p class="intro fade">No Electron, no background service, no browser engine kept warm. When the window is open and you aren&#x27;t doing anything, wroopmark uses no CPU. Text recognition and on-device AI run in small helper processes only while they have work, and you can pause them in Settings.</p>
       <figure class="cpu" data-draw>
         <figcaption><span>CPU over one minute, window open, idle</span><b>0.0%</b></figcaption>
         <svg viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
@@ -359,17 +361,17 @@
           <path class="line" d="M0 112 H600" pathLength="1"/>
         </svg>
       </figure>
-      <div class="table-wrap">
+      <div class="table-wrap rows">
       <table>
         <tr><th>Measured on a Mac</th><th>Result</th></tr>
-        <tr><td>CPU, window open, idle (a 50,000-post library, and a real archive after a day of use)</td><td class="n">0.0%</td></tr>
-        <tr><td>Memory, 50,000 posts, window open</td><td class="n">~110 MB</td></tr>
-        <tr><td>Memory after a day of everyday use, a screen full of pictures</td><td class="n">~280 MB</td></tr>
-        <tr><td>Open the library</td><td class="n">5 ms</td></tr>
-        <tr><td>First page of the newest posts</td><td class="n">0.6 ms</td></tr>
-        <tr><td>Word or phrase search across 50,000 posts</td><td class="n">7–21 ms</td></tr>
-        <tr><td>Filters (<code>platform:x has:video tag:…</code>, <code>from:@…</code>, folders)</td><td class="n">3–32 ms</td></tr>
-        <tr><td>Download / installed app</td><td class="n">15 MB / 29 MB</td></tr>
+        <tr style="--r:0"><td>CPU, window open, idle (a 50,000-post library, and a real archive after a day of use)</td><td class="n">0.0%</td></tr>
+        <tr style="--r:1"><td>Memory, 50,000 posts, window open</td><td class="n">~110 MB</td></tr>
+        <tr style="--r:2"><td>Memory after a day of everyday use, a screen full of pictures</td><td class="n">~280 MB</td></tr>
+        <tr style="--r:3"><td>Open the library</td><td class="n">5 ms</td></tr>
+        <tr style="--r:4"><td>First page of the newest posts</td><td class="n">0.6 ms</td></tr>
+        <tr style="--r:5"><td>Word or phrase search across 50,000 posts</td><td class="n">7–21 ms</td></tr>
+        <tr style="--r:6"><td>Filters (<code>platform:x has:video tag:…</code>, <code>from:@…</code>, folders)</td><td class="n">3–32 ms</td></tr>
+        <tr style="--r:7"><td>Download / installed app</td><td class="n">15 MB / 29 MB</td></tr>
       </table>
       </div>
       <p class="fine">Mac with M4 Pro, macOS 27.2, wroopmark 1.7. Memory is the system's “footprint” figure; CPU is from <code>top</code> over a minute. After a big import the library is indexed once in the background (text recognition, search by meaning), which uses CPU until it is done. Timings come from the repository's own test, <code>WM_PERF_N=50000 cargo test --release --test perf -- --ignored</code>, so you can run it yourself.</p>
@@ -379,56 +381,62 @@
   <section class="ipad">
     <div class="split">
       <div class="text">
-        <p class="eyebrow reveal">iPad</p>
-        <h2 class="reveal">Three columns on iPad.</h2>
-        <p class="intro reveal">Scopes, the list and the post side by side, with the same reader, feed and Triage.</p>
+        <p class="eyebrow track">iPad</p>
+        <h2 class="mask" aria-label="Three columns on iPad."><span aria-hidden="true"><span class="w"><span style="--i:0">Three</span></span> <span class="w"><span style="--i:1">columns</span></span> <span class="w"><span style="--i:2">on</span></span> <span class="w"><span style="--i:3">iPad.</span></span></span></h2>
+        <p class="intro fade">Scopes, the list and the post side by side, with the same reader, feed and Triage.</p>
       </div>
-      <div class="ipad-frame reveal-fade" data-speed="-60"><img src="images/en-ipad-1.jpg" width="1600" height="1200" alt="wroopmark on iPad in three columns" loading="lazy" decoding="async"></div>
+      <div class="ipad-frame" data-progress="0.95"><img src="images/en-ipad-1.jpg" width="1600" height="1200" alt="wroopmark on iPad in three columns" loading="lazy" decoding="async"></div>
     </div>
   </section>
 
   <section>
-    <p class="eyebrow reveal">Everything else</p>
-    <h2 class="reveal">Made to keep, not to scroll past.</h2>
+    <p class="eyebrow track">Everything else</p>
+    <h2 class="mask" aria-label="Made to keep, not to scroll past."><span aria-hidden="true"><span class="w"><span style="--i:0">Made</span></span> <span class="w"><span style="--i:1">to</span></span> <span class="w"><span style="--i:2">keep,</span></span> <span class="w"><span style="--i:3">not</span></span> <span class="w"><span style="--i:4">to</span></span> <span class="w"><span style="--i:5">scroll</span></span> <span class="w"><span style="--i:6">past.</span></span></span></h2>
     <div class="grid">
-      <div class="card reveal" style="--d:0"><h3>Watch your saves</h3><p>Saved videos and posts full screen, one after another, with picture-in-picture, AirPlay and playback speed.</p></div>
-      <div class="card reveal" style="--d:1"><h3>Bring it all in</h3><p>Data downloads from TikTok, Instagram, X, Threads and Reddit, browser bookmarks, Pocket and Raindrop CSV.</p></div>
-      <div class="card reveal" style="--d:2"><h3>Browser extension</h3><p>Chrome, Brave, Arc, Edge, Vivaldi and Safari: bookmarks and saved posts flow in as you browse.</p></div>
-      <div class="card reveal" style="--d:3"><h3>Keep it tidy</h3><p>Rules that file new saves, duplicates, a link pool with broken-link checks.</p></div>
-      <div class="card reveal" style="--d:4"><h3>Take it with you</h3><p>Markdown (Obsidian-ready, with pictures), CSV, JSON, or one HTML page you can send to anyone.</p></div>
-      <div class="card reveal" style="--d:5"><h3>For AI agents</h3><p>A local MCP server lets agents such as Claude search and read your archive, on your machine.</p></div>
+      <div class="card flip" style="--d:0; --c:0"><h3>Watch your saves</h3><p>Saved videos and posts full screen, one after another, with picture-in-picture, AirPlay and playback speed.</p></div>
+      <div class="card flip" style="--d:1; --c:1"><h3>Bring it all in</h3><p>Data downloads from TikTok, Instagram, X, Threads and Reddit, browser bookmarks, Pocket and Raindrop CSV.</p></div>
+      <div class="card flip" style="--d:2; --c:2"><h3>Browser extension</h3><p>Chrome, Brave, Arc, Edge, Vivaldi and Safari: bookmarks and saved posts flow in as you browse.</p></div>
+      <div class="card flip" style="--d:3; --c:0"><h3>Keep it tidy</h3><p>Rules that file new saves, duplicates, a link pool with broken-link checks.</p></div>
+      <div class="card flip" style="--d:4; --c:1"><h3>Take it with you</h3><p>Markdown (Obsidian-ready, with pictures), CSV, JSON, or one HTML page you can send to anyone.</p></div>
+      <div class="card flip" style="--d:5; --c:2"><h3>For AI agents</h3><p>A local MCP server lets agents such as Claude search and read your archive, on your machine.</p></div>
     </div>
   </section>
 
   <section>
-    <p class="eyebrow reveal">How it compares</p>
-    <h2 class="reveal">It keeps the post itself, not just the link.</h2>
-    <div class="table-wrap reveal">
+    <p class="eyebrow track">How it compares</p>
+    <h2 class="mask" aria-label="It keeps the post itself, not just the link."><span aria-hidden="true"><span class="w"><span style="--i:0">It</span></span> <span class="w"><span style="--i:1">keeps</span></span> <span class="w"><span style="--i:2">the</span></span> <span class="w"><span style="--i:3">post</span></span> <span class="w"><span style="--i:4">itself,</span></span> <span class="w"><span style="--i:5">not</span></span> <span class="w"><span style="--i:6">just</span></span> <span class="w"><span style="--i:7">the</span></span> <span class="w"><span style="--i:8">link.</span></span></span></h2>
+    <div class="table-wrap rows">
     <table class="compare">
       <tr><th></th><th>wroopmark</th><th>Read-later apps</th><th>Bookmark managers</th><th>Self-hosted archivers</th></tr>
-      <tr><td>Keeps the post&#x27;s pictures and videos</td><td>✅</td><td>—</td><td>—</td><td>some</td></tr>
-      <tr><td>Social saves (X, TikTok, Instagram, Reddit, Bluesky, Threads)</td><td>✅</td><td>—</td><td>links only</td><td>some</td></tr>
-      <tr><td>Offline, survives deletion</td><td>✅</td><td>articles</td><td>—</td><td>✅</td></tr>
-      <tr><td>Search inside pictures and video speech</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
-      <tr><td>On-device AI</td><td>✅</td><td>cloud</td><td>cloud</td><td>external API</td></tr>
-      <tr><td>No account, no server</td><td>✅</td><td>—</td><td>—</td><td>needs a server</td></tr>
-      <tr><td>Native Mac, iPhone and iPad apps</td><td>✅</td><td>✅</td><td>✅</td><td>web</td></tr>
+      <tr style="--r:0"><td>Keeps the post&#x27;s pictures and videos</td><td><span class="ok">✅</span></td><td>—</td><td>—</td><td>some</td></tr>
+      <tr style="--r:1"><td>Social saves (X, TikTok, Instagram, Reddit, Bluesky, Threads)</td><td><span class="ok">✅</span></td><td>—</td><td>links only</td><td>some</td></tr>
+      <tr style="--r:2"><td>Offline, survives deletion</td><td><span class="ok">✅</span></td><td>articles</td><td>—</td><td><span class="ok">✅</span></td></tr>
+      <tr style="--r:3"><td>Search inside pictures and video speech</td><td><span class="ok">✅</span></td><td>—</td><td>—</td><td>—</td></tr>
+      <tr style="--r:4"><td>On-device AI</td><td><span class="ok">✅</span></td><td>cloud</td><td>cloud</td><td>external API</td></tr>
+      <tr style="--r:5"><td>No account, no server</td><td><span class="ok">✅</span></td><td>—</td><td>—</td><td>needs a server</td></tr>
+      <tr style="--r:6"><td>Native Mac, iPhone and iPad apps</td><td><span class="ok">✅</span></td><td><span class="ok">✅</span></td><td><span class="ok">✅</span></td><td>web</td></tr>
     </table>
     </div>
   </section>
 
-  <section id="get">
-    <p class="eyebrow reveal">Get it</p>
-    <h2 class="reveal">Free, private, yours.</h2>
+  <section id="get" class="finale">
+    <div class="finale-icon" data-progress="0.85"><span class="ring" aria-hidden="true"></span><img src="logo.png" width="512" height="512" alt="wroopmark"></div>
+    <p class="eyebrow track">Get it</p>
+    <h2 class="mask" aria-label="Free, private, yours."><span aria-hidden="true"><span class="w"><span style="--i:0">Free,</span></span> <span class="w"><span style="--i:1">private,</span></span> <span class="w"><span style="--i:2">yours.</span></span></span></h2>
+    <div class="cta solid">
+      <a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a>
+      <a class="btn ghost" href="https://github.com/f0rknturkoglu/wroopmark">GitHub</a>
+    </div>
     <div class="get">
-      <div class="card reveal" style="--d:0"><h3>Mac</h3><p>macOS 26 or later. Signed and notarized by Apple; it keeps itself up to date and checks every update&#x27;s signature first.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a></div>
-      <div class="card reveal" style="--d:1"><h3>iPhone and iPad</h3><p>Coming to the App Store. The app walks you through the Share menu, the Safari extension and iCloud backup on first launch.</p></div>
-      <div class="card reveal" style="--d:2"><h3>Open source</h3><p>MIT licensed. Read the code, build it yourself, or share an idea.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark">Source on GitHub</a></div>
+      <div class="card pop" style="--d:0"><h3>Mac</h3><p>macOS 26 or later. Signed and notarized by Apple; it keeps itself up to date and checks every update&#x27;s signature first.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a></div>
+      <div class="card pop" style="--d:1"><h3>iPhone and iPad</h3><p>Coming to the App Store. The app walks you through the Share menu, the Safari extension and iCloud backup on first launch.</p></div>
+      <div class="card pop" style="--d:2"><h3>Open source</h3><p>MIT licensed. Read the code, build it yourself, or share an idea.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark">Source on GitHub</a></div>
     </div>
   </section>
 </main>
 
 <footer>
+  <a class="foot-brand" href="#top"><img src="logo.png" width="512" height="512" alt="">wroopmark</a>
   © 2026 Furkan Türkoğlu · MIT License · <a href="privacy.html">Privacy</a> · <a href="support.html">Support</a> · <a href="tr.html" hreflang="tr">Türkçe</a><br>
   Screenshots show Wikipedia articles (CC BY-SA 4.0) in a demo library.
 </footer>

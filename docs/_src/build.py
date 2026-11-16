@@ -288,6 +288,19 @@ def dots(n):
     return '<div class="dots" aria-hidden="true">' + "".join(f'<i data-i="{i}"></i>' for i in range(n)) + "</div>"
 
 
+def mask(text):
+    """A heading whose words rise one by one from behind a line (CSS .mask)."""
+    return "".join(f'<span class="w"><span style="--i:{i}">{esc(w)}</span></span> ' for i, w in enumerate(text.split(" "))).strip()
+
+
+def h2(text):
+    return f'<h2 class="mask" aria-label="{esc(text)}"><span aria-hidden="true">{mask(text)}</span></h2>'
+
+
+def eyebrow(text):
+    return f'<p class="eyebrow track">{esc(text)}</p>'
+
+
 def page(lang):
     t = T[lang]
     L = lang
@@ -306,7 +319,7 @@ def page(lang):
     }
     plat = "".join(f"<span>{esc(p)}</span>" for p in t["platforms"])
     stats = "\n".join(
-        f'  <div class="stat reveal" style="--d:{i}"><b>{esc(pre or "")}<span data-count="{v}">{v}</span>{esc(unit)}</b><span>{esc(txt)}</span></div>'
+        f'  <div class="stat blur" style="--d:{i}"><b>{esc(pre or "")}<span data-count="{v}">{v}</span>{esc(unit)}</b><span>{esc(txt)}</span></div>'
         for i, (v, unit, txt, pre) in enumerate(t["stats"]))
 
     mac_layers = "\n".join(
@@ -335,13 +348,15 @@ def page(lang):
     sync_steps = steps_html(t["sync_steps"], "y")
     sl = t["sync_labels"]
     words = " ".join(f"<span>{esc(w)}</span>" for w in t["private_text"].split(" "))
-    table = "\n".join(f'        <tr><td>{a}</td><td class="n">{esc(b)}</td></tr>' for a, b in t["table"])
-    cards = "\n".join(f'      <div class="card reveal" style="--d:{i}"><h3>{esc(h)}</h3><p>{esc(p)}</p></div>'
+    table = "\n".join(f'        <tr style="--r:{i}"><td>{a}</td><td class="n">{esc(b)}</td></tr>' for i, (a, b) in enumerate(t["table"]))
+    cards = "\n".join(f'      <div class="card flip" style="--d:{i}; --c:{i % 3}"><h3>{esc(h)}</h3><p>{esc(p)}</p></div>'
                       for i, (h, p) in enumerate(t["cards"]))
     cmp_head = "".join(f"<th>{esc(h)}</th>" for h in t["cmp_head"])
-    cmp_rows = "\n".join("      <tr>" + "".join(f"<td>{esc(c)}</td>" for c in r) + "</tr>" for r in t["cmp_rows"])
+    cmp_rows = "\n".join(f'      <tr style="--r:{i}">' + "".join(
+        ('<td><span class="ok">✅</span></td>' if c == "✅" else f"<td>{esc(c)}</td>") for c in r) + "</tr>"
+        for i, r in enumerate(t["cmp_rows"]))
     get = "\n".join(
-        f'      <div class="card reveal" style="--d:{i}"><h3>{esc(h)}</h3><p>{esc(p)}</p>'
+        f'      <div class="card pop" style="--d:{i}"><h3>{esc(h)}</h3><p>{esc(p)}</p>'
         + (f'<a class="btn" href="{u}">{esc(b)}</a>' if b else "") + "</div>"
         for i, (h, p, b, u) in enumerate(t["get"]))
 
@@ -377,7 +392,7 @@ def page(lang):
 {json.dumps(ld, ensure_ascii=False, indent=2)}
 </script>
 </head>
-<body>
+<body id="top">
 <div class="progress" aria-hidden="true"></div>
 <div class="bar"><div class="bar-in">
   <a class="brand" href="{"./" if lang == "en" else "tr.html"}"><img src="logo.png" alt="">wroopmark</a>
@@ -393,6 +408,7 @@ def page(lang):
   <div class="orb b" data-speed="-70"></div>
   <div class="orb c" data-speed="-220"></div>
   <div class="hero-copy">
+    <div class="app-icon"><img src="logo.png" width="512" height="512" alt="wroopmark"></div>
     <h1>{esc(t["h1"])}</h1>
     <p class="lead">{esc(t["lead"])}</p>
     <div class="cta">
@@ -419,14 +435,14 @@ def page(lang):
 
 <main>
   <section class="intro-block">
-    <p class="intro big reveal">{t["intro"]}</p>
+    <p class="intro big sweep" data-progress="0.75">{t["intro"]}</p>
   </section>
 
   <section class="chapter" id="mac">
     <div class="chapter-head">
-      <p class="eyebrow reveal">{esc(t["mac_eyebrow"])}</p>
-      <h2 class="reveal">{esc(t["mac_h2"])}</h2>
-      <p class="intro reveal">{esc(t["mac_intro"])}</p>
+      {eyebrow(t["mac_eyebrow"])}
+      {h2(t["mac_h2"])}
+      <p class="intro fade">{esc(t["mac_intro"])}</p>
     </div>
     <div class="tour mac-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -446,9 +462,9 @@ def page(lang):
 
   <section class="chapter" id="iphone">
     <div class="chapter-head">
-      <p class="eyebrow reveal">{esc(t["phone_eyebrow"])}</p>
-      <h2 class="reveal">{esc(t["phone_h2"])}</h2>
-      <p class="intro reveal">{esc(t["phone_intro"])}</p>
+      {eyebrow(t["phone_eyebrow"])}
+      {h2(t["phone_h2"])}
+      <p class="intro fade">{esc(t["phone_intro"])}</p>
     </div>
     <div class="tour phone-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -475,8 +491,8 @@ def page(lang):
 
   <section class="chapter" id="search">
     <div class="chapter-head">
-      <p class="eyebrow reveal">{esc(t["search_eyebrow"])}</p>
-      <h2 class="reveal">{esc(t["search_h2"])}</h2>
+      {eyebrow(t["search_eyebrow"])}
+      {h2(t["search_h2"])}
     </div>
     <div class="tour search-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -494,8 +510,8 @@ def page(lang):
 
   <section class="chapter" id="sync">
     <div class="chapter-head">
-      <p class="eyebrow reveal">{esc(t["sync_eyebrow"])}</p>
-      <h2 class="reveal">{esc(t["sync_h2"])}</h2>
+      {eyebrow(t["sync_eyebrow"])}
+      {h2(t["sync_h2"])}
     </div>
     <div class="tour sync-tour" data-tour>
       <div class="stage-col"><div class="sticky">
@@ -521,8 +537,9 @@ def page(lang):
     </div>
   </section>
 
-  <section class="private" id="private" data-words>
+  <section class="private" id="private" data-words data-progress="0.9">
     <div class="private-in">
+      <img class="vault" src="logo.png" width="512" height="512" alt="">
       <p class="eyebrow">{esc(t["private_eyebrow"])}</p>
       <p class="words">{words}</p>
       <a class="more" href="{t["privacy_href"]}">{esc(t["private_link"])} →</a>
@@ -530,11 +547,11 @@ def page(lang):
   </section>
 
   <section id="light">
-    <div class="light reveal">
+    <div class="light" data-progress="0.55">
       <div class="orb" data-speed="-90"></div>
-      <p class="eyebrow">{esc(t["light_eyebrow"])}</p>
-      <h2>{esc(t["light_h2"])}</h2>
-      <p class="intro">{esc(t["light_intro"])}</p>
+      {eyebrow(t["light_eyebrow"])}
+      {h2(t["light_h2"])}
+      <p class="intro fade">{esc(t["light_intro"])}</p>
       <figure class="cpu" data-draw>
         <figcaption><span>{esc(t["cpu_label"])}</span><b>{esc(t["cpu_value"])}</b></figcaption>
         <svg viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
@@ -542,7 +559,7 @@ def page(lang):
           <path class="line" d="M0 112 H600" pathLength="1"/>
         </svg>
       </figure>
-      <div class="table-wrap">
+      <div class="table-wrap rows">
       <table>
         <tr><th>{esc(t["table_head"][0])}</th><th>{esc(t["table_head"][1])}</th></tr>
 {table}
@@ -555,26 +572,26 @@ def page(lang):
   <section class="ipad">
     <div class="split">
       <div class="text">
-        <p class="eyebrow reveal">{esc(t["ipad_eyebrow"])}</p>
-        <h2 class="reveal">{esc(t["ipad_h2"])}</h2>
-        <p class="intro reveal">{esc(t["ipad_text"])}</p>
+        {eyebrow(t["ipad_eyebrow"])}
+        {h2(t["ipad_h2"])}
+        <p class="intro fade">{esc(t["ipad_text"])}</p>
       </div>
-      <div class="ipad-frame reveal-fade" data-speed="-60"><img src="images/{L}-ipad-1.jpg" width="1600" height="1200" alt="{esc(t["ipad_alt"])}" loading="lazy" decoding="async"></div>
+      <div class="ipad-frame" data-progress="0.95"><img src="images/{L}-ipad-1.jpg" width="1600" height="1200" alt="{esc(t["ipad_alt"])}" loading="lazy" decoding="async"></div>
     </div>
   </section>
 
   <section>
-    <p class="eyebrow reveal">{esc(t["more_eyebrow"])}</p>
-    <h2 class="reveal">{esc(t["more_h2"])}</h2>
+    {eyebrow(t["more_eyebrow"])}
+    {h2(t["more_h2"])}
     <div class="grid">
 {cards}
     </div>
   </section>
 
   <section>
-    <p class="eyebrow reveal">{esc(t["cmp_eyebrow"])}</p>
-    <h2 class="reveal">{esc(t["cmp_h2"])}</h2>
-    <div class="table-wrap reveal">
+    {eyebrow(t["cmp_eyebrow"])}
+    {h2(t["cmp_h2"])}
+    <div class="table-wrap rows">
     <table class="compare">
       <tr>{cmp_head}</tr>
 {cmp_rows}
@@ -582,9 +599,14 @@ def page(lang):
     </div>
   </section>
 
-  <section id="get">
-    <p class="eyebrow reveal">{esc(t["get_eyebrow"])}</p>
-    <h2 class="reveal">{esc(t["get_h2"])}</h2>
+  <section id="get" class="finale">
+    <div class="finale-icon" data-progress="0.85"><span class="ring" aria-hidden="true"></span><img src="logo.png" width="512" height="512" alt="wroopmark"></div>
+    {eyebrow(t["get_eyebrow"])}
+    {h2(t["get_h2"])}
+    <div class="cta solid">
+      <a class="btn" href="{DOWNLOAD}">{esc(t["download_mac"])}</a>
+      <a class="btn ghost" href="{REPO}">GitHub</a>
+    </div>
     <div class="get">
 {get}
     </div>
@@ -592,6 +614,7 @@ def page(lang):
 </main>
 
 <footer>
+  <a class="foot-brand" href="#top"><img src="logo.png" width="512" height="512" alt="">wroopmark</a>
   {esc(t["footer"])} · <a href="{t["privacy_href"]}">{esc(t["privacy"])}</a> · <a href="{t["support_href"]}">{esc(t["support"])}</a> · <a href="{t["other_href"]}" hreflang="{t["other"]}">{esc(t["other_name"])}</a><br>
   {esc(t["credit"])}
 </footer>

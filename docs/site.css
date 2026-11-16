@@ -191,17 +191,21 @@ section { padding: 56px 0 8px; }
 @keyframes run1 { from { transform: translateX(0); } to { transform: translateX(90px); } }
 @keyframes run2 { from { transform: translateX(0); } to { transform: translateX(100px); } }
 
-/* Privacy: words light up as you scroll */
-.private { min-height: 210vh; padding: 0; }
-.private-in { position: sticky; top: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; max-width: 1000px; }
+/* Privacy: a dark circle opens from the middle (the vault), then the words
+   light up one by one. --vp is 0 → 1 as the section scrolls in. */
+.private { position: relative; min-height: 230vh; padding: 0; --vp: 0; }
+.private::before { content: ""; position: absolute; z-index: 0; top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%); background: radial-gradient(900px 600px at 50% 30%, #2A1A55, #0B0912 70%); clip-path: circle(calc(var(--vp) * var(--vp) * 150vmax) at 50% 50vh); }
+.private-in { position: sticky; z-index: 1; top: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; max-width: 1000px; color: #fff; }
+.private .vault { width: 76px; height: 76px; margin: 0 0 22px -6px; filter: drop-shadow(0 10px 30px rgba(140, 97, 240, 0.6)); opacity: var(--vp); transform: scale(calc(0.6 + var(--vp) * 0.4)) rotate(calc((1 - var(--vp)) * -25deg)); }
+.private .eyebrow { color: #B9A0FF; }
 .words { font-size: clamp(30px, 5vw, 60px); font-weight: 750; letter-spacing: -0.03em; line-height: 1.12; margin: 0 0 24px; }
-.words span { color: color-mix(in srgb, var(--ink) 16%, transparent); transition: color 0.25s ease; }
-.words span.lit { color: var(--ink); }
-.words span.lit:nth-child(-n+8) { color: var(--accent-ink); }
-.private .more { font-weight: 600; }
+.words span { color: rgba(255, 255, 255, 0.16); transition: color 0.25s ease, text-shadow 0.4s ease; }
+.words span.lit { color: #fff; }
+.words span.lit:nth-child(-n+8) { color: #C9B5FF; text-shadow: 0 0 30px rgba(160, 120, 255, 0.45); }
+.private .more { font-weight: 600; color: #C9B5FF; }
 
 /* Light and fast */
-.light { position: relative; overflow: hidden; background: var(--tint); border: 1px solid var(--line); border-radius: 28px; padding: 36px; }
+.light { position: relative; overflow: hidden; background: var(--tint); border: 1px solid var(--line); border-radius: 28px; padding: 36px; --vp: 1; clip-path: inset(calc((1 - var(--vp)) * 7%) calc((1 - var(--vp)) * 9%) round 28px); }
 .light > :not(.orb) { position: relative; }
 .light .orb { width: 420px; height: 420px; right: -140px; top: -160px; background: var(--accent); opacity: 0.18; filter: blur(80px); }
 @media (max-width: 640px) { .light { padding: 20px; } }
@@ -224,7 +228,8 @@ td.n { white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums
 /* iPad, cards, get */
 .split { display: grid; grid-template-columns: 1fr 1.5fr; gap: 48px; align-items: center; }
 @media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
-.ipad-frame { background: #0d0b12; border-radius: 4.5%/6%; padding: 2.2%; box-shadow: 0 0 0 1.5px #3a3644, var(--shadow); }
+.ipad { perspective: 1600px; }
+.ipad-frame { background: #0d0b12; border-radius: 4.5%/6%; padding: 2.2%; box-shadow: 0 0 0 1.5px #3a3644, var(--shadow); --vp: 1; transform-origin: 50% 100%; transform: rotateX(calc((1 - var(--vp)) * 32deg)) rotateZ(calc((1 - var(--vp)) * -4deg)) scale(calc(0.8 + var(--vp) * 0.2)); opacity: calc(0.25 + var(--vp) * 0.75); will-change: transform; }
 .ipad-frame img { border-radius: 2.6%/3.5%; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; transition: transform 0.4s var(--ease), box-shadow 0.4s; }
@@ -232,12 +237,66 @@ td.n { white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums
 .card p { margin: 0; color: var(--muted); }
 .get { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .get .card .btn { margin-top: 14px; background: var(--accent); color: #fff; }
-footer { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 16px 48px; border-top: 1px solid var(--line); }
+footer { text-align: center; color: var(--muted); font-size: 14px; padding: 36px 16px 48px; border-top: 1px solid var(--line); }
+.foot-brand { display: flex; width: fit-content; align-items: center; gap: 10px; font-size: 22px; font-weight: 750; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; margin: 0 auto 14px; }
+.foot-brand img { width: 40px; height: 40px; transition: transform 0.6s var(--ease); }
+.foot-brand:hover img { transform: rotate(-10deg) scale(1.08); }
 
-/* Scroll effects (site.js): parallax layers and reveals */
+/* Hero icon: floats, catches the light once, and is clipped to its own shape */
+.app-icon { position: relative; width: clamp(84px, 9vw, 116px); margin: 0 auto 18px; animation: float 6s ease-in-out infinite; filter: drop-shadow(0 18px 30px rgba(20, 0, 60, 0.45)); }
+.app-icon img { width: 100%; height: auto; }
+.app-icon::after { content: ""; position: absolute; inset: 0; -webkit-mask: url(logo.png) center / contain no-repeat; mask: url(logo.png) center / contain no-repeat; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.75) 48%, transparent 62%) -160% 0 / 250% 100% no-repeat; animation: shine 3.2s 0.6s var(--ease) both; }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-8px) rotate(-2deg); } }
+@keyframes shine { to { background-position: 160% 0; } }
+
+/* Finale: the icon spins up into place inside a turning ring of light */
+.finale { text-align: center; padding-top: 96px; }
+.finale .eyebrow, .finale h2 { margin-left: auto; margin-right: auto; }
+.finale-icon { position: relative; width: 156px; height: 156px; margin: 0 auto 26px; --vp: 1; transform: scale(calc(0.5 + var(--vp) * 0.5)) rotate(calc((1 - var(--vp)) * -40deg)); opacity: calc(var(--vp) * 1.4); }
+.finale-icon img { position: relative; width: 100%; height: 100%; filter: drop-shadow(0 20px 40px rgba(90, 47, 208, 0.45)); }
+.finale-icon .ring { position: absolute; inset: -34px; border-radius: 50%; background: conic-gradient(from 0deg, transparent, #C77DFF, #5B8CFF, #FF7AC6, transparent 70%); filter: blur(24px); opacity: 0.55; animation: spin 7s linear infinite; }
+@keyframes spin { to { transform: rotate(1turn); } }
+.cta.solid { margin: 6px 0 40px; }
+.cta.solid .btn { background: var(--accent); color: #fff; }
+.cta.solid .btn.ghost { background: transparent; color: var(--accent-ink); border: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.finale .get { text-align: left; }
+
+/* Scroll effects (site.js). Each kind of thing arrives its own way, once. */
+/* --vp (0 → 1) follows how far an element has scrolled in; site.js sets it. */
+.js [data-progress] { --vp: 0; }
 [data-speed] { transform: translate3d(0, var(--py, 0px), 0); will-change: transform; }
-.js .reveal { opacity: 0; transform: translate3d(0, 34px, 0); transition: opacity 0.8s ease, transform 1s var(--ease); transition-delay: calc(var(--d, 0) * 90ms); }
-.js .reveal.in { opacity: 1; transform: none; }
+/* headings: words rise from behind a line */
+.mask .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 0.04em 0.12em; margin: 0 -0.04em -0.12em; }
+.js .mask .w > span { display: inline-block; transform: translate3d(0, 110%, 0) rotate(4deg); transition: transform 0.9s var(--ease); transition-delay: calc(var(--i) * 55ms); }
+.js .mask.in .w > span { transform: none; }
+/* eyebrows: letters close in */
+.js .track { opacity: 0; letter-spacing: 0.5em; transition: opacity 0.9s ease, letter-spacing 1.2s var(--ease); }
+.js .track.in { opacity: 1; letter-spacing: 0.08em; }
+/* supporting text: a quiet fade after the heading */
+.js .fade { opacity: 0; transition: opacity 1.1s ease 0.25s; }
+.js .fade.in { opacity: 1; }
+/* numbers: out of focus into focus */
+.js .blur { opacity: 0; filter: blur(14px); transform: scale(0.94); transition: opacity 0.8s ease, filter 0.9s ease, transform 1s var(--ease); transition-delay: calc(var(--d, 0) * 110ms); }
+.js .blur.in { opacity: 1; filter: none; transform: none; }
+/* the opening paragraph darkens line by line as you read it */
+.sweep { --vp: 1; background: linear-gradient(180deg, var(--ink) calc(var(--vp) * 120% - 20%), color-mix(in srgb, var(--muted) 45%, transparent) calc(var(--vp) * 120%)); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+.sweep b { color: transparent !important; }
+/* feature cards: tip forward in 3D, column by column */
+.grid { perspective: 1400px; }
+.js .flip { opacity: 0; transform: rotateX(-34deg) translateY(46px); transform-origin: 50% 0; transition: opacity 0.7s ease, transform 1.1s var(--ease), box-shadow 0.4s; transition-delay: calc(var(--c, 0) * 90ms + var(--d, 0) * 40ms); }
+.js .flip.in { opacity: 1; transform: none; }
+.js .flip.in:hover { transform: translateY(-3px); transition-delay: 0s; }
+/* tables: rows slide in, ticks pop */
+.js .rows tr { opacity: 0; transform: translateX(-18px); transition: opacity 0.5s ease, transform 0.7s var(--ease); transition-delay: calc(var(--r, 0) * 70ms); }
+.js .rows.in tr { opacity: 1; transform: none; }
+.ok { display: inline-block; }
+.js .rows.in .ok { animation: okpop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: calc(var(--r, 0) * 70ms + 250ms); }
+@keyframes okpop { from { transform: scale(0); } to { transform: scale(1); } }
+/* last cards: a springy pop */
+.js .pop { opacity: 0; transform: translateY(26px) scale(0.88); transition: opacity 0.6s ease, transform 0.9s cubic-bezier(0.34, 1.56, 0.64, 1); transition-delay: calc(var(--d, 0) * 110ms); }
+.js .pop.in { opacity: 1; transform: none; }
+.js .pop.in:hover { transform: translateY(-3px); transition-delay: 0s; }
+/* line drawings */
 .js .reveal-fade { opacity: 0; transition: opacity 1.1s ease; }
 .js .reveal-fade.in { opacity: 1; }
 
@@ -260,7 +319,10 @@ footer { text-align: center; color: var(--muted); font-size: 14px; padding: 24px
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .js .reveal, .js .reveal-fade { opacity: 1; transform: none; transition: none; }
+  .js .reveal, .js .reveal-fade, .js .mask .w > span, .js .track, .js .fade, .js .blur, .js .flip, .js .rows tr, .js .pop { opacity: 1; transform: none; filter: none; letter-spacing: 0.08em; transition: none; }
+  .js .mask .w > span { letter-spacing: normal; }
+  .js [data-progress] { --vp: 1 !important; }
+  .app-icon, .app-icon::after, .finale-icon .ring, .js .rows.in .ok { animation: none !important; }
   .hero-copy, .stage .mac, .stage .phone, [data-speed], .track { transform: none !important; opacity: 1 !important; }
   .zoomer, .layer, .float, .sheet, .island, .step, .wire, .cpu .line { transition: none !important; }
   .dot, .hint i, .app.hot img, .caret { animation: none !important; }
