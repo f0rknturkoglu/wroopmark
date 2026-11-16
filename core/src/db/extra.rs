@@ -636,10 +636,17 @@ impl Store {
     /// have not come down: (id, url, article).
     pub fn articles_to_fill(&self, limit: i64) -> Result<Vec<(String, String, Option<String>)>> {
         let mut stmt = self.conn.prepare_cached(
-            "SELECT id, url, article FROM items
-             WHERE (article IS NULL AND platform IN ('web', 'github', 'hackernews', 'arxiv') AND stub = 0)
-                OR (article IS NOT NULL AND article != '' AND article_ready = 0)
-             ORDER BY saved_at DESC LIMIT ?1",
+            // Two indexed halves (see MIGRATE_23) rather than one OR that
+            // reads every post and compares every stored copy.
+            "SELECT id, url, article FROM (
+                SELECT * FROM (SELECT id, url, NULL AS article, saved_at FROM items INDEXED BY items_article_todo
+                 WHERE article IS NULL AND stub = 0 AND platform IN ('web', 'github', 'hackernews', 'arxiv')
+                 ORDER BY saved_at DESC LIMIT ?1)
+                UNION ALL
+                SELECT * FROM (SELECT id, url, article, saved_at FROM items INDEXED BY items_article_pics
+                 WHERE article_ready = 0 AND article IS NOT NULL AND article != ''
+                 ORDER BY saved_at DESC LIMIT ?1)
+             ) ORDER BY saved_at DESC LIMIT ?1",
         )?;
         let rows = stmt.query_map([limit], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
         Ok(rows)

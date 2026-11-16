@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 22;
+const SCHEMA_VERSION: i64 = 23;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -327,6 +327,13 @@ END;";
 /// v21 → v22 (v1.2): 64-bit perceptual image fingerprint (`dHash`) for finding
 /// visually similar images and duplicate photos.
 const MIGRATE_22: &str = "ALTER TABLE items ADD COLUMN imghash INTEGER;";
+
+/// v22 → v23: the background pass looks for pages without a readable copy
+/// (and copies whose pictures are not in yet) several times a minute; these
+/// keep it to a few rows instead of reading every post (and its copy).
+const MIGRATE_23: &str = "CREATE INDEX IF NOT EXISTS items_article_todo ON items(saved_at)
+  WHERE article IS NULL AND stub = 0 AND platform IN ('web', 'github', 'hackernews', 'arxiv');
+CREATE INDEX IF NOT EXISTS items_article_pics ON items(saved_at) WHERE article_ready = 0 AND article IS NOT NULL;";
 
 /// v17 → v18: files another device has not uploaded yet are waited for too
 /// (`since`: when noted). The logs are read once more, so a phone that saw
@@ -1266,7 +1273,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} {MIGRATE_20} {MIGRATE_21} {MIGRATE_22} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} {MIGRATE_20} {MIGRATE_21} {MIGRATE_22} {MIGRATE_23} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -1334,6 +1341,9 @@ impl Store {
         }
         if (1..22).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_22} PRAGMA user_version = 22; COMMIT;"))?;
+        }
+        if (1..23).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_23} PRAGMA user_version = 23; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -2568,6 +2578,7 @@ mod tests {
                      ALTER TABLE links DROP COLUMN fetch_failures; ALTER TABLE links DROP COLUMN fetch_tried_at;
                      ALTER TABLE links DROP COLUMN status; ALTER TABLE links DROP COLUMN checked_at; ALTER TABLE links DROP COLUMN dead;
                      DROP INDEX IF EXISTS items_folder; ALTER TABLE items DROP COLUMN folder_id; DROP TABLE IF EXISTS folders;
+                     DROP INDEX IF EXISTS items_article_todo; DROP INDEX IF EXISTS items_article_pics;
                      DROP INDEX IF EXISTS items_stub; ALTER TABLE items DROP COLUMN summary; ALTER TABLE items DROP COLUMN ai_tags;
                      ALTER TABLE items DROP COLUMN stub; ALTER TABLE items DROP COLUMN stub_tries; DROP TABLE IF EXISTS rules; DROP TABLE IF EXISTS vectors;
                      ALTER TABLE items DROP COLUMN thread; ALTER TABLE items DROP COLUMN snapshot; ALTER TABLE items DROP COLUMN snapshot_tries;

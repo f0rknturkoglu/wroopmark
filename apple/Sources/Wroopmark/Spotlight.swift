@@ -18,12 +18,15 @@ enum Spotlight {
 
     private struct Page: Decodable, Sendable { let items: [Item] }
 
-    /// Indexes the whole library, at most every six hours unless forced.
+    /// Indexes the whole library, at most every three days unless forced:
+    /// new saves go in as they come (`indexRecent`) and deletions come out
+    /// at once, so a full pass only catches edits of old posts. At 50 000
+    /// posts a pass every six hours was a lot of work for a phone.
     /// Ensures the library can open before clearing the index so DB failures
     /// or cancellations do not wipe existing Spotlight entries.
     static func reindex(force: Bool = false, core: any CoreClient = Core.shared) {
         guard enabled, fullTask == nil else { return }
-        if !force, let last = UserDefaults.standard.object(forKey: indexedAtKey) as? Date, Date.now.timeIntervalSince(last) < 6 * 3600 {
+        if !force, let last = UserDefaults.standard.object(forKey: indexedAtKey) as? Date, Date.now.timeIntervalSince(last) < 3 * 24 * 3600 {
             return
         }
         fullTask = Task(priority: .background) {

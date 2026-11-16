@@ -230,5 +230,10 @@ fn large_library() {
     })
     .shutdown();
     other.shutdown();
+    // WM_PERF_KEEP=<dir>: keep the big library (to open it in the apps).
+    if let Some(keep) = std::env::var_os("WM_PERF_KEEP") {
+        let _ = std::fs::remove_dir_all(&keep);
+        let _ = std::fs::rename(root.join("lib"), &keep);
+    }
     let _ = std::fs::remove_dir_all(&root);
 }
