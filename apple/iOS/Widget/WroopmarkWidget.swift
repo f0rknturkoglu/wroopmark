@@ -157,7 +157,9 @@ struct PostView: View {
     let entry: PostEntry
 
     var body: some View {
-        if let post = entry.post {
+        if [.accessoryRectangular, .accessoryInline, .accessoryCircular].contains(family) {
+            LockScreenPost(entry: entry)
+        } else if let post = entry.post {
             let image = Shared.image(post.image)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .top) {
@@ -203,12 +205,42 @@ struct PostView: View {
     }
 }
 
+/// On the Lock Screen: who and the start of the text, in the system's tint.
+private struct LockScreenPost: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: PostEntry
+
+    var body: some View {
+        Group {
+            if let post = entry.post {
+                if family == .accessoryInline {
+                    Label(post.text.isEmpty ? post.author : post.text, systemImage: post.video ? "play.rectangle" : "bookmark")
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Label(post.author, systemImage: post.video ? "play.rectangle.fill" : "bookmark.fill")
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        Text(post.text)
+                            .font(.caption)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                Label(entry.note ?? String(localized: "wroopmark'ı bir kez aç"), systemImage: "bookmark")
+            }
+        }
+        .containerBackground(.clear, for: .widget)
+        .widgetURL(entry.post.flatMap { URL(string: "wroopmark://item/\($0.id)") })
+    }
+}
+
 struct RandomPostWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "random-post", intent: WidgetSettings.self, provider: Provider()) { PostView(entry: $0) }
             .configurationDisplayName("Arşivinden")
             .description("Kaydettiklerinden biri. Uzun bas → Widget'ı Düzenle: ne gösterileceği, klasör, sıklık.")
-            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular, .accessoryInline])
     }
 }
 
