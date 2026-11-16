@@ -1,347 +1,127 @@
 <p align="center">
-  <img src="docs/logo.png" width="128" height="128" alt="wroopmark logosu">
+  <img src="docs/logo.png" width="128" height="128" alt="wroopmark app icon: a white bookmark with a download arrow on purple">
 </p>
 
 <h1 align="center">wroopmark</h1>
 
 <p align="center">
-  Kaydettiklerin, çevrimdışı ve aranabilir. macOS için.<br>
-  <a href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">İndir</a> ·
-  <a href="#kurulum-macos-14">Kurulum</a> ·
-  <a href="#kullanım">Kullanım</a> ·
-  <a href="ARCHITECTURE.md">Mimari</a>
+  <b>Your saved posts, videos and pages — offline, searchable, on your own devices.</b><br>
+  An offline bookmark manager and read-later archive for Mac, iPhone and iPad.<br>
+  <a href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#features">Features</a> ·
+  <a href="PRIVACY.md">Privacy</a> ·
+  <a href="README.tr.md">Türkçe</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/en-iphone-1-list.jpg" width="200" alt="wroopmark on iPhone: the library list">
+  <img src="docs/images/en-iphone-2-item.jpg" width="200" alt="A saved post with its picture, tags and folder">
+  <img src="docs/images/en-iphone-3-reader.jpg" width="200" alt="The clean offline reader">
+  <img src="docs/images/en-iphone-4-triage.jpg" width="200" alt="Triage: swipe to keep or delete, with on-device summaries">
 </p>
 
 ---
 
-Sosyal medyada kaydettiklerin (X yer imleri, TikTok favorileri, Instagram,
-Reddit ve Bluesky kaydedilenleri, YouTube "Daha Sonra İzle", herhangi bir web
-sayfası) tek yerde, **çevrimdışı**
-ve aranabilir. Metin, görseller, videolar ve linkler Mac'ine iner; gönderi
-kaynağından silinse de arşivde kalır.
+You save things everywhere: X bookmarks, TikTok favorites, Instagram and Reddit
+saved posts, YouTube Watch Later, Bluesky, Threads, articles. They live in five
+apps, half of them can't be searched, and the post you want is gone the day its
+author deletes it.
 
-Sunucu, Docker, hesap yok. Rust çekirdeği + SwiftUI macOS uygulaması +
-Chromium/Safari eklentisi; hepsi tek bir yerel kütüphaneyi kullanır.
+**wroopmark brings them into one archive that belongs to you.** The text, the
+pictures and the videos are downloaded to your device, so they stay readable
+offline and survive the original being deleted. Everything is searchable — even
+the words inside screenshots and, with on-device AI, the meaning of a post.
 
-## Neler yapar
+No account. No server. No tracking. A Rust core with native SwiftUI apps, one
+local SQLite library, and optional sync through your own iCloud Drive.
 
-**Arşiv**
-- X, TikTok, Instagram, Reddit, Bluesky, YouTube ve her web sayfası tek bir kayıt biçiminde.
-- X zincirleri: zinciri bir kez açınca yazarın devam tweet'leri görselleriyle aynı kayda eklenir.
-- Web sayfalarının kaydedildiği hâli saklanır (site değişse, kapansa da açılır) + okuma görünümü.
-- Medya bir kez iner (aynı görsel iki gönderide olsa da); TikTok videoları
-  yt-dlp ile arka planda.
-- Görsellerdeki yazı cihazda okunur (Apple Vision), ekran görüntüleri de aranır.
-- Toplu içe aktarma: tarayıcı yer imleri, TikTok / Instagram / X veri paketleri,
-  Pocket / Raindrop CSV. Diskteki videolar ve görseller de (eski TikTok indirmelerin
-  dosya adındaki numarayla gönderisine bağlanır).
-- Dışa aktarma: Markdown (Obsidian'a hazır, görsellerle), CSV, JSON.
-- Yedek: veritabanı + medya + düz bir dışa aktarım (`items.jsonl`), istenirse her gün.
+## Features
 
-**Bulmak**
-- Tek arama kutusu: `rust tag:dev -from:@jack has:image after:2024 "tam ifade"`;
-  Türkçe katlama ("istanbul" = "İSTANBUL" = "ıstanbul").
-- **Anlamına göre arama** (✦): birebir geçmese de aynı şeyden bahseden kayıtlar.
-  Cihazdaki dil modeli aramayı eş anlamlılarla genişletir, her kaydın anlam
-  vektörüne bakılır. İnternete bir şey gitmez.
-- Filtre paneli (platform, medya, klasör, etiket, kişi, site, tarih…), kayıtlı aramalar.
-- Spotlight'ta da çıkar; seçince kayıt uygulamada açılır.
-- Kart, liste, akış görünümleri; foto ve video galerisi.
+**Save from anywhere**
+- **Share → wroopmark** in any iPhone or iPad app; the link is saved instantly
+  and the text and pictures follow. Your own videos and photos go onto their post.
+- **Browser extension** (Chrome, Brave, Arc, Edge, Vivaldi, Safari on Mac and
+  iPhone): your X bookmarks, Instagram and Bluesky saved posts, TikTok
+  favorites and YouTube lists flow in as you browse them.
+- **Import** a TikTok, Instagram, X, Threads or Reddit data download (.zip),
+  browser `bookmarks.html`, Pocket or Raindrop CSV, or videos and pictures from disk.
+- X threads come in whole, with the replies around a post.
 
-**Düzen**
-- Klasörler (alt klasörlerle), hiyerarşik etiketler (`dev/rust`), notlar.
-- Ayıkla: kayıtlar tek tek gelir, ← sil, → sakla, 1–3 önerilen klasöre taşı;
-  her kartın kısa özeti ve etiket önerileri cihazda çıkar, tek tıkla eklenir.
-- Kurallar: `site:github.com` → `#dev/github`, `from:@kişi` → klasör… yeni gelen her şeye uygulanır.
-- Kopyalar: aynı görsel/video, aynı metin ya da anlamca aynı kayıtlar; birini tut.
-- Her kaydın yanında anlamca benzerleri.
-- Link havuzu: gönderilerdeki tüm linkler tekilleştirilmiş, kırık olanlar işaretli.
+**Read and watch offline**
+- A clean **reader** for articles and threads: themes, text size, read aloud,
+  **highlights and notes** that sync and show up in search.
+- A full-screen **feed** to scroll your saved videos and posts, TikTok-style,
+  with picture-in-picture and AirPlay.
+- A copy of every saved web page, readable even if the site goes away.
 
-**Cihazlar arası**
-- Senkron: iCloud Drive (ya da Syncthing, Dropbox…) klasörü üzerinden; sunucu, hesap yok.
-  Kayıtlar, etiketler, klasörler, notlar, kayıtlı aramalar ve görseller gider.
+**Find anything**
+- One search field with filters: `rust tag:dev from:@jack has:video after:2024 "exact phrase"`.
+- Text in pictures (OCR) and the speech in your videos are searchable.
+- **Search by meaning**, summaries and tag suggestions with Apple's on-device models — nothing leaves the device.
+- Spotlight, Siri and Shortcuts: “Search wroopmark”, “Save to wroopmark”.
 
-**Ajanlar**
-- MCP sunucusu: Claude, Cursor gibi ajanlar arşivinde arar, kayıtları okur, etiketler.
-- Kısayollar, Siri ve Apple Intelligence: "wroopmark'ta ara", "wroopmark'a kaydet", "wroopmark'ta bul".
+**Keep it tidy**
+- Folders, nested tags (`reading/tech`), notes, saved searches, rules that file new saves.
+- **Triage**: items come one by one — swipe to keep, delete or move to a suggested folder.
+- Duplicates (same picture, same text, near-same meaning), a link pool with broken-link checks.
+- “On this day” and a Home Screen and Lock Screen widget with something from your archive.
 
-**Hızlı kayıt**
-- Menü çubuğundan link kaydet; her uygulamada ⌃⌥⌘S panodaki linki kaydeder.
-- Eklentide ⌥⇧S, sağ tıkla klasöre kaydet; arşivdeki sayfalarda simgede ✓.
+**Yours**
+- Sync between Mac, iPhone and iPad through a folder in your own iCloud Drive.
+- Export to Markdown (Obsidian-ready, with pictures), CSV, JSON, or a single
+  offline HTML page you can send to anyone.
+- An MCP server lets AI agents such as Claude search and read your archive, on your machine.
 
-## iPhone
+## Install
 
-`apple/iOS/Wroopmark.xcodeproj`: arşivi telefonda aramak, okumak, etiketlemek, not
-almak ve telefondan kaydetmek için. Mac'le iCloud Drive senkronu üzerinden konuşur.
-
-**Telefona kurmak** (ücretsiz Apple hesabı yeter, bir kez):
-
-1. Rust'ın iOS hedefleri: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`
-2. `open apple/iOS/Wroopmark.xcodeproj`
-3. Xcode → Wroopmark hedefi → **Signing & Capabilities** → **Team**: kendi Apple
-   hesabın (yoksa Xcode → Settings → Accounts'tan ekle). Bundle id'yi başka biri
-   kullanıyorsa sonuna bir şey ekle (`…wroopmark.ios.furkan`).
-4. iPhone'u kabloyla bağla, üstte cihaz olarak seç, **Çalıştır** (⌘R). Rust çekirdeği
-   ilk seferde derlenir (birkaç dakika).
-5. iPhone: Ayarlar → Genel → VPN ve Cihaz Yönetimi → geliştirici uygulamasına güven;
-   ilk seferde Ayarlar → Gizlilik ve Güvenlik → **Geliştirici Modu**'nu aç.
-
-Ücretsiz hesapla kurulan uygulama 7 günde bir yeniden kurulmalı (Xcode'dan yine
-⌘R, verin silinmez); AltStore / SideStore bunu kendiliğinden yapar.
-
-**İlk açılış**: Mac'te Ayarlar → Senkron → iCloud Drive ile başlat; telefonda Ayarlar
-(dişli) → Klasörü seç → iCloud Drive → `wroopmark`. Kütüphane telefona iner; sonra
-her açılışta ve aşağı çekince eşitlenir.
-
-**Telefondan kaydetmek**: her uygulamada **Paylaş → wroopmark** (ilk seferde paylaşım
-listesinde "Diğer"den ekle). Bağlantı anında kaydedilir, istersen etiket ve not
-eklersin; metin ve görseller wroopmark açılınca gelir. Kısayollar'da da
-"wroopmark'a Kaydet" eylemi var.
-
-## Kurulum (macOS 26+)
-
-### Tek komut
+**Mac** (macOS 26+): download the signed and notarized `.dmg` from
+[Releases](https://github.com/f0rknturkoglu/wroopmark/releases/latest) and drag
+wroopmark to Applications. It updates itself, verifying every update's signature.
+Or build from source:
 
 ```bash
 git clone https://github.com/f0rknturkoglu/wroopmark.git
-cd wroopmark
-./install.sh
+cd wroopmark && ./install.sh
 ```
 
-Betik eksikleri kendisi tamamlar ve sorarak ilerler:
+**iPhone and iPad**: coming to the App Store. Until then, open
+`apple/iOS/Wroopmark.xcodeproj` in Xcode and run it on your device (see
+[README.tr.md](README.tr.md#iphone) for the steps). The app walks you through
+the share sheet, the Safari extension and iCloud backup on first launch.
 
-1. Xcode Command Line Tools yoksa kurulum penceresini açar (bitince betiği yeniden çalıştır).
-2. Rust yoksa [rustup](https://rustup.rs) ile kurar.
-3. Uygulamayı derleyip `/Applications/wroopmark.app` olarak kurar (açıksa önce kapatır).
-4. `wroopmark` terminal komutunu ekler.
-5. İstersen TikTok video araçlarını (yt-dlp, gallery-dl) kurar.
-6. Uygulamayı açar ve eklenti adımlarını gösterir.
+**Browser extension**: wroopmark → Settings → Extension shows the steps for
+your browser; the Safari extension ships inside the app.
 
-Soru sormadan kurmak için `./install.sh --yes`.
+## How it compares
 
-### Hazır paket
+| | wroopmark | Read-later apps | Bookmark managers | Self-hosted archivers |
+|---|:-:|:-:|:-:|:-:|
+| Saves the post's pictures and videos | ✅ | — | — | some |
+| Social saves (X, TikTok, Instagram, Reddit, Bluesky, Threads) | ✅ | — | links only | some |
+| Works offline, survives deletion | ✅ | articles | — | ✅ |
+| Search in pictures and video speech | ✅ | — | — | — |
+| On-device AI (meaning search, summaries) | ✅ | cloud | cloud | external API |
+| No account, no server | ✅ | — | — | needs a server |
+| Native Mac, iPhone and iPad apps | ✅ | ✅ | ✅ | web |
 
-[Releases](https://github.com/f0rknturkoglu/wroopmark/releases) sayfasındaki
-`.dmg`'yi aç, wroopmark'ı Applications'a sürükle. v0.6'dan itibaren paketler
-Developer ID ile imzalı ve Apple onaylı (notarized): uyarısız açılır.
+## Privacy
 
-Daha eski bir paket ilk açılışta engellenirse: Sistem Ayarları → Gizlilik ve
-Güvenlik → **Yine de aç**, ya da bir kez:
+wroopmark collects no data. Your archive stays on your devices and, if you
+choose, in your own iCloud Drive. Text recognition, summaries and search by
+meaning run on the device. See [PRIVACY.md](PRIVACY.md).
 
-```bash
-xattr -dr com.apple.quarantine /Applications/wroopmark.app
-```
+## For developers
 
-### Tarayıcı eklentisi
+- [ARCHITECTURE.md](ARCHITECTURE.md): the Rust core, sync design, roadmap.
+- `core/`: Rust (SQLite + FTS5, extractors, sync, MCP). `cargo test` runs 68 tests;
+  `WM_PERF_N=50000 cargo test --release --test perf -- --ignored --nocapture`
+  times a 50 000-post library.
+- `apple/`: the Mac app (SwiftPM), the iPhone/iPad app, widgets, share and Safari extensions.
+- `extensions/chromium/`: the browser extension.
 
-**Chrome, Brave, Arc, Edge, Vivaldi, Helium:** wroopmark → Ayarlar → Eklenti →
-tarayıcının düğmesine bas. Eklentiler sayfası ve eklenti klasörü açılır, yol
-panoya kopyalanır. Sonra:
+Screenshots show Wikipedia articles (text and images CC BY-SA 4.0) in a demo library.
 
-1. Sağ üstte **Geliştirici modu**'nu aç.
-2. **Paketlenmemiş öğe yükle** → `~/Library/Application Support/wroopmark/chromium-extension`
+## License
 
-Eklenti uygulamayla gelir. Uygulama güncellenince bu klasör de güncellenir;
-eklentide ↻ (yeniden yükle) yeterli. Tarayıcıyla bağlantıyı uygulama kendisi
-kurar.
-
-**Safari:** uygulamanın içinde gelir. Ayarlar → Eklenti → **Safari'de aç**.
-İmzasız kurulumda önce Safari → Ayarlar → Geliştirici → "İmzasız eklentilere
-izin ver" (Safari bunu her açılışta sıfırlar; Xcode'da bir "Apple Development"
-sertifikası varsa derleme onunla imzalar ve bu adım gerekmez).
-
-### Güncelleme ve kaldırma
-
-```bash
-git pull && ./install.sh      # güncelle (sonra eklentide ↻)
-./install.sh --uninstall      # uygulamayı kaldır; kütüphane yerinde kalır
-```
-
-Kütüphane: `~/Library/Application Support/wroopmark/` (veritabanı + `media/`).
-
-## Kullanım
-
-### Kaydetme
-
-| Nereden | Nasıl |
-|---|---|
-| X yer imleri | Eklenti açıkken `x.com/i/bookmarks`'ı kaydır (ya da popup → Otomatik Kaydır), popup → Aktar. Yer imine eklediğin tweet de kuyruğa girer. |
-| TikTok | Profil → Favoriler / Beğenilenler'i kaydır, popup → Aktar. Videolar yt-dlp ile ya da sayfanın içinden iner. |
-| Instagram | Profil → Kaydedilenler'i kaydır (popup'taki düğme oraya götürür), popup → Aktar. |
-| X zincirleri ve yanıtlar | Kaydettiğin bir tweet'in konuşmasını x.com'da aç; yazarın devam tweet'leri ve gelen yanıtlar o kayda eklenir. |
-| YouTube | youtube.com'da popup → **Daha Sonra İzle'yi aç**, listeyi kaydır. Beğendiğin videolar için `playlist?list=LL`. Videolar inmez; kapak, başlık, kanal kalır. |
-| Bluesky | bsky.app'te popup → **Bluesky kaydedilenleri aç**, kaydır ya da gönderiyi yer imine ekle. Profilindeki Beğeniler sekmesi de aynı şekilde. |
-| Threads | threads.com'da popup → **Threads kaydedilenleri aç** ya da `/saved` sayfasını kaydır; ayrıca Instagram/Threads veri paketinden (`saved_threads.json`, `liked_threads.json`) içe aktarılır. |
-| Reddit | reddit.com'da popup → **Reddit kaydedilenlerini aktar** ya da Reddit veri paketinden (`saved_posts.csv`, `saved_comments.csv`, `post_votes.csv`). |
-| Herhangi bir sayfa | Popup → Kaydet (etiket, not, klasör), ⌥⇧S, ya da sağ tık → wroopmark'a kaydet / klasöre kaydet. |
-| Uygulamadan | ⌘N, linki pencereye sürükle-bırak, menü çubuğu simgesi, her yerde ⌃⌥⌘S (panodaki link). iPhone/iPad'de **+** veya **Ayarlar → Dosyalardan içe aktar**. |
-| Veri paketi, yer imleri | ⇧⌘I ya da dosyayı pencereye bırak (iPhone'da Ayarlar → Dosyalardan içe aktar): `bookmarks.html`, TikTok / Instagram / Threads / X / Reddit veri paketi (.zip ya da klasör), Pocket / Raindrop CSV. Çoğu yalnızca link verir; metin, yazar ve medya arka planda gelir. İzleme geçmişi alınmaz. |
-| Diskteki dosyalar | Video ve görselleri (ya da klasörü) pencereye bırak. Adında TikTok numarası olan video (`7194…​.mp4`, `SnapTik…_7194….mp4`) o gönderiye bağlanır; yt-dlp adları (`Başlık [id].mp4`) YouTube'a. |
-
-### Arama
-
-| Yazım | Anlamı |
-|---|---|
-| `kelime "tam ifade" -hariç` | metin (başlık, gövde, not, görseldeki yazı) |
-| `tag:dev` `-tag:okundu` | etiket (alt etiketler dahil: `dev` → `dev/rust`) |
-| `from:@jack` `-@jack` | kişi |
-| `platform:x` `platform:tiktok` | platform |
-| `has:image` `has:video` `has:link` `has:note` `has:ocr` `has:quote` `has:highlight` `has:thread` `has:reply` | içerik |
-| `folder:ders` `is:unfiled` `is:infolder` | klasör (alt klasörler dahil) |
-| `is:untagged` `is:tagged` `is:reviewed` | durum |
-| `after:2024-01` `before:2025` `savedafter:` `savedbefore:` | paylaşılma / kaydedilme tarihi |
-| `site:github.com` | gönderinin adresi ya da içindeki bir link o sitede |
-| `is:stub` | yalnızca linki bilinen (içe aktarılmış, ayrıntısı gelmemiş) |
-| `id:x:123` | tam o kayıt |
-
-Her süzgeç `-` ile tersine döner. Filtre paneli de yalnızca bu terimleri üretir.
-
-**Anlamına göre** (arama kutusunun yanındaki ✦, ⇧⌘M): "yazılımcı olarak iş bulmak"
-yazınca içinde bu kelimeler geçmeyen mülakat, kariyer gönderileri de gelir. Süzgeçler
-(etiket, tarih…) aynen çalışır. Apple Intelligence açık bir Mac'te en iyisi; değilse
-yalnızca anlam vektörleri kullanılır.
-
-### Kısayollar
-
-| Kısayol | |
-|---|---|
-| ⌘N | Link ekle |
-| ⌘1 / ⌘2 / ⌘3 | Kart / liste / akış |
-| ⌥⌘F | Filtreler |
-| ⌘⇧S | Aramayı kaydet |
-| ⌘⇧T | Seçilenleri etiketle |
-| ⌘⌫ | Seçilenleri sil |
-| ⌘⇧K | Ayıkla (← sil, → sakla, ⌘Z geri al, 1–3 önerilen klasör) |
-| ⇧⌘M | Anlamına göre aramayı aç / kapat |
-| ⇧⌘I | İçe aktar |
-| ⌘J | İndirmeler |
-| ⌃⌥⌘S | Her yerde: panodaki linki kaydet |
-| ⌥⇧S / ⌥⇧W | Tarayıcıda: sayfayı kaydet / popup (`chrome://extensions/shortcuts`) |
-
-### Sayfa kopyaları
-
-Kaydettiğin her web sayfası (makale, GitHub, arXiv…) görünmez bir tarayıcıda açılıp
-`.webarchive` olarak saklanır; detaydaki **Sayfanın kopyası** onu kaydedildiği hâliyle
-açar, **Okuma** sekmesi yalnızca metni gösterir. Sayfadaki metin aramaya da girer.
-Ayarlar → Medya'dan kapatılabilir.
-
-### Kısayollar ve Siri
-
-Kısayollar uygulamasında wroopmark eylemleri: **wroopmark'ta Ara** (uygulamada açar),
-**wroopmark'a Kaydet** (bağlantı + etiketler, paylaşım menüsünden de), **wroopmark'ta Bul**
-(sonuçları başka kısayollara verir; anlamına göre de arayabilir). Siri'ye
-"wroopmark'ta ara" demek de olur.
-
-### Senkron
-
-Ayarlar → Senkron → **iCloud Drive ile başlat** (ya da başka bir klasör). İlk seferde
-kütüphane klasöre yazılır; diğer cihazda aynı klasörü seçince hepsi gelir. Sonrasında
-değişiklikler birkaç saniye ile bir dakika içinde karşıya geçer.
-
-- Veritabanı klasöre konmaz; her cihaz yalnızca kendi değişiklik günlüğüne ekler
-  (`ops/<cihaz>/<ay>.jsonl`), diğerlerininkini okur.
-- Aynı kaydın farklı şeylerini iki cihazda değiştirirsen (birinde etiket, öbüründe not)
-  ikisi de kalır; aynı şeyi değiştirirsen son yapılan geçerli olur.
-- Medya: görseller klasöre kopyalanır (önerilen); videolar her cihazda kendi iner.
-  "Görseller ve videolar" seçilirse videolar da gider (GB'larca yer tutabilir).
-- Terminalden: `wroopmark sync`, `wroopmark sync status`.
-
-### Kurallar
-
-Ayarlar → Kurallar: bir arama yaz (`site:github.com`, `from:@karpathy`,
-`platform:tiktok has:video`, `"yapay zeka"`…), uyan kayda eklenecek etiketi ve/veya
-klasörü seç. Yeni kaydedilen ya da içe aktarılan her şey kurallardan geçer; istersen
-mevcut kayıtlara da uygulanır. Elle seçtiğin klasör kuralı ezer.
-
-### Dışa aktarma
-
-Dosya → Dışa aktar: ekrandaki görünüm ve arama (her şey için Tümü) Markdown, CSV ya da
-JSON olarak. Markdown her kaydı ön bilgili (yazar, tarih, etiketler, kaynak) ayrı bir
-not yapar, görseller `media/` altına kopyalanır; Obsidian kasasına doğrudan konur.
-
-### Ajanlar (MCP)
-
-Ayarlar → Ajanlar'daki satırı kopyala ya da:
-
-```bash
-claude mcp add wroopmark -- /Applications/wroopmark.app/Contents/Helpers/wroopmark mcp
-```
-
-Claude Desktop / Cursor için `command`: aynı yol, `args`: `["mcp"]` (yalnızca okuma:
-`["mcp", "--read-only"]`). Araçlar: `search` (süzgeçler + anlamsal), `get_item`
-(tam metin, görseldeki yazı, medya dosya yolları), `related`, `search_links`,
-`list_tags`, `list_folders`, `stats`, `save_url`, `tag_items`, `move_to_folder`,
-`set_note`. Her kayıt ayrıca `wroopmark://item/<id>` kaynağı olarak Markdown biçiminde
-okunabilir. Sunucu ajanla birlikte açılıp kapanır.
-
-### Yedek ve geri yükleme
-
-Ayarlar → Yedek → bir klasör seç (harici disk, senkronlanan klasör…). İçinde
-`wroopmark-yedek/` oluşur: `library.sqlite`, `media/`, `items.jsonl`
-(her satır bir kayıt; başka programlar için). İlk yedek her şeyi, sonrakiler
-yalnızca yenileri kopyalar. Geri yüklemek: uygulamayı kapat, `library.sqlite`
-ve `media/`'yı kütüphane klasörüne kopyala, aç.
-
-### Bağlantılar
-
-`wroopmark://item/<id>` (kaydı aç), `wroopmark://search?q=tag:dev`,
-`wroopmark://add?url=https://…` (kaydet). Kısayollar uygulamasından ya da
-başka araçlardan kullanılabilir.
-
-### Terminal
-
-```bash
-wroopmark search "tag:dev rust"
-wroopmark search -m "veritabanı performansı"        # anlamına göre
-wroopmark add https://example.com/yazi --tag okunacak
-wroopmark import ~/Downloads/tiktok-verilerim.zip
-wroopmark import-files ~/Movies/TikTok
-wroopmark export ~/Obsidian/Kasa/wroopmark tag:dev
-wroopmark rule-add site:github.com -t dev/github --apply
-wroopmark stats
-```
-
-`WROOPMARK_HOME=/bir/klasör` başka bir kütüphaneyle çalışır.
-
-## Sorun giderme
-
-- **Eklenti "bağlı değil" diyor:** uygulamayı bir kez aç; olmazsa Ayarlar →
-  Eklenti → Bağlantıyı yenile, sonra eklentide ↻. Eklenti kimliği
-  `kdkgliladllpidmnacdcackcamaknlej` olmalı.
-- **Eklentinin ne yaptığını görmek:** `~/Library/Application Support/wroopmark/host.log`.
-- **TikTok videoları inmiyor:** Ayarlar → Medya'da "Harici video indirici" yeşil
-  olmalı (`./install.sh` kurar). Olmazsa video, gönderi tarayıcıda açılınca iner.
-- **Anlamsal arama / özet çalışmıyor:** Ayarlar → Zeka'da iki modelin durumu yazar.
-  Özet için Apple Intelligence açık olmalı (Sistem Ayarları → Apple Intelligence ve Siri).
-  Anlam dizini ilk açılışta arka planda oluşur (1600 kayıt ~20 sn).
-- **Safari eklentisi listede yok:** "İmzasız eklentilere izin ver"i aç
-  (Safari her açılışta kapatır).
-
-## Geliştirme
-
-| Yol | Ne |
-|---|---|
-| `core/` | Rust çekirdek: SQLite + FTS5, ayrıştırıcılar, medya deposu, JSON API, CLI / native host |
-| `apple/` | SwiftUI macOS uygulaması, OCR ve zeka yardımcıları (`apple/OCR`, `apple/AI`), Safari eklentisinin native tarafı |
-| `extensions/chromium/` | MV3 eklenti (Safari sürümü de buradan üretilir) |
-| `install.sh` | kaynaktan kurulum / kaldırma |
-| `apple/scripts/build-mac.sh` | uygulamayı derler (`--install` ile /Applications'a koyar) |
-| `apple/scripts/package.sh` | `dist/` altına `.zip` + `.dmg` |
-
-```bash
-cd core && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
-apple/scripts/build-mac.sh --install
-```
-
-Sürüm çıkarmak: `core/Cargo.toml`'daki sürümü artır, commit'le, sonra
-`apple/scripts/release.sh`. Etiketi gönderir, imzalı + Apple onaylı `.dmg` / `.zip`
-üretip GitHub release'ine koyar. Bir kez gerekenler: "Developer ID Application"
-sertifikası ve `xcrun notarytool store-credentials wroopmark` ile kaydedilmiş onay
-profili. (GitHub Actions'taki `release` işi yalnızca elle çalıştırılan, imzasız bir
-derleme denetimi.)
-
-Mimari ve tasarım kararları: [ARCHITECTURE.md](ARCHITECTURE.md).
-
-## Lisans
-
-[MIT](LICENSE)
+MIT © 2026 Furkan Türkoğlu
