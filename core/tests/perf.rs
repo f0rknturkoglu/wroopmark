@@ -7,6 +7,9 @@
 //! most: opening, searching, paging, filters, Today, related, duplicates,
 //! exports and a sync with its log compaction.
 
+// A measuring harness, not product code: indexing a fixed table is fine here.
+#![allow(clippy::indexing_slicing)]
+
 use std::sync::Arc;
 use std::time::Instant;
 
