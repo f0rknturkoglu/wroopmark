@@ -108,6 +108,9 @@ extension PhoneModel {
         do {
             let r: SyncReport = try await core.call(.call("sync_now", [:]))
             lastSyncAt = .now
+            if let device = syncStatus?.device {
+                await Self.announceWrites(in: folder, device: device, media: r.mediaOut > 0)
+            }
             if r.applied > 0 { syncMessage = "\(r.applied) değişiklik geldi." }
             await afterSync(r)
         } catch {
@@ -160,6 +163,39 @@ extension PhoneModel {
     /// iCloud keeps files it has not downloaded as `.name.icloud`
     /// placeholders. The logs must be real files before the core reads
     /// them; pictures are left alone (missing ones download from the web).
+    /// The core writes the sync folder directly. On iOS iCloud may not
+    /// notice such writes for a quarter of an hour, so ours are touched again
+    /// through a file coordinator, which tells iCloud to upload them now:
+    /// our log, our device record and, when some went out, new media.
+    nonisolated static func announceWrites(in folder: URL, device: String, media: Bool) async {
+        await Task.detached(priority: .utility) {
+            let fm = FileManager.default
+            let since = Date.now.addingTimeInterval(-600)
+            var files = [folder.appendingPathComponent("devices/\(device).json")]
+            let ops = folder.appendingPathComponent("ops/\(device)", isDirectory: true)
+            files += (try? fm.contentsOfDirectory(at: ops, includingPropertiesForKeys: nil)) ?? []
+            if media { files += recentFiles(in: folder.appendingPathComponent("media", isDirectory: true), since: since) }
+            let coordinator = NSFileCoordinator()
+            for f in files where fm.fileExists(atPath: f.path) {
+                var err: NSError?
+                coordinator.coordinate(writingItemAt: f, options: .forMerging, error: &err) { url in
+                    try? fm.setAttributes([.modificationDate: Date.now], ofItemAtPath: url.path)
+                }
+            }
+        }.value
+    }
+
+    private nonisolated static func recentFiles(in dir: URL, since: Date) -> [URL] {
+        guard let e = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+                                                     options: [.skipsHiddenFiles]) else { return [] }
+        var out: [URL] = []
+        for case let url as URL in e {
+            let v = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey])
+            if v?.isRegularFile == true, let d = v?.contentModificationDate, d > since { out.append(url) }
+        }
+        return out
+    }
+
     nonisolated static func fetchLogs(in folder: URL) async {
         await Task.detached(priority: .userInitiated) {
             let fm = FileManager.default

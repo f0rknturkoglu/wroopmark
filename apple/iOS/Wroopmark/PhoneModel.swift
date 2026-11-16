@@ -118,6 +118,7 @@ final class PhoneModel {
 
     func start() async {
         PhoneAI.register()
+        ReaderView.onEdit = { [weak self] in self?.syncSoon() }
         guard await core.ensureOpen() else {
             errorMessage = "Kütüphane açılamadı"
             return
@@ -181,6 +182,9 @@ final class PhoneModel {
         PhoneAI.unload()
         let task = BackgroundTask(name: "wroopmark-pause")
         Task {
+            // What was changed just before leaving goes out now, not on
+            // the next open.
+            await syncNow()
             _ = try? await core.run(.call("pause", [:]))
             task.end()
         }

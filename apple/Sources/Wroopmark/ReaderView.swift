@@ -472,6 +472,10 @@ final class ReaderSpeech: NSObject, AVSpeechSynthesizerDelegate {
 // MARK: View
 
 struct ReaderView: View {
+    /// Called after a highlight is added, changed or removed, so the app
+    /// can send it to its other devices soon (set by the app's model).
+    @MainActor static var onEdit: (() -> Void)?
+
     @Environment(\.dismiss) private var dismiss
     let id: String
     @State private var item: Item?
@@ -628,6 +632,7 @@ struct ReaderView: View {
             "id": .string(id), "quote": .string(sel.quote), "prefix": .string(sel.prefix),
         ])) else { return }
         highlights = list
+        Self.onEdit?()
         let added = list.filter { !before.contains($0.id) }
         bridge.apply(added)
         if note { editing = added.first }
@@ -642,6 +647,7 @@ struct ReaderView: View {
         }
         guard let list: [ReaderHighlight] = try? await Core.shared.call(.call("highlight", args)) else { return }
         highlights = list
+        Self.onEdit?()
         switch change {
         case .color(let c): bridge.color(h.id, c)
         case .delete: bridge.remove(h.id)

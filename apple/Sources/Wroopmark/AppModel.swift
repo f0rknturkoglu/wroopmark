@@ -398,6 +398,7 @@ final class AppModel {
         if enableSystemIntegrations { startPageCopies() }
         Task { await loadAIStatus() }
         startSyncLoop()
+        ReaderView.onEdit = { [weak self] in self?.syncSoon() }
         if enableSystemIntegrations {
             Spotlight.reindex(core: core)
             QuickSave.shared.attach(self)
