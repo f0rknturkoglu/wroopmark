@@ -335,6 +335,38 @@ const MIGRATE_18: &str = "ALTER TABLE sync_media_wait ADD COLUMN since INTEGER N
 UPDATE sync_media_wait SET since = CAST(strftime('%s', 'now') AS INTEGER);
 DELETE FROM sync_cursor;";
 
+/// Before a library is upgraded to a newer schema, a consistent copy of
+/// it goes next to it (`library.sqlite.before-v22`): an upgrade cut short
+/// must never cost the only copy. The two newest copies are kept.
+fn backup_before_upgrade(path: &Path) {
+    let Ok(conn) = Connection::open(path) else { return };
+    let Ok(version) = conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0)) else { return };
+    if version == 0 || version >= SCHEMA_VERSION {
+        return;
+    }
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else { return };
+    let prefix = format!("{name}.before-v");
+    let dst = path.with_file_name(format!("{prefix}{SCHEMA_VERSION}"));
+    if !dst.exists() {
+        // VACUUM INTO reads through the WAL: the copy is whole and consistent.
+        let _ = conn.execute("VACUUM INTO ?1", [dst.to_string_lossy()]);
+    }
+    drop(conn);
+    let Some(dir) = path.parent() else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let mut old: Vec<(i64, std::path::PathBuf)> = entries
+        .flatten()
+        .filter_map(|e| {
+            let n = e.file_name().to_string_lossy().to_string();
+            n.strip_prefix(&prefix).and_then(|v| v.parse().ok()).map(|v| (v, e.path()))
+        })
+        .collect();
+    old.sort_by_key(|(v, _)| std::cmp::Reverse(*v));
+    for (_, p) in old.into_iter().skip(2) {
+        let _ = std::fs::remove_file(p);
+    }
+}
+
 /// Every sync trigger, for tests that rebuild an old schema.
 #[cfg(test)]
 const SYNC_TRIGGERS: [&str; 17] = [
@@ -1162,6 +1194,7 @@ fn pk_of(conn: &Connection, id: &str) -> Result<i64> {
 
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
+        backup_before_upgrade(path);
         Self::init(Connection::open(path)?)
     }
 
@@ -2473,6 +2506,14 @@ mod tests {
         assert_eq!(s.links_to_enrich(10).unwrap().len(), 1);
         assert_eq!(s.search(&Query::parse("eski"), Sort::Default, 10, 0).unwrap().total, 1);
         drop(s);
+        // The library as it was before the upgrade is kept next to it.
+        let backup = path.with_file_name(format!("{}.before-v{SCHEMA_VERSION}", path.file_name().and_then(|n| n.to_str()).unwrap_or("")));
+        let old = Connection::open(&backup).unwrap();
+        let v: i64 = old.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        assert_eq!(v, 3);
+        assert_eq!(old.query_row("SELECT count(*) FROM items", [], |r| r.get::<_, i64>(0)).unwrap(), 1);
+        drop(old);
+        let _ = std::fs::remove_file(&backup);
         for ext in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
         }
