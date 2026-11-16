@@ -9,8 +9,8 @@ yaptığını anlatıyor (2.3.1).
 
 | Alan | Değer |
 |---|---|
-| Ad (30) | wroopmark |
-| Alt başlık (30) | Kaydettiklerin, çevrimdışı |
+| Ad (30) | wroopmark: Çevrimdışı Arşiv |
+| Alt başlık (30) | Yer imi, video ve sonra oku |
 | Birincil kategori | Verimlilik (Productivity) |
 | İkincil kategori | Başvuru (Reference) |
 | Bundle ID | com.f0rknturkoglu.wroopmark.ios |
@@ -23,7 +23,7 @@ yaptığını anlatıyor (2.3.1).
 
 ## Tanıtım metni (170)
 
-Okumak, izlemek, sonra bulmak istediğin her şey tek yerde. Paylaş → wroopmark ile kaydet; metin ve görseller telefonuna iner, internetsiz okunur ve aranır.
+Her uygulamadan gönderi, makale ve görsel kaydet. Telefonunda kalır; internetsiz okursun, ararsın. Asıl gönderi silinse de arşivinde durur.
 
 ## Açıklama
 
@@ -46,7 +46,7 @@ OKU VE BUL
 KAYDIR VE AYIKLA
 • Videolarını (yerel dosyalar veya doğrudan akış) ve gönderilerini tam ekran, art arda kaydırarak izle; oynatma hızı seç, klasöre taşı, PiP / AirPlay / Kilit Ekranı kontrolü kullan, karıştır, kaldığın yerden devam et.
 • Ayıkla: kayıtlar tek tek gelir, sola at sil, sağa at sakla ya da önerilen klasöre taşı.
-• Ana ekran ve Denetim Merkezi widget'ları, Spotlight araması ve Handoff (Mac ↔ iPhone devam et).
+• Ana ekran, Kilit Ekranı ve Denetim Merkezi widget'ları, isteğe bağlı "Geçmişte bugün" bildirimi, Spotlight araması ve Handoff (Mac ↔ iPhone devam et).
 • Bir klasörü tek bir HTML sayfası veya Markdown olarak paylaş: görseller içinde, her yerde internetsiz açılır.
 • iPad'de üç sütun: kapsamlar, liste, kayıt.
 
@@ -63,10 +63,11 @@ GİZLİLİK
 ## Anahtar kelimeler (100)
 
 ```
-yer imi,okuma listesi,sonra oku,arşiv,çevrimdışı,kaydet,bağlantı,etiket,not,bookmark,read later
+kaydet,kayıt,koleksiyon,okuyucu,vurgu,not,etiket,klasör,arama,ekran görüntüsü,link,bağlantı,akış
 ```
 
-(95 karakter. Başka uygulama adı yok.)
+(96 karakter. Ad ve alt başlıktaki kelimeler (arşiv, çevrimdışı, yer imi, video,
+sonra oku) tekrar edilmedi; Apple onları zaten sayar. Başka uygulama ya da marka adı yok.)
 
 ## Bu sürümdeki yenilikler
 
@@ -115,12 +116,12 @@ language → English (U.S.)).
 
 | Field | Value |
 |---|---|
-| Name (30) | wroopmark |
-| Subtitle (30) | What you saved, offline |
+| Name (30) | wroopmark: Save Posts Offline |
+| Subtitle (30) | Bookmarks, videos & read later |
 
 ### Promotional text (170)
 
-Everything you want to read, watch and find later, in one place. Save with Share → wroopmark; text and pictures come to your phone and can be read and searched offline.
+Save posts, articles and pictures from any app. They stay on your iPhone, readable and searchable offline, even after the original is gone.
 
 ### Description
 
@@ -143,7 +144,7 @@ READ AND FIND
 SCROLL AND TRIAGE
 • Watch your videos (local files or direct streams) and posts full screen, one after another; adjust speed, move to folders, use PiP / AirPlay / Lock Screen controls, shuffle and pick up where you left off.
 • Triage: items come one by one; swipe left to delete, right to keep, or move to a suggested folder.
-• Home Screen and Control Center widgets, Spotlight search, and Handoff between Mac and iPhone.
+• Home Screen, Lock Screen and Control Center widgets, an optional “On this day” notification, Spotlight search, and Handoff between Mac and iPhone.
 • Share a folder as a single offline HTML page or Markdown export with images, highlights and replies.
 • Three columns on iPad: scopes, list, item.
 
@@ -160,10 +161,11 @@ PRIVACY
 ### Keywords (100)
 
 ```
-bookmark,read later,reading list,archive,offline,save,links,tags,notes,highlights,reader
+archive,reader,highlight,notes,tags,folders,screenshot,search,collection,link,clip,web,feed,ocr,ai
 ```
 
-(89 characters. No other app names.)
+(98 characters. Words already in the name and subtitle (save, posts, offline,
+bookmarks, videos, read later) are not repeated. No other app or brand names.)
 
 ### What's new
 
@@ -183,3 +185,36 @@ First release.
   girmez): iPhone 1320 × 2868 (liste, kayıt, okuyucu, ayıklama), iPad
   2752 × 2064 yatay (üç sütun, ayıklama). Demo kütüphane Wikipedia
   makalelerinden; senin arşivin görünmez. Saat 9:41, pil dolu.
+- **Mağazaya yüklenecek hâlleri**: `swift apple/scripts/store-images.swift` →
+  `apple/iOS/Screenshots/store/{en,tr}/` (mor zemin üstünde başlık + ekran).
+  Sıra ve başlıklar (ilk üçü arama sonucunda görünür, en güçlüleri öne):
+  1. Kaydettiğin her şey · İnternetsiz ve aranabilir (liste)
+  2. Gönderi görselleriyle kalır · Etiket, klasör, not (kayıt)
+  3. Sade okuyucu · Tema, vurgu, sesli okuma (okuyucu)
+  4. Kaydırarak ayıkla · Cihazda özet ve klasör önerisi (ayıkla)
+  - iPad: iPad için de (üç sütun), Saniyeler içinde karar ver (ayıkla).
+
+## ASO notları (mağaza araması)
+
+- **Ne aranıyor**: App Store aramasında ad, alt başlık ve anahtar kelime alanı
+  sayılır; açıklama sayılmaz. Bu yüzden ad "wroopmark: …" biçiminde en güçlü
+  ifadeyi taşır, alt başlık ikinci kümeyi, anahtar kelimeler geri kalanı. Hiçbir
+  kelime iki alanda tekrarlanmaz; tekil/çoğul ve boşluk gerekmez.
+- **Yasak olanlar**: başka uygulama, platform ya da marka adı (X, TikTok,
+  Instagram, Pocket…) ad, alt başlık ve anahtar kelimelerde yok (2.3.7);
+  açıklamada da "video indirici" ya da "TikTok'tan indir" gibi ifadeler yok (5.2.3).
+  Platform adları yalnızca uygulamanın gerçekten yaptığını anlatan cümlelerde
+  geçebilir; güvenli taraf için açıklamada da genel ifade kullanıldı.
+- **Ek anahtar kelime yuvası**: ABD mağazası İngilizce (ABD) ile birlikte
+  İspanyolca (Meksika) yerelleştirmesini de dizinler. İspanyolca (Meksika) için
+  İngilizce ek anahtar kelimeler girilebilir (ör. `bookmark manager,save for later,
+  offline reading,saved posts,inbox`); Türkiye mağazası için de İngilizce (BK)
+  eklenip ikinci bir İngilizce küme denenebilir. İlk sürümden sonra.
+- **Dönüşüm**: ilk iki ekran görüntüsü ve alt başlık indirme kararını verir;
+  hepsi "internetsiz, kalıcı, aranabilir" vaadini tekrarlar. Uygulama önizleme
+  videosu (15–30 sn: paylaş → kayıt → arama → okuyucu) ikinci sürümde.
+- **Puan**: StoreKit `requestReview` yalnızca olumlu bir anda (örn. 20. kayıttan
+  sonra bir ayıklama oturumu bitince), yılda en fazla üç kez. Henüz eklenmedi.
+- **Sonra**: Özel Ürün Sayfaları (okuyucu odaklı, video odaklı), Uygulama İçi
+  Etkinlikler ("Yıl sonu arşiv temizliği"), Apple Search Ads'te kendi adına ve
+  "read later / bookmark" kelimelerine küçük bütçe.
