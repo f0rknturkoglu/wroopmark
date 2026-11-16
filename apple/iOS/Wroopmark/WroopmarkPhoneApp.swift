@@ -1,3 +1,4 @@
+import UserNotifications
 import CoreSpotlight
 import SwiftUI
 import UIKit
@@ -39,6 +40,7 @@ struct WroopmarkPhoneApp: App {
         Self.moveLibraryToGroup()
         let model = PhoneModel()
         PhoneBackground.register(model)
+        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
         _model = State(initialValue: model)
     }
 

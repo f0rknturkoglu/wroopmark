@@ -73,6 +73,7 @@ extension PhoneModel {
     func backgroundSync() async {
         guard await core.ensureOpen() else { return }
         await syncNow()
+        await OnThisDay.notifyIfDue(core: core)
         _ = try? await core.run(.call("pause", [:]))
     }
 

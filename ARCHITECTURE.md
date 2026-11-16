@@ -357,5 +357,16 @@ hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
 - macOS `MediaViewer` ve `MacVideoFeedView`: görsel yakınlaştırma + Canlı Metin (`ImageAnalysisOverlayView`), `⌘C` ile panoya görsel/video kopyalama, `NSSharingServicePicker` paylaşımı, video oynatma hızı (`1×–2×`) ve izleme konumu hafızası (`MacFeedMemory`), `↑ / ↓` ile gönderiler arası kesintisiz geçiş ve tam ekran seri video akışı (`⇧⌘P`).
 - macOS ergonomi ve iOS v1.5 paritesi: `Space` ile hızlı medya ön izleme / ok tuşlarıyla gezinme, `AddURLSheet` (`⌘N`) ve `QuickAddMenu` içinde klasör seçimi ile bağlantısız Not Kartı (`add_note`), kenar çubuğu klasörlerine kart/bağlantı sürükle-bırak, çoklu seçimde toplu medya indirme, gelişmiş Mac `AppIntents` (`FolderAppEntity`, `SaveNoteIntent`, `OpenRandomItemIntent`) ve sistem geneli `NSServices` ("wroopmark'a Kaydet").
 
+**v1.7: Dağıtıma hazırlık** ✅
+- Şema yükseltmesinden önce kütüphanenin kopyası (`library.sqlite.before-v<N>`,
+  `VACUUM INTO`; son iki kopya tutulur).
+- iPhone arka plan işi (`BGTaskScheduler`): şarjdayken eşitleme, gönderi
+  ayrıntıları, OCR ve anlam dizini; ara sıra eşitleme.
+- iPhone kurulum rehberi (paylaşım menüsü, Safari eklentisi, iCloud yedeği)
+  ve TipKit ipuçları (akış, ayıkla, okuyucu); Ayarlar'dan yeniden açılır.
+- Mac güncelleyici: GitHub'daki son sürüm; imza, Gatekeeper ve aynı ekip
+  kimliği doğrulanmadan kurulmaz; kaynaktan derlenmiş sürüm yalnızca sayfayı açar.
+- Kilit ekranı widget'ları; isteğe bağlı "Geçmişte bugün" bildirimi.
+
 **Şimdilik yok**: RSS ve bültenler, EPUB, hesap ve sunucu, Raycast eklentisi (MCP çoğunu karşılar), harici API
 anahtarıyla AI (cihazdaki model yetmezse).

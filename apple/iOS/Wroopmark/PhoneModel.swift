@@ -244,6 +244,7 @@ final class PhoneModel {
         }
         // The rest is done on the charger, when iOS lets the app run.
         PhoneBackground.schedule()
+        Task { await OnThisDay.notifyIfDue(core: core) }
     }
 
     /// Low on space: pictures stop downloading until there is room again.
@@ -288,6 +289,8 @@ final class PhoneModel {
             if action == "clipboard" {
                 clipboardSaveTask?.cancel()
                 clipboardSaveTask = Task { await saveFromClipboard() }
+            } else if action == "today" {
+                scope = .today
             } else {
                 activeModal = action
             }

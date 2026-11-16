@@ -3349,6 +3349,16 @@
         }
       }
     },
+    "Geçmiş yıllarda bugün bir şey kaydettiysen, günde en fazla bir kez, sabah dokuzdan sonra gösterir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you saved something on this date in a past year, it shows it, at most once a day and not before nine in the morning."
+          }
+        }
+      }
+    },
     "Geçmiş yıllarda bugün kaydettiklerin ve arşivden 5 kayıt": {
       "localizations": {
         "en": {
@@ -3359,12 +3369,44 @@
         }
       }
     },
+    "Geçmiş yıllardan %lld kayıt": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item from past years"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items from past years"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Geçmişte bugün": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "On this day"
+          }
+        }
+      }
+    },
+    "Geçmişte bugün bildirimi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On This Day notification"
           }
         }
       }

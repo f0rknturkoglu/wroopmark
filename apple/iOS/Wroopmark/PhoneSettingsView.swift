@@ -10,6 +10,7 @@ struct PhoneSettingsView: View {
     @State private var pickingPhotos = false
     @State private var pickedPhotos: [PhotosPickerItem] = []
     @State private var confirmOffload = false
+    @State private var onThisDay = OnThisDay.enabled
 
     var body: some View {
         NavigationStack {
@@ -156,6 +157,22 @@ struct PhoneSettingsView: View {
                     Text("Zeka")
                 } footer: {
                     Text("Arama anlamı ve özetler cihazda çalışır; internete veri gönderilmez.")
+                }
+
+                Section {
+                    Toggle("Geçmişte bugün bildirimi", isOn: Binding(
+                        get: { onThisDay },
+                        set: { on in
+                            if on {
+                                Task { onThisDay = await OnThisDay.enable() }
+                            } else {
+                                OnThisDay.disable()
+                                onThisDay = false
+                            }
+                        }
+                    ))
+                } footer: {
+                    Text("Geçmiş yıllarda bugün bir şey kaydettiysen, günde en fazla bir kez, sabah dokuzdan sonra gösterir.")
                 }
 
                 Section("Hakkında") {
