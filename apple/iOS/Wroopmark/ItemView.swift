@@ -294,7 +294,13 @@ struct MediaStrip: View {
 
     var body: some View {
         if media.count == 1, let m = media.first {
-            tile(m).frame(maxWidth: .infinity).aspectRatio(m.aspect ?? 1.3, contentMode: .fit).clipShape(.rect(cornerRadius: 12))
+            // The picture fills a box the width of the screen; as an overlay it
+            // never makes the page wider (a filled image proposes its own size).
+            Color.clear
+                .aspectRatio(m.aspect ?? 1.3, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .overlay { tile(m) }
+                .clipShape(.rect(cornerRadius: 12))
         } else if !media.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {

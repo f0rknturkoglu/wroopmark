@@ -41,7 +41,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, platform, url, authorHandle, authorName, title, text, extra, ocr, createdAt, savedAt, media, links, quote, tags, note
         case summary, aiTags, stub, thread, replies, snapshot
-        case folderId = "folder_id"
+        case folderId
     }
 
     init(from decoder: Decoder) throws {
@@ -426,7 +426,7 @@ struct Folder: Identifiable, Decodable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, count
-        case createdAt = "created_at"
+        case createdAt
     }
 }
 
@@ -495,11 +495,11 @@ struct DownloadItem: Identifiable, Decodable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, platform, url, title, text, progress, speed, eta, status, tries
-        case authorHandle = "author_handle"
-        case authorName = "author_name"
-        case videoFile = "video_file"
-        case fileSize = "file_size"
-        case savedAt = "saved_at"
+        case authorHandle
+        case authorName
+        case videoFile
+        case fileSize
+        case savedAt
     }
 
     var author: String? {
