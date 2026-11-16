@@ -36,13 +36,17 @@ KAYDET
 
 OKU VE BUL
 • Arşivin internetsiz okunur; sayfa sonradan silinse ya da değişse de sende kalır.
+• Okuyucu: sade, reklamsız sayfa; tema, yazı boyutu, sesli okuma. Önemli cümleleri vurgula, not ekle; vurgular aramada da çıkar.
+• Cihazdaki zeka (Apple Intelligence olan cihazlarda): kısa özet, etiket önerisi, anlamına göre arama. Hiçbir şey internete gitmez.
 • Metinde, notlarında ve etiketlerinde ara. Etikete, klasöre ya da kaynağa göre süz; aramada tag:, from:@kişi, after:2025 gibi süzgeçler de çalışır.
 • Klasörler (alt klasörlerle) ve iç içe etiketlerle (okuma/teknoloji) düzenle.
 
 KAYDIR VE AYIKLA
 • Videolarını ve gönderilerini tam ekran, art arda kaydırarak izle; klasör seç, karıştır, kaldığın yerden devam et.
 • Ayıkla: kayıtlar tek tek gelir, sola at sil, sağa at sakla ya da önerilen klasöre taşı.
-• Ana ekran widget'ı her saat arşivinden bir kaydı gösterir.
+• Ana ekran widget'ı arşivinden bir kaydı gösterir; ne gösterileceğini, klasörü ve sıklığı sen seçersin.
+• Bir klasörü tek bir HTML sayfası olarak paylaş: görseller içinde, her yerde internetsiz açılır.
+• iPad'de üç sütun: kapsamlar, liste, kayıt.
 
 MAC İLE BİRLİKTE (İSTEĞE BAĞLI)
 • Mac'te de wroopmark kullanıyorsan arşivin iCloud Drive üzerinden iki yönlü eşitlenir: kayıtlar, etiketler, klasörler, notlar.
@@ -102,6 +106,65 @@ required to use the iPhone app. The app does not download videos from websites.
 
 Demo hesabı: gerekmiyor (giriş yok).
 
+## English (en-US)
+
+Same fields, for the English App Store page (App Store Connect → add
+language → English (U.S.)).
+
+| Field | Value |
+|---|---|
+| Name (30) | wroopmark |
+| Subtitle (30) | What you saved, offline |
+
+### Promotional text (170)
+
+Everything you want to read, watch and find later, in one place. Save with Share → wroopmark; text and pictures come to your phone and can be read and searched offline.
+
+### Description
+
+wroopmark keeps everything you meet online and mean to come back to in one place, on your phone.
+
+SAVE
+• Share → wroopmark from any app: the link is saved at once; add tags and a note if you like.
+• The title, text, author and pictures of what you save come to your phone.
+• Save without a connection too; the details fill in when you are back online.
+
+READ AND FIND
+• Your archive reads offline; it stays with you even if the page is later deleted or changed.
+• Reader: a clean page without ads; theme, text size, read aloud. Highlight what matters and add notes; highlights show up in search.
+• On-device intelligence (on devices with Apple Intelligence): short summaries, tag suggestions, search by meaning. Nothing goes to the internet.
+• Search your text, notes and tags. Filter by tag, folder or source; filters such as tag:, from:@someone and after:2025 work in search.
+• Organize with folders (and subfolders) and nested tags (reading/tech).
+
+SCROLL AND TRIAGE
+• Watch your videos and posts full screen, one after another; pick a folder, shuffle, pick up where you left off.
+• Triage: items come one by one; swipe left to delete, right to keep, or move to a suggested folder.
+• The home screen widget shows one of your saves; you choose what it shows, the folder and how often it changes.
+• Share a folder as a single HTML page: pictures inside, opens offline anywhere.
+• Three columns on iPad: scopes, list, item.
+
+WITH YOUR MAC (OPTIONAL)
+• If you also use wroopmark on a Mac, your archive syncs both ways through iCloud Drive: items, tags, folders, notes and highlights.
+• The phone works on its own; a Mac is not required.
+
+SHORTCUTS
+• “Save to wroopmark”, “Search wroopmark” and “Find in wroopmark” in Shortcuts and Siri.
+
+PRIVACY
+• No account, no server, no ads, no tracking. No data is collected; your archive lives only on your device (and, if you choose, in your own iCloud Drive).
+
+### Keywords (100)
+
+```
+bookmark,read later,reading list,archive,offline,save,links,tags,notes,highlights,reader
+```
+
+(89 characters. No other app names.)
+
+### What's new
+
+First release.
+
 ## Ekran görüntüleri
 
 - iPhone 6.9" (1320 × 2868): en az 3, en çok 10.
@@ -112,3 +175,7 @@ Demo hesabı: gerekmiyor (giriş yok).
   görünmesin (5.2.1). Örnek içerikle doldurulmuş bir kütüphaneyle çek (kendi
   kaydettiğin makaleler, Wikipedia, Apple Newsroom gibi).
 - Simülatörde çekmek için: iPhone 17 Pro Max simülatörü → ⌘S.
+- Çekilmiş olanlar `apple/iOS/Screenshots/{en,tr}/{iphone,ipad}/` içinde (git'e
+  girmez): iPhone 1320 × 2868 (liste, kayıt, okuyucu, ayıklama), iPad
+  2752 × 2064 yatay (üç sütun, ayıklama). Demo kütüphane Wikipedia
+  makalelerinden; senin arşivin görünmez. Saat 9:41, pil dolu.

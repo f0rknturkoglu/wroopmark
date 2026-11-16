@@ -303,9 +303,17 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
 - Saf Rust `.zip` açıcı (`flate2`) + iPhone/iPad Dosyalar'dan toplu veri paketi
   ve medya içe alma.
 
-**v1.0: App Store**
-- TestFlight, ekran görüntüleri, İngilizce, fiyat. Sonra: günlük sıkıştırma,
-  klasörü HTML olarak paylaşma.
+**v1.0: App Store** ✅ (yükleme ve fiyat bekliyor)
+- İngilizce: Mac, iPhone/iPad, widget, paylaşım eklentisi tek String Catalog'dan
+  (`apple/Resources/Localizable.xcstrings`, çoğullar dahil); Türkçe kaynak dil,
+  Türkçe olmayan herkes İngilizce görür. Tarayıcı eklentisi ve cihazdaki zeka
+  istemleri de kullanıcının dilinde.
+- Senkron günlüğü sıkıştırma: her cihaz kendi günlüğünü kısaltır (öğe ve alan
+  grubu başına en yeni satır), yeni adla yazar, eski dosyaları siler; diğer
+  cihazlar silinen dosyalardaki yerlerini unutur.
+- Klasörü (ya da herhangi bir görünümü) tek HTML sayfası olarak paylaşma:
+  görseller içinde, arama kutulu, açık/koyu.
+- Mağaza: iki dilde metin ve ekran görüntüleri (`apple/iOS/AppStore.md`).
 
-**Şimdilik yok**: metin vurgulama, EPUB, Raycast eklentisi (MCP çoğunu
-karşılar), harici API anahtarıyla AI (cihazdaki model yetmezse).
+**Şimdilik yok**: EPUB, Raycast eklentisi (MCP çoğunu karşılar), harici API
+anahtarıyla AI (cihazdaki model yetmezse).

@@ -16,3 +16,6 @@ dist/
 xcuserdata/
 *.xcuserstate
 DerivedData/
+
+# App Store screenshots (demo library with Wikipedia pictures; uploaded, not versioned)
+apple/iOS/Screenshots/
