@@ -119,17 +119,7 @@ impl Tool {
         let owned = |v: &[&str]| v.iter().map(|a| a.to_string()).collect::<Vec<_>>();
         match self {
             Tool::YtDlp => {
-                let mut a = owned(&[
-                    "--no-playlist",
-                    "--no-warnings",
-                    "--newline",
-                    "--write-subs",
-                    "--write-auto-subs",
-                    "--sub-langs",
-                    "tr,en",
-                    "--sub-format",
-                    "vtt/srt",
-                ]);
+                let mut a = owned(&["--no-playlist", "--no-warnings", "--newline"]);
                 a.extend(owned(&["--socket-timeout", "30", "-f", YTDLP_FORMAT, "-o"]));
                 a.push(format!("{dir}/video.%(ext)s"));
                 a.push("--".into());
@@ -305,12 +295,63 @@ pub fn download_with_progress(url: &str, work: &Path, on_progress: Option<&Progr
         let _ = fs::remove_dir_all(work);
         fs::create_dir_all(work).map_err(ExternalError::WorkDir)?;
         match run(tool, &exe, work, url, on_progress, stop) {
-            Ok(f) => return Ok(f),
+            Ok(f) => {
+                if tool == Tool::YtDlp {
+                    fetch_subtitles(&exe, work, url, stop);
+                }
+                return Ok(f);
+            }
             Err(ExternalError::Cancelled(name)) => return Err(ExternalError::Cancelled(name)),
             Err(e) => errors.push(e.to_string()),
         }
     }
     Err(ExternalError::Multiple(errors.join("; ")))
+}
+
+/// Asks yt-dlp for the post's subtitles (made or automatic, Turkish or
+/// English) next to the video. A separate run, after the video is safe:
+/// subtitle requests fail often (rate limits, none offered) and yt-dlp
+/// then exits with an error, which must never cost the video.
+fn fetch_subtitles(exe: &Path, dir: &Path, url: &str, stop: &AtomicBool) {
+    const SUBS_TIMEOUT: Duration = Duration::from_secs(60);
+    let path = std::env::join_paths(std::iter::once(exe.parent().unwrap_or(Path::new("/")).to_path_buf()).chain(search_dirs()));
+    let Ok(path) = path else { return };
+    let out = format!("{}/video.%(ext)s", dir.to_string_lossy());
+    let Ok(child) = Command::new(exe)
+        .args([
+            "--skip-download",
+            "--no-playlist",
+            "--no-warnings",
+            "--write-subs",
+            "--write-auto-subs",
+            "--sub-langs",
+            "tr,en",
+            "--sub-format",
+            "vtt/srt",
+            "--socket-timeout",
+            "20",
+            "-o",
+            &out,
+            "--",
+            url,
+        ])
+        .env("PATH", path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        return;
+    };
+    let mut guard = ChildGuard { child, progress: None, reaped: false };
+    let start = Instant::now();
+    while !stop.load(Ordering::Acquire) && start.elapsed() < SUBS_TIMEOUT {
+        if matches!(guard.child.try_wait(), Ok(Some(_)) | Err(_)) {
+            guard.reaped = true;
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
 }
 
 /// Reads the best downloaded `.vtt`/`.srt` subtitle track left in `dir`, if any.

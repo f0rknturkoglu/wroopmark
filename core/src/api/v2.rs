@@ -579,7 +579,7 @@ impl Library {
             let mut visual: Vec<(u32, i64)> = store
                 .imghashes()?
                 .into_iter()
-                .filter(|(_, oid, _)| oid != id)
+                .filter(|(_, oid, oh)| oid != id && (8..=56).contains(&(*oh as u64).count_ones()))
                 .filter_map(|(opk, _, oh)| {
                     let dist = (target_bits ^ (oh as u64)).count_ones();
                     (dist <= 10).then_some((dist, opk))
@@ -658,7 +658,9 @@ impl Library {
     pub fn duplicates(&self) -> Result<Vec<DuplicateGroup>> {
         let store = self.lock_store()?;
         let mut groups: Vec<(&str, Vec<i64>)> = store.duplicate_candidates()?;
-        let hashes = store.imghashes()?;
+        // A blank or one-colour picture has an almost empty (or full)
+        // fingerprint and would pair with every other such picture.
+        let hashes: Vec<_> = store.imghashes()?.into_iter().filter(|(_, _, h)| (8..=56).contains(&(*h as u64).count_ones())).collect();
         if hashes.len() <= 20_000 {
             for (i, (pk1, _, h1)) in hashes.iter().enumerate() {
                 for (pk2, _, h2) in hashes.iter().skip(i + 1) {

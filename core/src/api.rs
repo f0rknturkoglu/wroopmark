@@ -61,6 +61,8 @@ pub enum CoreError {
     UnknownCmd(String),
     #[error("kayıt yok")]
     ItemNotFound,
+    #[error("bu cihazda video indirme kapalı")]
+    VideosOff,
     #[error("kaydedilemedi")]
     SaveFailed,
     #[error("geçersiz URL")]
@@ -554,6 +556,11 @@ impl Library {
         use base64::Engine;
         use std::io::Write;
         const MAX: u64 = 600 << 20;
+        // A device that does not download videos (the iPhone, where Apple's
+        // rules forbid saving media from other sites) takes none from a page.
+        if !self.videos_enabled() {
+            return Err(CoreError::VideosOff);
+        }
         let dir = self.root.join(".uploads");
         std::fs::create_dir_all(&dir)?;
         let part = dir.join(format!("{}.part", hash_hex(c.id.as_bytes())));

@@ -611,11 +611,14 @@ final class PhoneModel {
 
     func deleteItems(_ ids: [String]) async {
         guard !ids.isEmpty else { return }
-        for id in ids { _ = await perform(.delete(id: id)) }
-        Spotlight.remove(ids)
-        let idSet = Set(ids)
+        // Only what was really deleted leaves the list.
+        var gone: [String] = []
+        for id in ids where await perform(.delete(id: id)) { gone.append(id) }
+        guard !gone.isEmpty else { return }
+        Spotlight.remove(gone)
+        let idSet = Set(gone)
         items.removeAll { idSet.contains($0.id) }
-        total = max(0, total - ids.count)
+        total = max(0, total - gone.count)
         syncSoon()
         await refreshMeta()
     }

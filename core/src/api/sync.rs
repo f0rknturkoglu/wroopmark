@@ -164,6 +164,9 @@ impl Library {
         Ok(MediaMode::parse(&self.lock_store()?.setting("sync_media")?.unwrap_or_default()))
     }
 
+    /// Videos go out in "all" mode, and always from a device that never
+    /// downloads videos itself (the iPhone): every video it has is one the
+    /// user put there, and exists nowhere else.
     fn send_videos(&self, mode: MediaMode) -> bool {
         mode == MediaMode::All || !self.videos_enabled()
     }
@@ -291,8 +294,7 @@ impl Library {
         let quote = item.quote.iter().flat_map(|q| q.media.iter());
         let mut out = vec![];
         for m in item.media.iter().chain(quote) {
-            let include_video = self.send_videos(mode) || m.downloadable_video().is_none();
-            let video = if include_video { m.video_file.as_deref() } else { None };
+            let video = if self.send_videos(mode) { m.video_file.as_deref() } else { None };
             for name in [m.file.as_deref(), video].into_iter().flatten() {
                 if self.media.contains(name) && matches!(shared_state(&shared_media(base, name)), Shared::Missing) {
                     out.push(name.to_string());
@@ -342,7 +344,7 @@ impl Library {
         let quote = item.quote.iter().flat_map(|q| q.media.iter());
         for m in item.media.iter().chain(quote) {
             let mut files = vec![m.file.as_deref()];
-            if self.send_videos(mode) || m.downloadable_video().is_none() {
+            if self.send_videos(mode) {
                 files.push(m.video_file.as_deref());
             }
             for name in files.into_iter().flatten() {

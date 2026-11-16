@@ -118,6 +118,7 @@ struct PhoneLibrary: View {
     @State private var editMode: EditMode = .inactive
     @State private var selection = Set<String>()
     @State private var showBatchTags = false
+    @State private var confirmBatchDelete = false
     @State private var batchTagsInput = ""
     @State private var path: [String] = []
 
@@ -332,16 +333,25 @@ struct PhoneLibrary: View {
             .disabled(selection.isEmpty)
 
             Button(role: .destructive) {
-                let ids = Array(selection)
-                Task {
-                    await model.deleteItems(ids)
-                    editMode = .inactive
-                    selection.removeAll()
-                }
+                confirmBatchDelete = true
             } label: {
                 Label("Sil", systemImage: "trash")
             }
             .disabled(selection.isEmpty)
+            // Many items at once, and with sync on, on every device too.
+            .confirmationDialog("\(selection.count) kaydı silmek istediğine emin misin?", isPresented: $confirmBatchDelete, titleVisibility: .visible) {
+                Button("Sil", role: .destructive) {
+                    let ids = Array(selection)
+                    Task {
+                        await model.deleteItems(ids)
+                        editMode = .inactive
+                        selection.removeAll()
+                    }
+                }
+                Button("Vazgeç", role: .cancel) {}
+            } message: {
+                Text("Senkron açıksa diğer cihazlardan da silinir.")
+            }
 
             Button("Bitti") {
                 withAnimation {

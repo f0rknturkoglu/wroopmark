@@ -1,0 +1,67 @@
+{
+  "sourceLanguage": "tr",
+  "strings": {
+    "Akış": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed"
+          }
+        }
+      },
+      "shouldTranslate": true
+    },
+    "Ayıkla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Triage"
+          }
+        }
+      },
+      "shouldTranslate": true
+    },
+    "Bağlantı Ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Link"
+          }
+        }
+      },
+      "shouldTranslate": true
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turns speech in your videos into text on the device, so you can search it."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videolardaki konuşmayı cihazda aramak için yazıya döker."
+          }
+        }
+      },
+      "shouldTranslate": true
+    },
+    "Panodan Kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save from Clipboard"
+          }
+        }
+      },
+      "shouldTranslate": true
+    }
+  },
+  "version": "1.0"
+}

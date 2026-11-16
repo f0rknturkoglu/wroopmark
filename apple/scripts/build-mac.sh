@@ -49,6 +49,13 @@ fi
 xcrun xcstringstool compile "$APP_PKG/Resources/Localizable.xcstrings" --output-directory "$APP/Contents/Resources"
 mkdir -p "$APP/Contents/Resources/tr.lproj"
 : > "$APP/Contents/Resources/tr.lproj/Localizable.strings"
+# Info.plist texts (the permission prompt, the Services menu) in English.
+cat > "$APP/Contents/Resources/en.lproj/InfoPlist.strings" <<'STRINGS'
+"NSSpeechRecognitionUsageDescription" = "Turns speech in your videos into text on the device, so you can search it.";
+STRINGS
+cat > "$APP/Contents/Resources/en.lproj/ServicesMenu.strings" <<'STRINGS'
+"wroopmark'a Kaydet" = "Save to wroopmark";
+STRINGS
 VERSION="$(grep -m1 '^version' "$CORE/Cargo.toml" | cut -d'"' -f2)"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
