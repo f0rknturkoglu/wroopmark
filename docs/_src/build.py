@@ -256,7 +256,7 @@ T = {
 MAC_STEPS = [
     ("library", 1.0, 50, 50),
     ("library", 2.05, 98, 34),
-    ("search", 1.45, 84, 0),
+    ("search", 1.45, 100, 0),
     ("today", 1.0, 50, 50),
     ("triage", 1.5, 45, 100),
     ("gallery", 1.0, 50, 50),
@@ -265,6 +265,8 @@ MAC_STEPS = [
 ]
 MAC_LAYERS = [("library", "1-library"), ("search", "4-search"), ("today", "5-today"), ("triage", "2-triage"),
               ("gallery", "3-gallery"), ("reader", "6-reader")]
+# The tour zooms up to 2×, so on large screens ask for the 3200 px pictures.
+TOUR_SIZES = "(max-width: 860px) 170vw, 1500px"
 PHONE_STEPS = ["list sheet", "list island", "item", "reader", "triage"]
 PHONE_LAYERS = [("list", "1-list"), ("item", "2-item"), ("reader", "3-reader"), ("triage", "4-triage")]
 
@@ -323,7 +325,7 @@ def page(lang):
         for i, (v, unit, txt, pre) in enumerate(t["stats"]))
 
     mac_layers = "\n".join(
-        f'            <img class="layer" data-layer="{k}" src="images/{L}-mac-{f}.jpg" width="1600" height="867" alt="" {"" if k == "library" else "loading=\"lazy\" "}decoding="async">'
+        f'            <img class="layer" data-layer="{k}" src="images/{L}-mac-{f}.jpg" srcset="images/{L}-mac-{f}.jpg 1600w, images/{L}-mac-{f}-3200.jpg 3200w" sizes="{TOUR_SIZES}" width="1600" height="867" alt="" {"" if k == "library" else "loading=\"lazy\" "}decoding="async">'
         for k, f in MAC_LAYERS)
     mac_steps = "\n".join(
         f'      <article class="step" data-i="{i}" data-show="{MAC_STEPS[i][0]}" data-zoom="{MAC_STEPS[i][1]}" data-ox="{MAC_STEPS[i][2]}%" data-oy="{MAC_STEPS[i][3]}%">\n'
@@ -418,7 +420,7 @@ def page(lang):
     <p class="cta-note">{esc(t["cta_note"])}</p>
   </div>
   <div class="stage">
-    <img class="mac" src="images/{L}-mac-1-library.jpg" width="1600" height="867" alt="{esc(t["hero_mac_alt"])}">
+    <img class="mac" src="images/{L}-mac-1-library.jpg" srcset="images/{L}-mac-1-library.jpg 1600w, images/{L}-mac-1-library-3200.jpg 3200w" sizes="(max-width: 1100px) 100vw, 1080px" width="1600" height="867" alt="{esc(t["hero_mac_alt"])}">
     <div class="iphone phone"><div class="screen"><img src="images/{L}-screen-1-list.jpg" width="460" height="1000" alt="{esc(t["hero_phone_alt"])}"></div></div>
   </div>
   <p class="hint" aria-hidden="true">{esc(t["scroll_hint"])}<i></i></p>
