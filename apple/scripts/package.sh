@@ -22,7 +22,8 @@ mkdir -p "$DIST"
 rm -f "$DIST/$NAME.zip" "$DIST/$NAME.dmg"
 
 # -dvv: since macOS 27 a single -v no longer prints the Authority lines.
-SIGNER="$(codesign -dvv "$APP" 2>&1 | awk -F= '/^Authority=/ { print $2; exit }')"
+# awk reads to the end: an early exit would SIGPIPE codesign under pipefail.
+SIGNER="$(codesign -dvv "$APP" 2>&1 | awk -F= '/^Authority=/ && !s { print $2; s = 1 }')"
 NOTARIZE=0
 if [[ "$SIGNER" == "Developer ID Application:"* ]] && xcrun notarytool history --keychain-profile wroopmark >/dev/null 2>&1; then
   NOTARIZE=1
