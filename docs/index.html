@@ -4,23 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>wroopmark — offline bookmark manager and read-later archive for Mac, iPhone and iPad</title>
-<meta name="description" content="Save posts, videos, articles and pictures from any app into one archive on your own devices. Offline, searchable (even text in pictures), with on-device AI. No account, no server.">
+<meta name="description" content="Save posts, videos, articles and pictures from any app into one archive on your own devices. A native Mac app that sits at 0% CPU when idle, plus iPhone and iPad. Offline, searchable, no account, no server.">
 <link rel="canonical" href="https://f0rknturkoglu.github.io/wroopmark/">
 <link rel="alternate" hreflang="en" href="https://f0rknturkoglu.github.io/wroopmark/">
 <link rel="alternate" hreflang="tr" href="https://f0rknturkoglu.github.io/wroopmark/tr.html">
 <link rel="icon" href="logo.png">
+<link rel="stylesheet" href="site.css">
 <meta name="theme-color" content="#784AED">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="wroopmark">
 <meta property="og:title" content="wroopmark — your saved posts, offline and searchable">
-<meta property="og:description" content="One archive for what you save on X, TikTok, Instagram, Reddit, YouTube, Bluesky, Threads and the web. On your Mac, iPhone and iPad. No account, no server.">
+<meta property="og:description" content="One archive for what you save on X, TikTok, Instagram, Reddit, YouTube, Bluesky, Threads and the web. Native on Mac, iPhone and iPad. No account, no server.">
 <meta property="og:url" content="https://f0rknturkoglu.github.io/wroopmark/">
 <meta property="og:image" content="https://f0rknturkoglu.github.io/wroopmark/images/social-preview.png">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="wroopmark — your saved posts, offline and searchable">
-<meta name="twitter:description" content="Save posts, videos and articles from any app into an archive on your own devices. Offline, searchable, private.">
+<meta name="twitter:description" content="Save posts, videos and articles from any app into an archive on your own devices. Native, light, offline, private.">
 <meta name="twitter:image" content="https://f0rknturkoglu.github.io/wroopmark/images/social-preview.png">
 <script type="application/ld+json">
 {
@@ -32,93 +33,161 @@
   "description": "An offline bookmark manager and read-later archive: saves posts, videos, articles and pictures from any app to your own devices, searchable offline with on-device AI.",
   "url": "https://f0rknturkoglu.github.io/wroopmark/",
   "downloadUrl": "https://github.com/f0rknturkoglu/wroopmark/releases/latest",
-  "image": "https://f0rknturkoglu.github.io/wroopmark/images/social-preview.png",
+  "softwareVersion": "1.7.0",
+  "fileSize": "15MB",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "image": "https://f0rknturkoglu.github.io/wroopmark/images/en-mac-1-library.jpg",
+  "screenshot": ["https://f0rknturkoglu.github.io/wroopmark/images/en-mac-1-library.jpg", "https://f0rknturkoglu.github.io/wroopmark/images/en-iphone-1-list.jpg"],
   "license": "https://opensource.org/licenses/MIT",
   "author": { "@type": "Person", "name": "Furkan Türkoğlu" }
 }
 </script>
-<style>
-  :root { --accent: #784AED; --top: #8C61F0; --bottom: #542EBD; --ink: #1D1C1A; --muted: #5F5B66; --card: #FFFFFF; --bg: #F7F5FC; --line: #E6E0F5; }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink: #F1EEF8; --muted: #A9A3B6; --card: #1E1B26; --bg: #13111A; --line: #2C2838; }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
-  a { color: var(--accent); }
-  header { background: linear-gradient(180deg, var(--top), var(--bottom)); color: #fff; text-align: center; padding: 64px 16px 0; overflow: hidden; }
-  header img.logo { width: 96px; height: 96px; }
-  h1 { font-size: clamp(36px, 7vw, 64px); margin: 12px 0 8px; letter-spacing: -0.02em; }
-  header p.lead { font-size: clamp(18px, 3.2vw, 22px); max-width: 640px; margin: 0 auto 24px; opacity: 0.94; }
-  .cta { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 40px; }
-  .cta a { color: var(--bottom); background: #fff; padding: 12px 22px; border-radius: 999px; font-weight: 600; text-decoration: none; }
-  .cta a.ghost { color: #fff; background: transparent; border: 1.5px solid rgba(255,255,255,0.7); }
-  .shots { display: flex; gap: 16px; justify-content: center; margin: 0 auto -8px; max-width: 980px; }
-  .shots img { width: min(22vw, 220px); border-radius: 22px 22px 0 0; box-shadow: 0 -6px 40px rgba(0,0,0,0.25); }
-  main { max-width: 980px; margin: 0 auto; padding: 56px 16px; }
-  h2 { font-size: 28px; margin: 48px 0 16px; letter-spacing: -0.01em; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; }
-  .card h3 { margin: 0 0 6px; font-size: 18px; }
-  .card p { margin: 0; color: var(--muted); }
-  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 14px; overflow: hidden; font-size: 15px; }
-  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: center; }
-  th:first-child, td:first-child { text-align: left; }
-  .table-wrap { overflow-x: auto; }
-  code { background: var(--card); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; font-size: 0.92em; }
-  footer { text-align: center; color: var(--muted); font-size: 14px; padding: 32px 16px 48px; }
-  @media (max-width: 640px) { .shots img:nth-child(n+3) { display: none; } .shots img { width: 42vw; } }
-</style>
 </head>
 <body>
-<header>
-  <img class="logo" src="logo.png" alt="wroopmark app icon">
-  <h1>wroopmark</h1>
-  <p class="lead">Your saved posts, videos and pages — offline, searchable, on your own devices. An offline bookmark manager and read-later archive for Mac, iPhone and iPad.</p>
+<div class="bar"><div class="bar-in">
+  <a class="brand" href="./"><img src="logo.png" alt="">wroopmark</a>
+  <nav>
+    <a href="#mac">Mac</a>
+    <a href="#iphone">iPhone &amp; iPad</a>
+    <a href="#light">Light &amp; fast</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="tr.html" hreflang="tr">Türkçe</a>
+  </nav>
+  <a class="btn small" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download</a>
+</div></div>
+
+<header class="hero">
+  <h1>Everything you saved, in one archive you own.</h1>
+  <p class="lead">Posts, videos, articles and pictures from X, TikTok, Instagram, Reddit, YouTube and the web, kept on your Mac, iPhone and iPad. Offline, searchable, and on nobody's server, because there isn't one.</p>
   <div class="cta">
-    <a href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a>
-    <a class="ghost" href="https://github.com/f0rknturkoglu/wroopmark">Source on GitHub</a>
+    <a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a>
+    <a class="btn ghost" href="#iphone">iPhone &amp; iPad</a>
   </div>
-  <div class="shots">
-    <img src="images/en-iphone-1-list.jpg" alt="The wroopmark library on iPhone" loading="lazy">
-    <img src="images/en-iphone-2-item.jpg" alt="A saved post with its picture, tags and folder" loading="lazy">
-    <img src="images/en-iphone-3-reader.jpg" alt="The clean offline reader" loading="lazy">
-    <img src="images/en-iphone-4-triage.jpg" alt="Triage with on-device summaries" loading="lazy">
+  <p class="cta-note">Free and open source · macOS 26 or later · 15 MB, signed and notarized by Apple</p>
+  <div class="stage">
+    <img class="mac" src="images/en-mac-1-library.jpg" width="1600" height="867" alt="wroopmark on Mac: a grid of saved pages with pictures and tags, and the selected item's summary, folder and tags on the right">
+    <div class="iphone phone"><div class="screen"><img src="images/en-screen-1-list.jpg" width="460" height="1000" alt="wroopmark on iPhone: the library list"></div></div>
   </div>
 </header>
 
+<div class="stats">
+  <div class="stat"><b>0.0% CPU</b><span>when it sits open and idle on a Mac</span></div>
+  <div class="stat"><b>~110 MB</b><span>of memory with 50,000 posts in the library</span></div>
+  <div class="stat"><b>&lt; 35 ms</b><span>to search, filter or page through 50,000 posts</span></div>
+  <div class="stat"><b>0 servers</b><span>no account, no tracking, nothing to sign up for</span></div>
+</div>
+
 <main>
-  <p>You save things everywhere: X bookmarks, TikTok favorites, Instagram and Reddit saved posts, YouTube Watch Later, Bluesky, Threads, articles. They live in different apps, most of them can't be searched, and the post you wanted is gone the day its author deletes it. <b>wroopmark brings them into one archive that belongs to you</b>: the text, the pictures and the videos are kept on your devices, so they stay readable offline and survive the original.</p>
+  <section>
+    <p class="intro">You save things everywhere: X bookmarks, TikTok favorites, Instagram and Reddit saved posts, YouTube Watch Later, Bluesky, Threads, articles. They live in different apps, most can't be searched, and the post you wanted is gone the day its author deletes it. <b style="color:var(--ink)">wroopmark keeps the text, the pictures and the videos on your own devices</b>, so they stay readable offline and outlive the original.</p>
+  </section>
 
-  <h2>What it does</h2>
-  <div class="grid">
-    <div class="card"><h3>Save from anywhere</h3><p>Share → wroopmark in any app on iPhone and iPad. A browser extension brings in your bookmarks and saved posts as you browse. Import data downloads, bookmarks.html and CSV.</p></div>
-    <div class="card"><h3>Read offline</h3><p>A clean reader with themes, read aloud, highlights and notes. A copy of every saved page, readable even if the site disappears.</p></div>
-    <div class="card"><h3>Find anything</h3><p>Filters like <code>tag:</code>, <code>from:@</code>, <code>has:video</code>. Text inside pictures and speech in videos are searchable. Search by meaning with on-device AI.</p></div>
-    <div class="card"><h3>Watch your saves</h3><p>Scroll your saved videos and posts full screen, TikTok-style, with picture-in-picture and AirPlay.</p></div>
-    <div class="card"><h3>Keep it tidy</h3><p>Folders, nested tags, rules, duplicates, and Triage: swipe to keep, delete or file away, with summaries made on the device.</p></div>
-    <div class="card"><h3>Private by design</h3><p>No account, no server, no tracking. Sync between your devices through your own iCloud Drive. Export to Markdown, CSV or a single HTML page.</p></div>
-  </div>
+  <section id="mac">
+    <div class="split">
+      <div class="text">
+        <p class="eyebrow">On your Mac</p>
+        <h2>A real Mac app, not a web page in a box.</h2>
+        <p class="intro">SwiftUI on top of a Rust core and one SQLite file. It opens instantly, stays out of the way, and does the heavy lifting for your other devices.</p>
+        <ul class="ticks">
+          <li><b>Browser extension</b> for Chrome, Brave, Arc, Edge, Vivaldi and Safari: your X bookmarks, Instagram and Bluesky saves, TikTok favorites and YouTube lists flow in as you browse.</li>
+          <li><b>Save from anywhere</b>: <kbd>⌃⌥⌘S</kbd> in any app, the menu bar, or right-click → Services → Save to wroopmark.</li>
+          <li><b>Keyboard first</b>: <kbd>⌘N</kbd> to add, <kbd>Space</kbd> to preview, arrow keys to move, <kbd>⇧⌘P</kbd> for a full-screen video feed.</li>
+          <li><b>Videos and pictures</b> are downloaded to your Mac and reach your iPhone through your own iCloud Drive.</li>
+          <li><b>AI agents</b> such as Claude can search and read your archive through a local MCP server, on your machine.</li>
+        </ul>
+      </div>
+      <img class="shot" src="images/en-mac-2-triage.jpg" width="1600" height="867" alt="Triage on Mac: one saved page at a time with an on-device summary, suggested folders, and Delete, Undo and Keep buttons" loading="lazy">
+    </div>
+  </section>
 
-  <h2>How it compares</h2>
-  <div class="table-wrap">
-  <table>
-    <tr><th></th><th>wroopmark</th><th>Read-later apps</th><th>Bookmark managers</th><th>Self-hosted archivers</th></tr>
-    <tr><td>Keeps the post's pictures and videos</td><td>✅</td><td>—</td><td>—</td><td>some</td></tr>
-    <tr><td>Social saves (X, TikTok, Instagram, Reddit, Bluesky, Threads)</td><td>✅</td><td>—</td><td>links only</td><td>some</td></tr>
-    <tr><td>Offline, survives deletion</td><td>✅</td><td>articles</td><td>—</td><td>✅</td></tr>
-    <tr><td>Search inside pictures and video speech</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
-    <tr><td>On-device AI</td><td>✅</td><td>cloud</td><td>cloud</td><td>external API</td></tr>
-    <tr><td>No account, no server</td><td>✅</td><td>—</td><td>—</td><td>needs a server</td></tr>
-  </table>
-  </div>
+  <section>
+    <div class="split flip">
+      <div class="text">
+        <p class="eyebrow">Find anything</p>
+        <h2>Search the words, the pictures and the meaning.</h2>
+        <p class="intro">One field with filters like <code>tag:</code>, <code>from:@</code>, <code>has:video</code>, <code>after:2024</code>. Text inside screenshots and the speech in videos are searchable, and with Apple's on-device models you can search by meaning. Nothing leaves the device.</p>
+      </div>
+      <img class="shot" src="images/en-mac-3-gallery.jpg" width="1600" height="867" alt="The picture gallery on Mac: every saved picture in a grid" loading="lazy">
+    </div>
+  </section>
 
-  <h2>Get it</h2>
-  <p><b>Mac</b> (macOS 26 or later): download the signed, notarized app from <a href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">GitHub Releases</a>; it keeps itself up to date. <b>iPhone and iPad</b>: coming to the App Store.</p>
-  <p>Help and questions: <a href="support.html">support</a>. Privacy: <a href="privacy.html">wroopmark collects no data</a>.</p>
+  <section id="iphone">
+    <p class="eyebrow">On your iPhone and iPad</p>
+    <h2>Share → wroopmark, from any app.</h2>
+    <p class="intro">The link is saved at once and the text and pictures follow. Read offline, scroll your saved videos TikTok-style, triage with a swipe. It works on its own; the Mac only makes it faster.</p>
+    <div class="phones">
+      <div class="iphone"><div class="screen"><img src="images/en-screen-1-list.jpg" width="460" height="1000" alt="The library list on iPhone" loading="lazy"></div></div>
+      <div class="iphone"><div class="screen"><img src="images/en-screen-2-item.jpg" width="460" height="1000" alt="A saved post with its picture, tags and folder" loading="lazy"></div></div>
+      <div class="iphone"><div class="screen"><img src="images/en-screen-3-reader.jpg" width="460" height="1000" alt="The clean offline reader" loading="lazy"></div></div>
+      <div class="iphone"><div class="screen"><img src="images/en-screen-4-triage.jpg" width="460" height="1000" alt="Triage with an on-device summary" loading="lazy"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Everything else</p>
+    <h2>Made to keep, not to scroll past.</h2>
+    <div class="grid">
+      <div class="card"><h3>Read offline</h3><p>A clean reader with themes, read aloud, highlights and notes. A copy of every saved page, readable even if the site disappears.</p></div>
+      <div class="card"><h3>Watch your saves</h3><p>Your saved videos and posts full screen, one after another, with picture-in-picture, AirPlay and playback speed.</p></div>
+      <div class="card"><h3>Keep it tidy</h3><p>Folders, nested tags, rules that file new saves, duplicates, a link pool with broken-link checks, and Triage.</p></div>
+      <div class="card"><h3>Bring it all in</h3><p>Data downloads from TikTok, Instagram, X, Threads and Reddit, browser bookmarks, Pocket and Raindrop CSV.</p></div>
+      <div class="card"><h3>Sync without a server</h3><p>Mac, iPhone and iPad stay in step through a folder in your own iCloud Drive. That folder is also your backup.</p></div>
+      <div class="card"><h3>Take it with you</h3><p>Export to Markdown (Obsidian-ready, with pictures), CSV, JSON, or a single HTML page you can send to anyone.</p></div>
+    </div>
+  </section>
+
+  <section id="light">
+    <div class="light">
+      <p class="eyebrow">Light &amp; fast</p>
+      <h2>Idle means idle.</h2>
+      <p class="intro">No Electron, no background service, no browser engine kept warm. When the window is open and you aren't doing anything, wroopmark uses no CPU. Text recognition and on-device AI run in small helper processes only while they have work, and you can pause them in Settings.</p>
+      <div class="table-wrap">
+      <table>
+        <tr><th>Measured on a Mac</th><th>Result</th></tr>
+        <tr><td>CPU, window open, idle (a 50,000-post library, and a real archive after a day of use)</td><td class="n">0.0%</td></tr>
+        <tr><td>Memory, 50,000 posts, window open</td><td class="n">~110 MB</td></tr>
+        <tr><td>Memory after a day of everyday use, a screen full of pictures</td><td class="n">~280 MB</td></tr>
+        <tr><td>Open the library</td><td class="n">5 ms</td></tr>
+        <tr><td>First page of the newest posts</td><td class="n">0.6 ms</td></tr>
+        <tr><td>Word or phrase search across 50,000 posts</td><td class="n">7–21 ms</td></tr>
+        <tr><td>Filters (<code>platform:x has:video tag:…</code>, <code>from:@…</code>, folders)</td><td class="n">3–32 ms</td></tr>
+        <tr><td>Download / installed app</td><td class="n">15 MB / 29 MB</td></tr>
+      </table>
+      </div>
+      <p class="fine">Mac with M4 Pro, macOS 27.2, wroopmark 1.7.0. Memory is the system's “footprint” figure; CPU is from <code>top</code> over a minute. After a big import the library is indexed once in the background (text recognition, search by meaning), which uses CPU until it is done. Timings come from the repository's own test, <code>WM_PERF_N=50000 cargo test --release --test perf -- --ignored</code>, so you can run it yourself.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">How it compares</p>
+    <h2>It keeps the post itself, not just the link.</h2>
+    <div class="table-wrap">
+    <table class="compare">
+      <tr><th></th><th>wroopmark</th><th>Read-later apps</th><th>Bookmark managers</th><th>Self-hosted archivers</th></tr>
+      <tr><td>Keeps the post's pictures and videos</td><td>✅</td><td>—</td><td>—</td><td>some</td></tr>
+      <tr><td>Social saves (X, TikTok, Instagram, Reddit, Bluesky, Threads)</td><td>✅</td><td>—</td><td>links only</td><td>some</td></tr>
+      <tr><td>Offline, survives deletion</td><td>✅</td><td>articles</td><td>—</td><td>✅</td></tr>
+      <tr><td>Search inside pictures and video speech</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>On-device AI</td><td>✅</td><td>cloud</td><td>cloud</td><td>external API</td></tr>
+      <tr><td>No account, no server</td><td>✅</td><td>—</td><td>—</td><td>needs a server</td></tr>
+      <tr><td>Native Mac, iPhone and iPad apps</td><td>✅</td><td>✅</td><td>✅</td><td>web</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="get">
+    <p class="eyebrow">Get it</p>
+    <h2>Free, private, yours.</h2>
+    <div class="get">
+      <div class="card"><h3>Mac</h3><p>macOS 26 or later. Signed and notarized by Apple; it keeps itself up to date and checks every update's signature first.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a></div>
+      <div class="card"><h3>iPhone and iPad</h3><p>Coming to the App Store. The app walks you through the Share menu, the Safari extension and iCloud backup on first launch.</p></div>
+      <div class="card"><h3>Open source</h3><p>MIT licensed. Read the code, build it yourself, or share an idea. Help and questions on the <a href="support.html">support page</a>.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark">Source on GitHub</a></div>
+    </div>
+  </section>
 </main>
 
 <footer>
-  © 2026 Furkan Türkoğlu · MIT License · <a href="privacy.html">Privacy</a> · <a href="support.html">Support</a> · <a href="tr.html">Türkçe</a><br>
+  © 2026 Furkan Türkoğlu · MIT License · <a href="privacy.html">Privacy</a> · <a href="support.html">Support</a> · <a href="tr.html" hreflang="tr">Türkçe</a><br>
   Screenshots show Wikipedia articles (CC BY-SA 4.0) in a demo library.
 </footer>
 </body>

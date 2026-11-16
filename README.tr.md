@@ -9,8 +9,13 @@
   <a href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Mac için indir</a> ·
   <a href="#kurulum-macos-26">Kurulum</a> ·
   <a href="#kullanım">Kullanım</a> ·
+  <a href="#hafif-ve-hızlı">Hafif ve hızlı</a> ·
   <a href="ARCHITECTURE.md">Mimari</a> ·
   <a href="README.md">English</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/tr-mac-1-library.jpg" width="860" alt="Mac'te wroopmark: kayıtlar bir ızgarada, sağda seçili kaydın özeti, klasörü ve etiketleri">
 </p>
 
 <p align="center">
@@ -77,6 +82,31 @@ Ekran görüntüleri demo kütüphanedeki Wikipedia makaleleridir (CC BY-SA 4.0)
 **Hızlı kayıt**
 - Menü çubuğundan link kaydet; her uygulamada ⌃⌥⌘S panodaki linki kaydeder.
 - Eklentide ⌥⇧S, sağ tıkla klasöre kaydet; arşivdeki sayfalarda simgede ✓.
+
+## Hafif ve hızlı
+
+Kutuya konmuş bir tarayıcı değil, yerel bir uygulama: Electron yok, arka plan
+servisi yok, sıcak tutulan bir web motoru yok. Mac uygulaması açık dururken sen
+kullanmıyorsan **hiç işlemci kullanmaz**. Görsellerde yazı tanıma ve cihazdaki
+yapay zekâ küçük yardımcı süreçlerde, yalnızca iş varken çalışır; Ayarlar'dan
+duraklatılır.
+
+| Mac'te ölçülen (M4 Pro, macOS 27.2, wroopmark 1.7.0) | |
+|---|--:|
+| İşlemci, pencere açık, boşta: 50.000 gönderilik kütüphane ve bir günlük kullanımdan sonra gerçek bir arşiv | **%0,0** |
+| Bellek, 50.000 gönderi, pencere açık | **~110 MB** |
+| Bellek, bir günlük kullanımdan sonra, ekran görsellerle dolu | **~280 MB** |
+| Kütüphaneyi açma | **5 ms** |
+| En yeni gönderilerin ilk sayfası | **0,6 ms** |
+| 50.000 gönderide kelime ya da öbek araması | **7–21 ms** |
+| Süzgeçler (`platform:x has:video tag:…`, `from:@…`, klasörler) | **3–32 ms** |
+| İndirme / kurulu uygulama | **15 MB / 29 MB** |
+
+Bellek sistemin "footprint" değeri; işlemci bir dakika boyunca `top`. Dürüst
+olmak gerekirse: büyük bir içe aktarmadan sonra kütüphane bir kez arka planda
+dizinlenir (görsellerdeki yazı, anlamına göre arama) ve bitene kadar işlemci
+kullanır. Süreler bu deponun kendi testinden, kendin de bakabilirsin:
+`WM_PERF_N=50000 cargo test --release --test perf -- --ignored --nocapture`.
 
 ## iPhone
 

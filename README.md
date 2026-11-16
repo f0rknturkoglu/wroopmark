@@ -10,8 +10,13 @@
   <a href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a> ·
   <a href="#install">Install</a> ·
   <a href="#features">Features</a> ·
-  <a href="PRIVACY.md">Privacy</a> ·
+  <a href="#light-and-fast">Light and fast</a> ·
+  <a href="https://f0rknturkoglu.github.io/wroopmark/privacy.html">Privacy</a> ·
   <a href="README.tr.md">Türkçe</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/en-mac-1-library.jpg" width="860" alt="wroopmark on Mac: saved pages in a grid, with the selected item's summary, folder and tags">
 </p>
 
 <p align="center">
@@ -72,6 +77,30 @@ local SQLite library, and optional sync through your own iCloud Drive.
 - Export to Markdown (Obsidian-ready, with pictures), CSV, JSON, or a single
   offline HTML page you can send to anyone.
 - An MCP server lets AI agents such as Claude search and read your archive, on your machine.
+
+## Light and fast
+
+A native app, not a browser in a box: no Electron, no background service, no
+web engine kept warm. When the Mac app sits open and you aren't using it, it
+uses **no CPU at all**. Text recognition and on-device AI run in small helper
+processes only while they have work, and can be paused in Settings.
+
+| Measured on a Mac (M4 Pro, macOS 27.2, wroopmark 1.7.0) | |
+|---|--:|
+| CPU, window open, idle: a 50,000-post library, and a real archive after a day of use | **0.0%** |
+| Memory, 50,000 posts, window open | **~110 MB** |
+| Memory after a day of everyday use, a screen full of pictures | **~280 MB** |
+| Open the library | **5 ms** |
+| First page of the newest posts | **0.6 ms** |
+| Word or phrase search across 50,000 posts | **7–21 ms** |
+| Filters (`platform:x has:video tag:…`, `from:@…`, folders) | **3–32 ms** |
+| Download / installed app | **15 MB / 29 MB** |
+
+Memory is the system's "footprint" figure; CPU is `top` over a minute. The
+honest catch: after a big import the library is indexed once in the background
+(text in pictures, search by meaning), and that uses CPU until it is done.
+The timings come from this repository's own test, so you can check them:
+`WM_PERF_N=50000 cargo test --release --test perf -- --ignored --nocapture`.
 
 ## Install
 
