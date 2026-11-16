@@ -293,7 +293,7 @@
       <span>wroopmark</span>
       <span class="brand-badge">PRO</span>
     </div>
-    <span id="status">bağlanıyor…</span>
+    <span id="status" data-en="connecting…">bağlanıyor…</span>
   </header>
 
   <div class="container">
@@ -301,21 +301,21 @@
     <section class="card" id="collectCard">
       <div class="card-header">
         <div class="card-title">
-          <span>📦 Toplanan İçerikler</span>
+          <span data-en="📦 Collected">📦 Toplanan İçerikler</span>
         </div>
         <div class="row">
-          <label class="auto-sync" title="Açıkken yer imleri gezinirken kendiliğinden aktarılır"><input type="checkbox" id="autoSyncToggle"> Otomatik</label>
+          <label class="auto-sync" title="Açıkken yer imleri gezinirken kendiliğinden aktarılır" data-en-title="When on, bookmarks are imported on their own as you browse"><input type="checkbox" id="autoSyncToggle"> <span data-en="Automatic">Otomatik</span></label>
           <span class="badge-count empty" id="collectedBadge">0</span>
         </div>
       </div>
-      <div class="card-sub" id="collectedSummary">
+      <div class="card-sub" id="collectedSummary" data-en="Posts and links gather here as you browse; import them into the library with one click.">
         Sayfada gezindikçe gönderiler ve linkler burada birikir; tek tıkla kütüphaneye aktarabilirsiniz.
       </div>
       <div class="row">
         <button id="importCollectedBtn" class="primary" disabled>
-          📥 Wroopmark'a Aktar (<span id="collectedBtnCount">0</span>)
+          📥 <span data-en="Import into wroopmark">Wroopmark'a Aktar</span> (<span id="collectedBtnCount">0</span>)
         </button>
-        <button id="clearCollectedBtn" class="ghost" style="display:none;">Temizle</button>
+        <button id="clearCollectedBtn" class="ghost" style="display:none;" data-en="Clear">Temizle</button>
       </div>
       <div class="row" id="siteImportRow" style="display:none; margin-top:6px;">
         <button id="siteImportBtn" class="scroll-btn"></button>
@@ -327,14 +327,14 @@
     <section class="card">
       <div class="card-header">
         <div class="card-title">
-          <span>⚡ Otomatik Kaydırıcı</span>
+          <span data-en="⚡ Auto Scroller">⚡ Otomatik Kaydırıcı</span>
         </div>
       </div>
-      <div class="card-sub">
+      <div class="card-sub" data-en="Scrolls smoothly. You can still scroll yourself with the mouse or trackpad while it runs.">
         Akıcı kaydırma yapar. Kaydırma sırasında mouse veya dokunmatik yüzeyle kendiniz de serbestçe kaydırabilirsiniz.
       </div>
       <button id="autoScrollBtn" class="scroll-btn">
-        <span id="scrollIcon">▶</span> <span id="scrollLabel">Otomatik Kaydır</span>
+        <span id="scrollIcon">▶</span> <span id="scrollLabel" data-en="Auto Scroll">Otomatik Kaydır</span>
       </button>
       <div id="scrollMsg" class="msg"></div>
     </section>
@@ -343,27 +343,27 @@
     <section class="card">
       <div class="card-header">
         <div class="card-title">
-          <span>💾 Bu Sayfayı Kaydet</span>
+          <span data-en="💾 Save This Page">💾 Bu Sayfayı Kaydet</span>
         </div>
       </div>
       <div id="savedHere" class="saved-here"></div>
-      <input id="tags" placeholder="etiketler: reddit, dev/rust, makale" list="taglist" autocomplete="off">
+      <input id="tags" placeholder="etiketler: reddit, dev/rust, makale" data-en-placeholder="tags: reddit, dev/rust, article" list="taglist" autocomplete="off">
       <div class="row" style="margin-top:6px;">
-        <select id="folder" aria-label="Klasör"><option value="">Klasörsüz</option></select>
+        <select id="folder" aria-label="Klasör"><option value="" data-en="No folder">Klasörsüz</option></select>
       </div>
       <datalist id="taglist"></datalist>
       <div class="row" style="margin-top:6px;">
-        <textarea id="note" placeholder="not (isteğe bağlı)"></textarea>
+        <textarea id="note" placeholder="not (isteğe bağlı)" data-en-placeholder="note (optional)"></textarea>
       </div>
       <div class="row" style="margin-top:6px;">
-        <button id="save" class="primary" title="Kısayol: ⌥⇧S">Sayfayı Arşive Kaydet</button>
+        <button id="save" class="primary" title="Kısayol: ⌥⇧S" data-en-title="Shortcut: ⌥⇧S" data-en="Save Page to Archive">Sayfayı Arşive Kaydet</button>
       </div>
       <div id="saveMsg" class="msg"></div>
     </section>
 
     <!-- 4. Kütüphanede Ara -->
     <section class="card">
-      <input id="q" placeholder="Kütüphanede Ara… (tag:dev from:@user)" autocomplete="off">
+      <input id="q" placeholder="Kütüphanede Ara… (tag:dev from:@user)" data-en-placeholder="Search the library… (tag:dev from:@user)" autocomplete="off">
       <ul id="results"></ul>
     </section>
   </div>

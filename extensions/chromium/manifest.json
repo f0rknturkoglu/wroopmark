@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "wroopmark",
   "version": "0.9.0",
-  "description": "X, TikTok, Reddit, YouTube, Instagram, Bluesky, Threads, GitHub ve web sayfalarını çevrimdışı wroopmark arşivine kaydeder.",
+  "description": "Saves X, TikTok, Reddit, YouTube, Instagram, Bluesky, Threads, GitHub and web pages to your offline wroopmark archive.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0ZhkDq9WoyDir+hq4EOdirc1cN24ZnVPAB1Z0MJQvmRogkGGM7o0AdCfaMHgIiB8SJ+Yj2dwGhicZd4vQAPuhLm8DzXi24eh76B4vUmXb9qsMHDRegVTZVTT/SWC6XJux98TBlWaaL3xTb75iglYrgROMiGZ0W9HFFnRFAwvKoirr7bc9ZrbsdN5lUWlAbW4C4lQGaxilzVqCunEIAKtvXthl+sluq29mxGXx2ZbHIRBITt8PHyTs3Wmbbu19QJS0nXhwWGzopSuXYnfhY1KVDzpsK97Ep/dZ8liQ3WJKl7OnrQffd9Ly6FJ7zfJ5RUjLfhh9MPZlm/UYfqJdYwtlwIDAQAB",
   "minimum_chrome_version": "116",
   "permissions": [
@@ -69,11 +69,11 @@
   "commands": {
     "_execute_action": {
       "suggested_key": { "default": "Alt+Shift+W" },
-      "description": "wroopmark penceresini aç"
+      "description": "Open the wroopmark window"
     },
     "save-page": {
       "suggested_key": { "default": "Alt+Shift+S" },
-      "description": "Bu sayfayı wroopmark'a kaydet"
+      "description": "Save this page to wroopmark"
     }
   },
   "action": {

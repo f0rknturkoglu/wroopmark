@@ -41,7 +41,7 @@ function call(cmd, args = {}) {
   if (IS_SAFARI) {
     return browser.runtime
       .sendNativeMessage(HOST, { ...args, cmd })
-      .then((r) => r ?? { ok: false, error: "wroopmark yanıt vermedi" }, (e) => ({ ok: false, error: String(e) }));
+      .then((r) => r ?? { ok: false, error: t("wroopmark yanıt vermedi", "wroopmark did not answer") }, (e) => ({ ok: false, error: String(e) }));
   }
   armIdle();
   return new Promise((resolve) => {
@@ -55,6 +55,10 @@ function call(cmd, args = {}) {
     }
   });
 }
+
+// Turkish for Turkish browsers, English for everyone else.
+const TR = (navigator.language || "en").toLowerCase().startsWith("tr");
+const t = (tr, en) => (TR ? tr : en);
 
 function log(line) {
   return call("log", { line: `${IS_SAFARI ? "safari" : "chrome"} ${line}` });
@@ -971,7 +975,8 @@ async function redditSavedPages(maxPages) {
     .then((r) => r.json())
     .catch(() => null);
   const name = me && me.data && me.data.name;
-  if (!name) return { error: "Reddit'e giriş yapılmamış görünüyor" };
+  // Runs inside the page: no `t` here, the caller words the error.
+  if (!name) return { error: "signed_out" };
   const pages = [];
   let after = null;
   for (let i = 0; i < maxPages; i++) {
@@ -991,15 +996,16 @@ async function redditSavedPages(maxPages) {
 async function importReddit() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id || !/^https:\/\/([a-z0-9-]+\.)?reddit\.com\//.test(tab.url || "")) {
-    return { ok: false, error: "Önce reddit.com'da bir sekme aç" };
+    return { ok: false, error: t("Önce reddit.com'da bir sekme aç", "Open a reddit.com tab first") };
   }
   let res;
   try {
     [{ result: res }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: redditSavedPages, args: [10] });
   } catch (e) {
-    return { ok: false, error: `Reddit okunamadı: ${e}` };
+    return { ok: false, error: `${t("Reddit okunamadı", "Couldn't read Reddit")}: ${e}` };
   }
-  if (!res || res.error) return { ok: false, error: res?.error || "Reddit okunamadı" };
+  if (res?.error === "signed_out") return { ok: false, error: t("Reddit'e giriş yapılmamış görünüyor", "You don't seem to be signed in to Reddit") };
+  if (!res || res.error) return { ok: false, error: res?.error || t("Reddit okunamadı", "Couldn't read Reddit") };
   let total = 0;
   let fresh = 0;
   for (const payload of res.pages) {
@@ -1023,10 +1029,10 @@ let menuBuild = Promise.resolve();
 function buildMenus() {
   menuBuild = menuBuild.then(async () => {
     await chrome.contextMenus.removeAll();
-    chrome.contextMenus.create({ id: "save", title: "wroopmark'a kaydet", contexts: MENU_CONTEXTS });
+    chrome.contextMenus.create({ id: "save", title: t("wroopmark'a kaydet", "Save to wroopmark"), contexts: MENU_CONTEXTS });
     const r = await call("folders");
     if (!r.ok || !r.data.length) return;
-    chrome.contextMenus.create({ id: "save-folder", title: "wroopmark'ta klasöre kaydet", contexts: MENU_CONTEXTS });
+    chrome.contextMenus.create({ id: "save-folder", title: t("wroopmark'ta klasöre kaydet", "Save to a wroopmark folder"), contexts: MENU_CONTEXTS });
     for (const f of r.data.slice(0, 40)) {
       chrome.contextMenus.create({ id: `folder:${f.id}`, parentId: "save-folder", title: f.name.replaceAll("/", " › "), contexts: MENU_CONTEXTS });
     }
@@ -1082,7 +1088,7 @@ const POPUP_ONLY = new Set([
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (POPUP_ONLY.has(msg.type) && !fromExtensionPage(sender)) {
-    reply({ ok: false, error: "izin yok" });
+    reply({ ok: false, error: t("izin yok", "not allowed") });
     return false;
   }
 
@@ -1115,14 +1121,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 
     case "save_tab":
       chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-        if (!tab) return reply({ ok: false, error: "Aktif sekme bulunamadı" });
+        if (!tab) return reply({ ok: false, error: t("Aktif sekme bulunamadı", "No active tab") });
         saveTab(tab, msg).then(reply);
       });
       return true;
 
     case "toggle_autoscroll":
       chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-        if (!tab || !tab.id) return reply({ ok: false, error: "Aktif sekme bulunamadı" });
+        if (!tab || !tab.id) return reply({ ok: false, error: t("Aktif sekme bulunamadı", "No active tab") });
         const { scrollingTabId } = await chrome.storage.session.get("scrollingTabId");
         const isRunning = scrollingTabId === tab.id;
 
