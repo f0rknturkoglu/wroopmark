@@ -215,7 +215,8 @@ impl Store {
     pub fn apply_remote_extras(&mut self, item: &Item) -> Result<()> {
         let pk = pk_of(&self.conn, &item.id)?;
         self.conn.execute("UPDATE items SET stub = ?2, ocr = coalesce(?3, ocr) WHERE pk = ?1", params![pk, item.stub, item.ocr])?;
-        reindex_item(&self.conn, pk)
+        // The upsert has just indexed it; only the picture text is new here.
+        if item.ocr.as_deref().is_some_and(|o| !o.is_empty()) { reindex_item(&self.conn, pk) } else { Ok(()) }
     }
 
     /// Notes files of remote items that are in the sync folder but not on

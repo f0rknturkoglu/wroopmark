@@ -367,6 +367,32 @@ fn backup_before_upgrade(path: &Path) {
     }
 }
 
+/// What `Store::write` hands out: a transaction, or a savepoint when a
+/// batch is open. Both commit with `commit()` and roll back when dropped.
+pub(crate) enum Tx<'a> {
+    Top(Transaction<'a>),
+    Nested(rusqlite::Savepoint<'a>),
+}
+
+impl std::ops::Deref for Tx<'_> {
+    type Target = Connection;
+    fn deref(&self) -> &Connection {
+        match self {
+            Tx::Top(t) => t,
+            Tx::Nested(s) => s,
+        }
+    }
+}
+
+impl Tx<'_> {
+    pub fn commit(self) -> rusqlite::Result<()> {
+        match self {
+            Tx::Top(t) => t.commit(),
+            Tx::Nested(s) => s.commit(),
+        }
+    }
+}
+
 /// Every sync trigger, for tests that rebuild an old schema.
 #[cfg(test)]
 const SYNC_TRIGGERS: [&str; 17] = [
@@ -869,6 +895,33 @@ fn drop_orphan_tags(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// The same for a few tags (one post's): an index lookup each, where the
+/// whole-table form costs the size of the library on every call (a first
+/// sync of 50 000 posts spent most of its time there).
+fn drop_orphan_tags_of(conn: &Connection, tags: &[i64]) -> Result<()> {
+    let mut stmt = conn.prepare_cached("DELETE FROM tags WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM item_tags WHERE tag = ?1)")?;
+    for t in tags {
+        stmt.execute([t])?;
+    }
+    Ok(())
+}
+
+/// Of these links, the ones no post mentions any more (and not added by hand).
+fn drop_orphan_links_of(conn: &Connection, links: &[i64]) -> Result<()> {
+    let mut gone = conn.prepare_cached("DELETE FROM links WHERE id = ?1 AND manual = 0 AND NOT EXISTS (SELECT 1 FROM item_links WHERE link = ?1)")?;
+    let mut fts = conn.prepare_cached("DELETE FROM links_fts WHERE rowid = ?1 AND NOT EXISTS (SELECT 1 FROM links WHERE id = ?1)")?;
+    for l in links {
+        gone.execute([l])?;
+        fts.execute([l])?;
+    }
+    Ok(())
+}
+
+fn ids_of(conn: &Connection, sql: &str, pk: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare_cached(sql)?;
+    Ok(stmt.query_map([pk], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?)
+}
+
 /// Links no post mentions any more (and the user did not add by hand).
 fn drop_orphan_links(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM links WHERE manual = 0 AND id NOT IN (SELECT link FROM item_links)", [])?;
@@ -1288,8 +1341,31 @@ impl Store {
     /// Write transactions take the write lock up front. A deferred one that
     /// reads first and then writes fails at once with "database is locked"
     /// (no busy wait) when the other process committed in between.
-    fn write(&mut self) -> Result<Transaction<'_>> {
-        Ok(self.conn.transaction_with_behavior(TransactionBehavior::Immediate)?)
+    /// A write: its own transaction, or a savepoint inside a batch that is
+    /// already open (`begin_batch`).
+    fn write(&mut self) -> Result<Tx<'_>> {
+        if self.conn.is_autocommit() {
+            Ok(Tx::Top(self.conn.transaction_with_behavior(TransactionBehavior::Immediate)?))
+        } else {
+            Ok(Tx::Nested(self.conn.savepoint()?))
+        }
+    }
+
+    /// Many small writes in one transaction (applying another device's
+    /// log): one commit instead of several per post, and the search index
+    /// is not rewritten after each. `end_batch` commits.
+    pub fn begin_batch(&mut self) -> Result<()> {
+        if self.conn.is_autocommit() {
+            self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        }
+        Ok(())
+    }
+
+    pub fn end_batch(&mut self) -> Result<()> {
+        if !self.conn.is_autocommit() {
+            self.conn.execute_batch("COMMIT")?;
+        }
+        Ok(())
     }
 
     /// Bumps whenever another connection (the browser extension's host)
@@ -1723,13 +1799,14 @@ impl Store {
     pub fn set_tags(&mut self, id: &str, tags: &[String]) -> Result<()> {
         let tx = self.write()?;
         let pk = pk_of(&tx, id)?;
+        let before = ids_of(&tx, "SELECT tag FROM item_tags WHERE item = ?1", pk)?;
         tx.execute("DELETE FROM item_tags WHERE item = ?1", [pk])?;
         for t in tags {
             if let Some(tag) = ensure_tag(&tx, t)? {
                 tx.execute("INSERT OR IGNORE INTO item_tags(item, tag) VALUES (?1, ?2)", [pk, tag])?;
             }
         }
-        drop_orphan_tags(&tx)?;
+        drop_orphan_tags_of(&tx, &before)?;
         reindex_item(&tx, pk)?;
         tx.commit()?;
         Ok(())
@@ -1929,10 +2006,12 @@ impl Store {
         let quote_item = quote.and_then(|q| serde_json::from_str::<Item>(&q).ok());
         let files: Vec<String> =
             media_items.into_iter().chain(quote_item.into_iter().flat_map(|q| q.media)).flat_map(|m| [m.file, m.video_file]).flatten().collect();
+        let tags = ids_of(&tx, "SELECT tag FROM item_tags WHERE item = ?1", pk)?;
+        let links = ids_of(&tx, "SELECT link FROM item_links WHERE item = ?1", pk)?;
         tx.execute("DELETE FROM items WHERE pk = ?1", [pk])?;
         tx.execute("DELETE FROM items_fts WHERE rowid = ?1", [pk])?;
-        drop_orphan_tags(&tx)?;
-        drop_orphan_links(&tx)?;
+        drop_orphan_tags_of(&tx, &tags)?;
+        drop_orphan_links_of(&tx, &links)?;
         let mut orphans = vec![];
         for f in files {
             let used: bool = tx.query_row(

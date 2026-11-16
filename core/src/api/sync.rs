@@ -634,15 +634,28 @@ impl Library {
         if !lines.is_empty() {
             lines.sort_by(|a, b| (a.ts, &a.dev).cmp(&(b.ts, &b.dev)));
             self.lock_store()?.set_applying(true)?;
+            // In batches of 500: a first sync of a big library is mostly
+            // commits and search-index rewrites otherwise (50 000 posts
+            // took half a minute). What was applied before an error is
+            // committed, as it was when every write committed alone.
             let result = (|| -> Result<()> {
-                for op in lines {
+                for (i, op) in lines.into_iter().enumerate() {
+                    if i % 500 == 0 {
+                        let mut store = self.lock_store()?;
+                        store.end_batch()?;
+                        store.begin_batch()?;
+                    }
                     if self.apply_op(base, op, report)? {
                         report.applied += 1;
                     }
                 }
                 Ok(())
             })();
-            self.lock_store()?.set_applying(false)?;
+            {
+                let mut store = self.lock_store()?;
+                store.end_batch()?;
+                store.set_applying(false)?;
+            }
             result?;
         }
         let mut store = self.lock_store()?;
