@@ -42,8 +42,53 @@ enum CoreError: LocalizedError, Sendable, Equatable {
         case .noResponse: String(localized: "Çekirdek yanıt vermedi")
         case .invalidEncoding: String(localized: "Çekirdek yanıtı geçersiz")
         case .emptyResult: String(localized: "Çekirdek boş yanıt döndürdü")
-        case .server(let message): message
+        case .server(let message): Self.english ? Self.inEnglish(message) : message
         }
+    }
+
+    private static var english: Bool { Bundle.main.preferredLocalizations.first?.hasPrefix("tr") == false }
+
+    /// The core speaks Turkish; the messages a person can meet, in English.
+    /// Longest first, so a whole message wins over a piece of it.
+    private static let phrases: [(String, String)] = [
+        ("Facebook bu gönderiyi giriş yapmadan göstermiyor; tarayıcı eklentisiyle kaydet", "Facebook does not show this post without signing in; save it with the browser extension"),
+        ("TikTok sayfası okunamadı", "Couldn't read the TikTok page"),
+        ("gizli/silinmiş olabilir ya da eklentiyle kaydet", "it may be private or deleted, or save it with the extension"),
+        ("X oEmbed boş döndü (silinmiş ya da gizli olabilir)", "X returned nothing (the post may be deleted or private)"),
+        ("kural boş olamaz: bir arama terimi yaz (ör. site:github.com)", "A rule can't be empty: write a search term (e.g. site:github.com)"),
+        ("yedek klasörü kütüphanenin içinde olamaz", "The backup folder can't be inside the library"),
+        ("içe aktarılacak bir şey bulunamadı", "Nothing to import was found"),
+        ("yt-dlp ya da gallery-dl kurulu değil", "yt-dlp or gallery-dl is not installed"),
+        ("cihazdaki zeka yardımcısı bulunamadı (wroopmark-ai)", "The on-device intelligence helper was not found (wroopmark-ai)"),
+        ("zeka yardımcısı yanıt vermedi", "The intelligence helper did not answer"),
+        ("zeka yardımcısı", "intelligence helper"),
+        ("bu kaydın beklenen bir videosu yok", "This item has no video to expect"),
+        ("video boyut sınırını aşıyor", "the video is over the size limit"),
+        ("video indirilemedi", "Couldn't download the video"),
+        ("video çok büyük", "The video is too large"),
+        ("klasör adı boş olamaz", "A folder name can't be empty"),
+        ("Zip64 desteklenmiyor", "Zip64 is not supported"),
+        ("zip dizini bulunamadı", "the zip's directory was not found"),
+        ("geçersiz zip boyutu", "invalid zip size"),
+        ("bozuk zip dosya başlığı", "damaged zip file header"),
+        ("bozuk zip kaydı", "damaged zip entry"),
+        ("bozuk zip", "damaged zip"),
+        ("geçersiz zip", "invalid zip"),
+        ("zip açılamadı", "couldn't open the zip"),
+        ("yanıt okunamadı", "couldn't read the answer"),
+        ("geçersiz JSON", "invalid JSON"),
+        ("boş yanıt", "empty answer"),
+        ("zaman aşımı", "timed out"),
+        ("geçersiz URL", "Invalid URL"),
+        ("kayıt yok", "No such item"),
+        ("kaydedilemedi", "Couldn't save"),
+        ("bilinmeyen biçim", "unknown format"),
+        ("bilinmeyen komut", "unknown command"),
+        ("geçersiz istek", "invalid request"),
+    ]
+
+    private static func inEnglish(_ message: String) -> String {
+        phrases.reduce(message) { $0.replacingOccurrences(of: $1.0, with: $1.1) }
     }
 }
 
