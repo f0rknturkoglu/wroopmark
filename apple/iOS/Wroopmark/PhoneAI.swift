@@ -242,7 +242,8 @@ enum PhoneAI {
                 }
                 done.signal()
             }
-            done.wait()
+            // A stuck model must not hold the core's AI lock for ever.
+            if done.wait(timeout: .now() + 90) == .timedOut { return ["error": "model yanıt vermedi"] }
             return box.get()
         case "expand":
             let query = req["query"] as? String ?? ""
@@ -259,7 +260,8 @@ enum PhoneAI {
                 }
                 done.signal()
             }
-            done.wait()
+            // A stuck model must not hold the core's AI lock for ever.
+            if done.wait(timeout: .now() + 90) == .timedOut { return ["error": "model yanıt vermedi"] }
             return box.get()
         case "status":
             let m = Embedder.load()

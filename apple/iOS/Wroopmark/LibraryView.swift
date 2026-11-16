@@ -289,16 +289,17 @@ struct AddURLView: View {
                         }
                     }
                     .disabled(saving || model.isImporting)
+                    if let msg = model.importMessage, !msg.isEmpty, !model.isImporting {
+                        Text(msg).font(.footnote).foregroundStyle(.secondary)
+                    }
                 } footer: {
                     Text("Veri paketi (.zip), yer imleri (bookmarks.html), CSV ya da video/görsel.")
                 }
             }
             .fileImporter(isPresented: $pickingImport, allowedContentTypes: [.item, .folder], allowsMultipleSelection: true) { result in
                 if case .success(let urls) = result {
-                    Task {
-                        await model.importURLs(urls)
-                        dismiss()
-                    }
+                    // Stays open: the result is shown under the button.
+                    Task { await model.importURLs(urls) }
                 }
             }
             .navigationTitle("Bağlantı")

@@ -57,7 +57,13 @@ impl Library {
                 }
                 let at = crate::text::now();
                 list.push(Highlight {
-                    id: format!("{at:x}{}", list.len()),
+                    // Nanoseconds: two devices marking in the same second
+                    // must not make the same id.
+                    id: format!(
+                        "{:x}{}",
+                        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0),
+                        list.len()
+                    ),
                     quote,
                     prefix: e.prefix.unwrap_or_default(),
                     note: e.note.filter(|n| !n.trim().is_empty()),

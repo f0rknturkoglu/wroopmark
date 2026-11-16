@@ -312,9 +312,12 @@
     if (isThreads) {
       const found = [];
       indexThreads(json, found);
-      const savedPage = location.pathname.includes("/saved") || location.pathname.includes("/liked") || text.includes("saved_media") || text.includes("liked");
+      // Only on the saved / liked pages: every post's JSON carries a
+      // `has_liked` field, so the response text says nothing about the page.
+      const path = location.pathname.replace(/\/+$/, "");
+      const savedPage = path === "/saved" || path === "/liked";
       if (savedPage && found.length) {
-        const tag = location.pathname.includes("/liked") ? "threads/begenilenler" : "threads/kaydedilenler";
+        const tag = path === "/liked" ? "threads/begenilenler" : "threads/kaydedilenler";
         post("threads_list", { tag, items: found });
       }
       return;
