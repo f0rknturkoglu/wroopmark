@@ -10,6 +10,8 @@
 <link rel="alternate" hreflang="tr" href="https://f0rknturkoglu.github.io/wroopmark/tr.html">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="site.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="site.js" defer></script>
 <meta name="theme-color" content="#784AED">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="wroopmark">
@@ -59,6 +61,10 @@
 </div></div>
 
 <header class="hero">
+  <div class="orb a" data-speed="-140"></div>
+  <div class="orb b" data-speed="-70"></div>
+  <div class="orb c" data-speed="-220"></div>
+  <div class="hero-copy">
   <h1>Kaydettiğin her şey, sana ait tek bir arşivde.</h1>
   <p class="lead">X, TikTok, Instagram, Reddit, YouTube ve web'den gönderiler, videolar, makaleler ve görseller Mac'inde, iPhone'unda ve iPad'inde durur. İnternetsiz, aranabilir ve kimsenin sunucusunda değil, çünkü sunucu yok.</p>
   <div class="cta">
@@ -66,6 +72,7 @@
     <a class="btn ghost" href="#iphone">iPhone ve iPad</a>
   </div>
   <p class="cta-note">Ücretsiz ve açık kaynak · macOS 26 ve sonrası · 15 MB, Apple tarafından imzalı ve onaylı</p>
+  </div>
   <div class="stage">
     <img class="mac" src="images/tr-mac-1-library.jpg" width="1600" height="867" alt="Mac'te wroopmark: görselli ve etiketli kayıtlardan bir ızgara, sağda seçili kaydın özeti, klasörü ve etiketleri">
     <div class="iphone phone"><div class="screen"><img src="images/tr-screen-1-list.jpg" width="460" height="1000" alt="iPhone'da wroopmark: kütüphane listesi"></div></div>
@@ -73,24 +80,24 @@
 </header>
 
 <div class="stats">
-  <div class="stat"><b>%0,0 işlemci</b><span>Mac'te açık dururken, sen bir şey yapmıyorken</span></div>
-  <div class="stat"><b>~110 MB</b><span>bellek, kütüphanede 50.000 gönderi varken</span></div>
-  <div class="stat"><b>&lt; 35 ms</b><span>50.000 gönderide arama, süzme ya da sayfa geçişi</span></div>
-  <div class="stat"><b>0 sunucu</b><span>hesap yok, takip yok, üye olunacak bir şey yok</span></div>
+  <div class="stat reveal" style="--d:0"><b>%0,0 işlemci</b><span>Mac'te açık dururken, sen bir şey yapmıyorken</span></div>
+  <div class="stat reveal" style="--d:1"><b>~110 MB</b><span>bellek, kütüphanede 50.000 gönderi varken</span></div>
+  <div class="stat reveal" style="--d:2"><b>&lt; 35 ms</b><span>50.000 gönderide arama, süzme ya da sayfa geçişi</span></div>
+  <div class="stat reveal" style="--d:3"><b>0 sunucu</b><span>hesap yok, takip yok, üye olunacak bir şey yok</span></div>
 </div>
 
 <main>
   <section>
-    <p class="intro">Her yerde bir şeyler kaydediyorsun: X yer imleri, TikTok favorileri, Instagram ve Reddit kaydedilenleri, YouTube Daha Sonra İzle, Bluesky, Threads, makaleler. Hepsi ayrı uygulamalarda duruyor, çoğunda arama yok ve aradığın gönderi, sahibi sildiği gün kayboluyor. <b style="color:var(--ink)">wroopmark metni, görselleri ve videoları kendi cihazlarında saklar</b>; internetsiz okunur, asıl gönderi silinse de kalır.</p>
+    <p class="intro reveal">Her yerde bir şeyler kaydediyorsun: X yer imleri, TikTok favorileri, Instagram ve Reddit kaydedilenleri, YouTube Daha Sonra İzle, Bluesky, Threads, makaleler. Hepsi ayrı uygulamalarda duruyor, çoğunda arama yok ve aradığın gönderi, sahibi sildiği gün kayboluyor. <b style="color:var(--ink)">wroopmark metni, görselleri ve videoları kendi cihazlarında saklar</b>; internetsiz okunur, asıl gönderi silinse de kalır.</p>
   </section>
 
   <section id="mac">
     <div class="split">
       <div class="text">
-        <p class="eyebrow">Mac'te</p>
-        <h2>Gerçek bir Mac uygulaması, kutuya konmuş bir web sayfası değil.</h2>
-        <p class="intro">Rust çekirdeği ve tek bir SQLite dosyası üstünde SwiftUI. Anında açılır, ayağına dolanmaz ve diğer cihazların ağır işini üstlenir.</p>
-        <ul class="ticks">
+        <p class="eyebrow reveal">Mac'te</p>
+        <h2 class="reveal">Gerçek bir Mac uygulaması, kutuya konmuş bir web sayfası değil.</h2>
+        <p class="intro reveal">Rust çekirdeği ve tek bir SQLite dosyası üstünde SwiftUI. Anında açılır, ayağına dolanmaz ve diğer cihazların ağır işini üstlenir.</p>
+        <ul class="ticks reveal">
           <li><b>Tarayıcı eklentisi</b> (Chrome, Brave, Arc, Edge, Vivaldi ve Safari): X yer imlerin, Instagram ve Bluesky kaydedilenlerin, TikTok favorilerin ve YouTube listelerin gezindikçe arşive akar.</li>
           <li><b>Her yerden kaydet</b>: herhangi bir uygulamada <kbd>⌃⌥⌘S</kbd>, menü çubuğu ya da sağ tık → Servisler → wroopmark'a Kaydet.</li>
           <li><b>Klavyeyle</b>: <kbd>⌘N</kbd> ekle, <kbd>Boşluk</kbd> önizle, oklarla gez, <kbd>⇧⌘P</kbd> tam ekran video akışı.</li>
@@ -98,51 +105,52 @@
           <li><b>Yapay zekâ ajanları</b> (Claude gibi) arşivinde yerel bir MCP sunucusuyla, senin bilgisayarında arar ve okur.</li>
         </ul>
       </div>
-      <img class="shot" src="images/tr-mac-2-triage.jpg" width="1600" height="867" alt="Mac'te Ayıkla: kayıtlar tek tek gelir; cihazda özet, önerilen klasörler, Sil, Geri al ve Sakla düğmeleri" loading="lazy">
+      <img class="shot reveal-fade" data-speed="-50" src="images/tr-mac-2-triage.jpg" width="1600" height="867" alt="Mac'te Ayıkla: kayıtlar tek tek gelir; cihazda özet, önerilen klasörler, Sil, Geri al ve Sakla düğmeleri" loading="lazy">
     </div>
   </section>
 
   <section>
     <div class="split flip">
       <div class="text">
-        <p class="eyebrow">Her şeyi bul</p>
-        <h2>Kelimede, görselde ve anlamda ara.</h2>
-        <p class="intro"><code>tag:</code>, <code>from:@</code>, <code>has:video</code>, <code>after:2024</code> gibi süzgeçlerle tek bir arama kutusu. Ekran görüntülerindeki yazı ve videolardaki konuşma aranabilir; Apple'ın cihazdaki modelleriyle anlamına göre de ararsın. Hiçbir şey cihazdan çıkmaz.</p>
+        <p class="eyebrow reveal">Her şeyi bul</p>
+        <h2 class="reveal">Kelimede, görselde ve anlamda ara.</h2>
+        <p class="intro reveal"><code>tag:</code>, <code>from:@</code>, <code>has:video</code>, <code>after:2024</code> gibi süzgeçlerle tek bir arama kutusu. Ekran görüntülerindeki yazı ve videolardaki konuşma aranabilir; Apple'ın cihazdaki modelleriyle anlamına göre de ararsın. Hiçbir şey cihazdan çıkmaz.</p>
       </div>
-      <img class="shot" src="images/tr-mac-3-gallery.jpg" width="1600" height="867" alt="Mac'te görsel galerisi: kaydedilen bütün görseller bir ızgarada" loading="lazy">
+      <img class="shot reveal-fade" data-speed="-70" src="images/tr-mac-3-gallery.jpg" width="1600" height="867" alt="Mac'te görsel galerisi: kaydedilen bütün görseller bir ızgarada" loading="lazy">
     </div>
   </section>
 
   <section id="iphone">
-    <p class="eyebrow">iPhone ve iPad'de</p>
-    <h2>Her uygulamadan Paylaş → wroopmark.</h2>
-    <p class="intro">Bağlantı hemen kaydedilir, metin ve görseller arkasından gelir. İnternetsiz oku, videolarını TikTok gibi kaydır, bir kaydırmayla ayıkla. Tek başına çalışır; Mac yalnızca hızlandırır.</p>
-    <div class="phones">
-      <div class="iphone"><div class="screen"><img src="images/tr-screen-1-list.jpg" width="460" height="1000" alt="iPhone'da kütüphane listesi" loading="lazy"></div></div>
-      <div class="iphone"><div class="screen"><img src="images/tr-screen-2-item.jpg" width="460" height="1000" alt="Görseli, etiketleri ve klasörüyle kayıtlı bir gönderi" loading="lazy"></div></div>
-      <div class="iphone"><div class="screen"><img src="images/tr-screen-3-reader.jpg" width="460" height="1000" alt="Sade, internetsiz okuyucu" loading="lazy"></div></div>
-      <div class="iphone"><div class="screen"><img src="images/tr-screen-4-triage.jpg" width="460" height="1000" alt="Cihazda özetle ayıklama" loading="lazy"></div></div>
+    <p class="eyebrow reveal">iPhone ve iPad'de</p>
+    <h2 class="reveal">Her uygulamadan Paylaş → wroopmark.</h2>
+    <p class="intro reveal">Bağlantı hemen kaydedilir, metin ve görseller arkasından gelir. İnternetsiz oku, videolarını TikTok gibi kaydır, bir kaydırmayla ayıkla. Tek başına çalışır; Mac yalnızca hızlandırır.</p>
+    <div class="phones reveal">
+      <div class="iphone" data-speed="30"><div class="screen"><img src="images/tr-screen-1-list.jpg" width="460" height="1000" alt="iPhone'da kütüphane listesi" loading="lazy"></div></div>
+      <div class="iphone" data-speed="90"><div class="screen"><img src="images/tr-screen-2-item.jpg" width="460" height="1000" alt="Görseli, etiketleri ve klasörüyle kayıtlı bir gönderi" loading="lazy"></div></div>
+      <div class="iphone" data-speed="45"><div class="screen"><img src="images/tr-screen-3-reader.jpg" width="460" height="1000" alt="Sade, internetsiz okuyucu" loading="lazy"></div></div>
+      <div class="iphone" data-speed="105"><div class="screen"><img src="images/tr-screen-4-triage.jpg" width="460" height="1000" alt="Cihazda özetle ayıklama" loading="lazy"></div></div>
     </div>
   </section>
 
   <section>
-    <p class="eyebrow">Gerisi</p>
-    <h2>Geçip gitmek için değil, saklamak için.</h2>
+    <p class="eyebrow reveal">Gerisi</p>
+    <h2 class="reveal">Geçip gitmek için değil, saklamak için.</h2>
     <div class="grid">
-      <div class="card"><h3>İnternetsiz oku</h3><p>Temalı, sesli okumalı, vurgu ve notlu sade okuyucu. Kaydettiğin her sayfanın kopyası; site kapansa da açılır.</p></div>
-      <div class="card"><h3>Kaydettiklerini izle</h3><p>Videolarını ve gönderilerini tam ekran, art arda; resim içinde resim, AirPlay ve oynatma hızıyla.</p></div>
-      <div class="card"><h3>Düzenli tut</h3><p>Klasörler, iç içe etiketler, yeni kayıtları dosyalayan kurallar, kopyalar, kırık link taramalı link havuzu ve Ayıkla.</p></div>
-      <div class="card"><h3>Hepsini getir</h3><p>TikTok, Instagram, X, Threads ve Reddit veri paketleri, tarayıcı yer imleri, Pocket ve Raindrop CSV.</p></div>
-      <div class="card"><h3>Sunucusuz eşitleme</h3><p>Mac, iPhone ve iPad kendi iCloud Drive'ındaki bir klasörle eşit kalır. O klasör aynı zamanda yedeğin.</p></div>
-      <div class="card"><h3>Yanında götür</h3><p>Markdown (Obsidian'a hazır, görselleriyle), CSV, JSON ya da herkese gönderebileceğin tek bir HTML sayfası.</p></div>
+      <div class="card reveal" style="--d:0"><h3>İnternetsiz oku</h3><p>Temalı, sesli okumalı, vurgu ve notlu sade okuyucu. Kaydettiğin her sayfanın kopyası; site kapansa da açılır.</p></div>
+      <div class="card reveal" style="--d:1"><h3>Kaydettiklerini izle</h3><p>Videolarını ve gönderilerini tam ekran, art arda; resim içinde resim, AirPlay ve oynatma hızıyla.</p></div>
+      <div class="card reveal" style="--d:2"><h3>Düzenli tut</h3><p>Klasörler, iç içe etiketler, yeni kayıtları dosyalayan kurallar, kopyalar, kırık link taramalı link havuzu ve Ayıkla.</p></div>
+      <div class="card reveal" style="--d:3"><h3>Hepsini getir</h3><p>TikTok, Instagram, X, Threads ve Reddit veri paketleri, tarayıcı yer imleri, Pocket ve Raindrop CSV.</p></div>
+      <div class="card reveal" style="--d:4"><h3>Sunucusuz eşitleme</h3><p>Mac, iPhone ve iPad kendi iCloud Drive'ındaki bir klasörle eşit kalır. O klasör aynı zamanda yedeğin.</p></div>
+      <div class="card reveal" style="--d:5"><h3>Yanında götür</h3><p>Markdown (Obsidian'a hazır, görselleriyle), CSV, JSON ya da herkese gönderebileceğin tek bir HTML sayfası.</p></div>
     </div>
   </section>
 
   <section id="hafif">
-    <div class="light">
-      <p class="eyebrow">Hafif ve hızlı</p>
-      <h2>Boştayken gerçekten boşta.</h2>
-      <p class="intro">Electron yok, arka plan servisi yok, sıcak tutulan bir tarayıcı motoru yok. Pencere açıkken bir şey yapmıyorsan wroopmark işlemci kullanmaz. Görsellerde yazı tanıma ve cihazdaki yapay zekâ küçük yardımcı süreçlerde, yalnızca iş varken çalışır; Ayarlar'dan duraklatılır.</p>
+    <div class="light reveal">
+      <div class="orb" data-speed="-90"></div>
+      <p class="eyebrow reveal">Hafif ve hızlı</p>
+      <h2 class="reveal">Boştayken gerçekten boşta.</h2>
+      <p class="intro reveal">Electron yok, arka plan servisi yok, sıcak tutulan bir tarayıcı motoru yok. Pencere açıkken bir şey yapmıyorsan wroopmark işlemci kullanmaz. Görsellerde yazı tanıma ve cihazdaki yapay zekâ küçük yardımcı süreçlerde, yalnızca iş varken çalışır; Ayarlar'dan duraklatılır.</p>
       <div class="table-wrap">
       <table>
         <tr><th>Mac'te ölçülen</th><th>Sonuç</th></tr>
@@ -161,9 +169,9 @@
   </section>
 
   <section>
-    <p class="eyebrow">Karşılaştırma</p>
-    <h2>Yalnızca linki değil, gönderinin kendisini saklar.</h2>
-    <div class="table-wrap">
+    <p class="eyebrow reveal">Karşılaştırma</p>
+    <h2 class="reveal">Yalnızca linki değil, gönderinin kendisini saklar.</h2>
+    <div class="table-wrap reveal">
     <table class="compare">
       <tr><th></th><th>wroopmark</th><th>Sonra oku uygulamaları</th><th>Yer imi yöneticileri</th><th>Kendi sunucunda arşivleyiciler</th></tr>
       <tr><td>Gönderinin görsel ve videolarını saklar</td><td>✅</td><td>—</td><td>—</td><td>bazıları</td></tr>
@@ -178,12 +186,12 @@
   </section>
 
   <section id="edin">
-    <p class="eyebrow">Edin</p>
-    <h2>Ücretsiz, gizli, senin.</h2>
+    <p class="eyebrow reveal">Edin</p>
+    <h2 class="reveal">Ücretsiz, gizli, senin.</h2>
     <div class="get">
-      <div class="card"><h3>Mac</h3><p>macOS 26 ve sonrası. Apple tarafından imzalı ve onaylı; kendini günceller, her güncellemenin imzasını önce doğrular.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Mac için indir</a></div>
-      <div class="card"><h3>iPhone ve iPad</h3><p>Yakında App Store'da. İlk açılışta Paylaş menüsünü, Safari eklentisini ve iCloud yedeğini adım adım gösterir.</p></div>
-      <div class="card"><h3>Açık kaynak</h3><p>MIT lisanslı. Kodu oku, kendin derle ya da bir fikir paylaş. Yardım ve sorular <a href="support.html#tr">destek sayfasında</a>.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark">GitHub'da kaynak</a></div>
+      <div class="card reveal" style="--d:0"><h3>Mac</h3><p>macOS 26 ve sonrası. Apple tarafından imzalı ve onaylı; kendini günceller, her güncellemenin imzasını önce doğrular.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Mac için indir</a></div>
+      <div class="card reveal" style="--d:1"><h3>iPhone ve iPad</h3><p>Yakında App Store'da. İlk açılışta Paylaş menüsünü, Safari eklentisini ve iCloud yedeğini adım adım gösterir.</p></div>
+      <div class="card reveal" style="--d:2"><h3>Açık kaynak</h3><p>MIT lisanslı. Kodu oku, kendin derle ya da bir fikir paylaş. Yardım ve sorular <a href="support.html#tr">destek sayfasında</a>.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark">GitHub'da kaynak</a></div>
     </div>
   </section>
 </main>

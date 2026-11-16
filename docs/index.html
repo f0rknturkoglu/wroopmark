@@ -10,6 +10,8 @@
 <link rel="alternate" hreflang="tr" href="https://f0rknturkoglu.github.io/wroopmark/tr.html">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="site.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="site.js" defer></script>
 <meta name="theme-color" content="#784AED">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="wroopmark">
@@ -57,6 +59,10 @@
 </div></div>
 
 <header class="hero">
+  <div class="orb a" data-speed="-140"></div>
+  <div class="orb b" data-speed="-70"></div>
+  <div class="orb c" data-speed="-220"></div>
+  <div class="hero-copy">
   <h1>Everything you saved, in one archive you own.</h1>
   <p class="lead">Posts, videos, articles and pictures from X, TikTok, Instagram, Reddit, YouTube and the web, kept on your Mac, iPhone and iPad. Offline, searchable, and on nobody's server, because there isn't one.</p>
   <div class="cta">
@@ -64,6 +70,7 @@
     <a class="btn ghost" href="#iphone">iPhone &amp; iPad</a>
   </div>
   <p class="cta-note">Free and open source · macOS 26 or later · 15 MB, signed and notarized by Apple</p>
+  </div>
   <div class="stage">
     <img class="mac" src="images/en-mac-1-library.jpg" width="1600" height="867" alt="wroopmark on Mac: a grid of saved pages with pictures and tags, and the selected item's summary, folder and tags on the right">
     <div class="iphone phone"><div class="screen"><img src="images/en-screen-1-list.jpg" width="460" height="1000" alt="wroopmark on iPhone: the library list"></div></div>
@@ -71,24 +78,24 @@
 </header>
 
 <div class="stats">
-  <div class="stat"><b>0.0% CPU</b><span>when it sits open and idle on a Mac</span></div>
-  <div class="stat"><b>~110 MB</b><span>of memory with 50,000 posts in the library</span></div>
-  <div class="stat"><b>&lt; 35 ms</b><span>to search, filter or page through 50,000 posts</span></div>
-  <div class="stat"><b>0 servers</b><span>no account, no tracking, nothing to sign up for</span></div>
+  <div class="stat reveal" style="--d:0"><b>0.0% CPU</b><span>when it sits open and idle on a Mac</span></div>
+  <div class="stat reveal" style="--d:1"><b>~110 MB</b><span>of memory with 50,000 posts in the library</span></div>
+  <div class="stat reveal" style="--d:2"><b>&lt; 35 ms</b><span>to search, filter or page through 50,000 posts</span></div>
+  <div class="stat reveal" style="--d:3"><b>0 servers</b><span>no account, no tracking, nothing to sign up for</span></div>
 </div>
 
 <main>
   <section>
-    <p class="intro">You save things everywhere: X bookmarks, TikTok favorites, Instagram and Reddit saved posts, YouTube Watch Later, Bluesky, Threads, articles. They live in different apps, most can't be searched, and the post you wanted is gone the day its author deletes it. <b style="color:var(--ink)">wroopmark keeps the text, the pictures and the videos on your own devices</b>, so they stay readable offline and outlive the original.</p>
+    <p class="intro reveal">You save things everywhere: X bookmarks, TikTok favorites, Instagram and Reddit saved posts, YouTube Watch Later, Bluesky, Threads, articles. They live in different apps, most can't be searched, and the post you wanted is gone the day its author deletes it. <b style="color:var(--ink)">wroopmark keeps the text, the pictures and the videos on your own devices</b>, so they stay readable offline and outlive the original.</p>
   </section>
 
   <section id="mac">
     <div class="split">
       <div class="text">
-        <p class="eyebrow">On your Mac</p>
-        <h2>A real Mac app, not a web page in a box.</h2>
-        <p class="intro">SwiftUI on top of a Rust core and one SQLite file. It opens instantly, stays out of the way, and does the heavy lifting for your other devices.</p>
-        <ul class="ticks">
+        <p class="eyebrow reveal">On your Mac</p>
+        <h2 class="reveal">A real Mac app, not a web page in a box.</h2>
+        <p class="intro reveal">SwiftUI on top of a Rust core and one SQLite file. It opens instantly, stays out of the way, and does the heavy lifting for your other devices.</p>
+        <ul class="ticks reveal">
           <li><b>Browser extension</b> for Chrome, Brave, Arc, Edge, Vivaldi and Safari: your X bookmarks, Instagram and Bluesky saves, TikTok favorites and YouTube lists flow in as you browse.</li>
           <li><b>Save from anywhere</b>: <kbd>⌃⌥⌘S</kbd> in any app, the menu bar, or right-click → Services → Save to wroopmark.</li>
           <li><b>Keyboard first</b>: <kbd>⌘N</kbd> to add, <kbd>Space</kbd> to preview, arrow keys to move, <kbd>⇧⌘P</kbd> for a full-screen video feed.</li>
@@ -96,51 +103,52 @@
           <li><b>AI agents</b> such as Claude can search and read your archive through a local MCP server, on your machine.</li>
         </ul>
       </div>
-      <img class="shot" src="images/en-mac-2-triage.jpg" width="1600" height="867" alt="Triage on Mac: one saved page at a time with an on-device summary, suggested folders, and Delete, Undo and Keep buttons" loading="lazy">
+      <img class="shot reveal-fade" data-speed="-50" src="images/en-mac-2-triage.jpg" width="1600" height="867" alt="Triage on Mac: one saved page at a time with an on-device summary, suggested folders, and Delete, Undo and Keep buttons" loading="lazy">
     </div>
   </section>
 
   <section>
     <div class="split flip">
       <div class="text">
-        <p class="eyebrow">Find anything</p>
-        <h2>Search the words, the pictures and the meaning.</h2>
-        <p class="intro">One field with filters like <code>tag:</code>, <code>from:@</code>, <code>has:video</code>, <code>after:2024</code>. Text inside screenshots and the speech in videos are searchable, and with Apple's on-device models you can search by meaning. Nothing leaves the device.</p>
+        <p class="eyebrow reveal">Find anything</p>
+        <h2 class="reveal">Search the words, the pictures and the meaning.</h2>
+        <p class="intro reveal">One field with filters like <code>tag:</code>, <code>from:@</code>, <code>has:video</code>, <code>after:2024</code>. Text inside screenshots and the speech in videos are searchable, and with Apple's on-device models you can search by meaning. Nothing leaves the device.</p>
       </div>
-      <img class="shot" src="images/en-mac-3-gallery.jpg" width="1600" height="867" alt="The picture gallery on Mac: every saved picture in a grid" loading="lazy">
+      <img class="shot reveal-fade" data-speed="-70" src="images/en-mac-3-gallery.jpg" width="1600" height="867" alt="The picture gallery on Mac: every saved picture in a grid" loading="lazy">
     </div>
   </section>
 
   <section id="iphone">
-    <p class="eyebrow">On your iPhone and iPad</p>
-    <h2>Share → wroopmark, from any app.</h2>
-    <p class="intro">The link is saved at once and the text and pictures follow. Read offline, scroll your saved videos TikTok-style, triage with a swipe. It works on its own; the Mac only makes it faster.</p>
-    <div class="phones">
-      <div class="iphone"><div class="screen"><img src="images/en-screen-1-list.jpg" width="460" height="1000" alt="The library list on iPhone" loading="lazy"></div></div>
-      <div class="iphone"><div class="screen"><img src="images/en-screen-2-item.jpg" width="460" height="1000" alt="A saved post with its picture, tags and folder" loading="lazy"></div></div>
-      <div class="iphone"><div class="screen"><img src="images/en-screen-3-reader.jpg" width="460" height="1000" alt="The clean offline reader" loading="lazy"></div></div>
-      <div class="iphone"><div class="screen"><img src="images/en-screen-4-triage.jpg" width="460" height="1000" alt="Triage with an on-device summary" loading="lazy"></div></div>
+    <p class="eyebrow reveal">On your iPhone and iPad</p>
+    <h2 class="reveal">Share → wroopmark, from any app.</h2>
+    <p class="intro reveal">The link is saved at once and the text and pictures follow. Read offline, scroll your saved videos TikTok-style, triage with a swipe. It works on its own; the Mac only makes it faster.</p>
+    <div class="phones reveal">
+      <div class="iphone" data-speed="30"><div class="screen"><img src="images/en-screen-1-list.jpg" width="460" height="1000" alt="The library list on iPhone" loading="lazy"></div></div>
+      <div class="iphone" data-speed="90"><div class="screen"><img src="images/en-screen-2-item.jpg" width="460" height="1000" alt="A saved post with its picture, tags and folder" loading="lazy"></div></div>
+      <div class="iphone" data-speed="45"><div class="screen"><img src="images/en-screen-3-reader.jpg" width="460" height="1000" alt="The clean offline reader" loading="lazy"></div></div>
+      <div class="iphone" data-speed="105"><div class="screen"><img src="images/en-screen-4-triage.jpg" width="460" height="1000" alt="Triage with an on-device summary" loading="lazy"></div></div>
     </div>
   </section>
 
   <section>
-    <p class="eyebrow">Everything else</p>
-    <h2>Made to keep, not to scroll past.</h2>
+    <p class="eyebrow reveal">Everything else</p>
+    <h2 class="reveal">Made to keep, not to scroll past.</h2>
     <div class="grid">
-      <div class="card"><h3>Read offline</h3><p>A clean reader with themes, read aloud, highlights and notes. A copy of every saved page, readable even if the site disappears.</p></div>
-      <div class="card"><h3>Watch your saves</h3><p>Your saved videos and posts full screen, one after another, with picture-in-picture, AirPlay and playback speed.</p></div>
-      <div class="card"><h3>Keep it tidy</h3><p>Folders, nested tags, rules that file new saves, duplicates, a link pool with broken-link checks, and Triage.</p></div>
-      <div class="card"><h3>Bring it all in</h3><p>Data downloads from TikTok, Instagram, X, Threads and Reddit, browser bookmarks, Pocket and Raindrop CSV.</p></div>
-      <div class="card"><h3>Sync without a server</h3><p>Mac, iPhone and iPad stay in step through a folder in your own iCloud Drive. That folder is also your backup.</p></div>
-      <div class="card"><h3>Take it with you</h3><p>Export to Markdown (Obsidian-ready, with pictures), CSV, JSON, or a single HTML page you can send to anyone.</p></div>
+      <div class="card reveal" style="--d:0"><h3>Read offline</h3><p>A clean reader with themes, read aloud, highlights and notes. A copy of every saved page, readable even if the site disappears.</p></div>
+      <div class="card reveal" style="--d:1"><h3>Watch your saves</h3><p>Your saved videos and posts full screen, one after another, with picture-in-picture, AirPlay and playback speed.</p></div>
+      <div class="card reveal" style="--d:2"><h3>Keep it tidy</h3><p>Folders, nested tags, rules that file new saves, duplicates, a link pool with broken-link checks, and Triage.</p></div>
+      <div class="card reveal" style="--d:3"><h3>Bring it all in</h3><p>Data downloads from TikTok, Instagram, X, Threads and Reddit, browser bookmarks, Pocket and Raindrop CSV.</p></div>
+      <div class="card reveal" style="--d:4"><h3>Sync without a server</h3><p>Mac, iPhone and iPad stay in step through a folder in your own iCloud Drive. That folder is also your backup.</p></div>
+      <div class="card reveal" style="--d:5"><h3>Take it with you</h3><p>Export to Markdown (Obsidian-ready, with pictures), CSV, JSON, or a single HTML page you can send to anyone.</p></div>
     </div>
   </section>
 
   <section id="light">
-    <div class="light">
-      <p class="eyebrow">Light &amp; fast</p>
-      <h2>Idle means idle.</h2>
-      <p class="intro">No Electron, no background service, no browser engine kept warm. When the window is open and you aren't doing anything, wroopmark uses no CPU. Text recognition and on-device AI run in small helper processes only while they have work, and you can pause them in Settings.</p>
+    <div class="light reveal">
+      <div class="orb" data-speed="-90"></div>
+      <p class="eyebrow reveal">Light &amp; fast</p>
+      <h2 class="reveal">Idle means idle.</h2>
+      <p class="intro reveal">No Electron, no background service, no browser engine kept warm. When the window is open and you aren't doing anything, wroopmark uses no CPU. Text recognition and on-device AI run in small helper processes only while they have work, and you can pause them in Settings.</p>
       <div class="table-wrap">
       <table>
         <tr><th>Measured on a Mac</th><th>Result</th></tr>
@@ -159,9 +167,9 @@
   </section>
 
   <section>
-    <p class="eyebrow">How it compares</p>
-    <h2>It keeps the post itself, not just the link.</h2>
-    <div class="table-wrap">
+    <p class="eyebrow reveal">How it compares</p>
+    <h2 class="reveal">It keeps the post itself, not just the link.</h2>
+    <div class="table-wrap reveal">
     <table class="compare">
       <tr><th></th><th>wroopmark</th><th>Read-later apps</th><th>Bookmark managers</th><th>Self-hosted archivers</th></tr>
       <tr><td>Keeps the post's pictures and videos</td><td>✅</td><td>—</td><td>—</td><td>some</td></tr>
@@ -176,12 +184,12 @@
   </section>
 
   <section id="get">
-    <p class="eyebrow">Get it</p>
-    <h2>Free, private, yours.</h2>
+    <p class="eyebrow reveal">Get it</p>
+    <h2 class="reveal">Free, private, yours.</h2>
     <div class="get">
-      <div class="card"><h3>Mac</h3><p>macOS 26 or later. Signed and notarized by Apple; it keeps itself up to date and checks every update's signature first.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a></div>
-      <div class="card"><h3>iPhone and iPad</h3><p>Coming to the App Store. The app walks you through the Share menu, the Safari extension and iCloud backup on first launch.</p></div>
-      <div class="card"><h3>Open source</h3><p>MIT licensed. Read the code, build it yourself, or share an idea. Help and questions on the <a href="support.html">support page</a>.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark">Source on GitHub</a></div>
+      <div class="card reveal" style="--d:0"><h3>Mac</h3><p>macOS 26 or later. Signed and notarized by Apple; it keeps itself up to date and checks every update's signature first.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark/releases/latest">Download for Mac</a></div>
+      <div class="card reveal" style="--d:1"><h3>iPhone and iPad</h3><p>Coming to the App Store. The app walks you through the Share menu, the Safari extension and iCloud backup on first launch.</p></div>
+      <div class="card reveal" style="--d:2"><h3>Open source</h3><p>MIT licensed. Read the code, build it yourself, or share an idea. Help and questions on the <a href="support.html">support page</a>.</p><a class="btn" href="https://github.com/f0rknturkoglu/wroopmark">Source on GitHub</a></div>
     </div>
   </section>
 </main>
