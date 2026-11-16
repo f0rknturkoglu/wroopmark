@@ -404,6 +404,13 @@ final class AppModel {
         if enableSystemIntegrations {
             Spotlight.reindex(core: core)
             QuickSave.shared.attach(self)
+            // At launch, then every few hours (the updater asks GitHub at most daily).
+            Task {
+                while !Task.isCancelled {
+                    Updater.shared.checkInBackground()
+                    try? await Task.sleep(for: .seconds(6 * 3600))
+                }
+            }
         }
     }
 

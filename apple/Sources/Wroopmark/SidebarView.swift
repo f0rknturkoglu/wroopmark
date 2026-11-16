@@ -266,6 +266,21 @@ struct SidebarView: View {
 
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            if case .available(let release) = Updater.shared.phase {
+                Button {
+                    Task { await Updater.shared.install(release) }
+                } label: {
+                    Label("wroopmark \(release.version) hazır: yükle ve yeniden başlat", systemImage: "arrow.down.app")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
+                .help(release.notes)
+            } else if Updater.shared.phase == .downloading {
+                Label("Güncelleme indiriliyor…", systemImage: "arrow.down.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             Button {
                 model.showDownloads.toggle()
             } label: {

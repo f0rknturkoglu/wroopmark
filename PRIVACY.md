@@ -11,6 +11,9 @@
   (başlığını, metnini ve görsellerini almak için).
 - Görsellerdeki yazı tanıma, özetler ve anlamsal arama cihazda çalışır (Apple'ın
   cihazdaki modelleri); içerik dışarı gönderilmez.
+- Mac uygulaması günde en fazla bir kez GitHub'a son sürümün ne olduğunu sorar
+  (Ayarlar → Hakkında'dan kapatılabilir). Bu istekte senin hakkında hiçbir bilgi
+  yoktur.
 
 **wroopmark collects no data.**
 
@@ -23,6 +26,8 @@
   text and images).
 - Text recognition, summaries and meaning search run on the device (Apple's
   on-device models); your content is not sent anywhere.
+- The Mac app asks GitHub at most once a day what the latest version is (turn
+  it off in Settings → About). The request carries nothing about you.
 
 ## Saklama ve silme / Retention and deletion
 

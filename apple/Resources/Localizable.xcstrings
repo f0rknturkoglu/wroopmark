@@ -2406,6 +2406,16 @@
         }
       }
     },
+    "Denetleniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        }
+      }
+    },
     "Destek ve geri bildirim": {
       "localizations": {
         "en": {
@@ -3639,6 +3649,56 @@
         }
       }
     },
+    "Güncel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to date"
+          }
+        }
+      }
+    },
+    "Güncelleme denetlenemedi: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't check for updates: %@"
+          }
+        }
+      }
+    },
+    "Güncelleme indiriliyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the update…"
+          }
+        }
+      }
+    },
+    "Güncellemeler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updates"
+          }
+        }
+      }
+    },
+    "Güncellemeleri kendiliğinden denetle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for updates automatically"
+          }
+        }
+      }
+    },
     "Hakkında": {
       "localizations": {
         "en": {
@@ -3735,6 +3795,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Target"
+          }
+        }
+      }
+    },
+    "Henüz denetlenmedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not checked yet"
           }
         }
       }
@@ -7096,6 +7166,16 @@
         }
       }
     },
+    "Uygulama yerine konamadı. Yeni sürümü indirme sayfasından elle kurabilirsin.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app couldn't be replaced. You can install the new version by hand from the download page."
+          }
+        }
+      }
+    },
     "Uygulamanın içinde gelir. İmzasız kurulumda önce Safari → Ayarlar → Geliştirici → \"İmzasız eklentilere izin ver\" gerekir (Safari her açılışta sıfırlar).": {
       "localizations": {
         "en": {
@@ -7548,6 +7628,16 @@
         }
       }
     },
+    "Yalnızca GitHub'daki son sürüm sorulur; senden hiçbir bilgi gitmez. Yeni sürüm, imzası doğrulanmadan ve aynı geliştiriciden geldiği görülmeden kurulmaz.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the latest version on GitHub is asked for; nothing about you is sent. A new version is installed only after its signature is verified and it is seen to come from the same developer."
+          }
+        }
+      }
+    },
     "Yalnızca bunu sakla": {
       "localizations": {
         "en": {
@@ -7654,6 +7744,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Helper not found"
+          }
+        }
+      }
+    },
+    "Yayınlanmış bir sürüm bulunamadı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No published release was found."
           }
         }
       }
@@ -7828,6 +7928,16 @@
         }
       }
     },
+    "Yeni sürüm: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New version: %@"
+          }
+        }
+      }
+    },
     "Yeniden adlandır…": {
       "localizations": {
         "en": {
@@ -7894,6 +8004,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Swipe up for the next one. Drag the bar at the bottom to seek; swipe right from the left edge to leave."
+          }
+        }
+      }
+    },
+    "Yükle ve yeniden başlat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install and Restart"
           }
         }
       }
@@ -8330,6 +8450,16 @@
         }
       }
     },
+    "wroopmark %@ hazır: yükle ve yeniden başlat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wroopmark %@ is ready: install and restart"
+          }
+        }
+      }
+    },
     "wroopmark → aç": {
       "localizations": {
         "en": {
@@ -8756,6 +8886,46 @@
         }
       }
     },
+    "İndirilen paket açılamadı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The downloaded package couldn't be opened."
+          }
+        }
+      }
+    },
+    "İndirilen uygulama başka bir geliştiricinin imzasını taşıyor; kurulmadı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The downloaded app is signed by another developer; it was not installed."
+          }
+        }
+      }
+    },
+    "İndirilen uygulamanın imzası doğrulanamadı; kurulmadı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The downloaded app's signature couldn't be verified; it was not installed."
+          }
+        }
+      }
+    },
+    "İndiriliyor ve doğrulanıyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading and verifying…"
+          }
+        }
+      }
+    },
     "İndiriliyor…": {
       "localizations": {
         "en": {
@@ -9013,6 +9183,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Working"
+          }
+        }
+      }
+    },
+    "Şimdi denetle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Now"
           }
         }
       }

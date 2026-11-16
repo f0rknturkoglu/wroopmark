@@ -546,6 +546,36 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Güncellemeleri kendiliğinden denetle", isOn: Binding(
+                    get: { Updater.shared.autoCheck },
+                    set: { Updater.shared.autoCheck = $0 }
+                ))
+                HStack {
+                    switch Updater.shared.phase {
+                    case .idle: Text("Henüz denetlenmedi").foregroundStyle(.secondary)
+                    case .checking: ProgressView().controlSize(.small); Text("Denetleniyor…").foregroundStyle(.secondary)
+                    case .upToDate: Label("Güncel", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    case .available(let r): Text("Yeni sürüm: \(r.version)").fontWeight(.semibold)
+                    case .downloading: ProgressView().controlSize(.small); Text("İndiriliyor ve doğrulanıyor…").foregroundStyle(.secondary)
+                    case .failed(let why): Text(why).foregroundStyle(.orange)
+                    }
+                    Spacer()
+                    if case .available(let r) = Updater.shared.phase {
+                        Button("Yükle ve yeniden başlat") { Task { await Updater.shared.install(r) } }
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        Button("Şimdi denetle") { Task { await Updater.shared.check() } }
+                            .disabled(Updater.shared.phase == .checking || Updater.shared.phase == .downloading)
+                    }
+                }
+            } header: {
+                Text("Güncellemeler")
+            } footer: {
+                Text("Yalnızca GitHub'daki son sürüm sorulur; senden hiçbir bilgi gitmez. Yeni sürüm, imzası doğrulanmadan ve aynı geliştiriciden geldiği görülmeden kurulmaz.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark")!) {
                     Label("GitHub'da aç", systemImage: "arrow.up.forward.square")
                 }
