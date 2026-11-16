@@ -37,7 +37,9 @@ struct WroopmarkPhoneApp: App {
 
     init() {
         Self.moveLibraryToGroup()
-        _model = State(initialValue: PhoneModel())
+        let model = PhoneModel()
+        PhoneBackground.register(model)
+        _model = State(initialValue: model)
     }
 
     /// Before the share extension: the library lived in the app's own

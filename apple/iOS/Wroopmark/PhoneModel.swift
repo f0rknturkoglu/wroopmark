@@ -239,6 +239,8 @@ final class PhoneModel {
             _ = try? await core.run(.call("pause", [:]))
             task.end()
         }
+        // The rest is done on the charger, when iOS lets the app run.
+        PhoneBackground.schedule()
     }
 
     /// Low on space: pictures stop downloading until there is room again.
@@ -318,6 +320,14 @@ final class PhoneModel {
 
     func loadAIStatus() async {
         aiStatus = try? await core.call(.call("ai_status", [:]), network: true)
+    }
+
+    /// One of the background loops (pictures, meaning, page copies) is running.
+    var isBackgroundWorking: Bool { ocrTask != nil || embedTask != nil || pageCopyTask != nil }
+
+    func stopEmbedding() {
+        embedTask?.cancel()
+        embedTask = nil
     }
 
     func startEmbedding() {
