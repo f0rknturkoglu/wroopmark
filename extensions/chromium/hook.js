@@ -27,6 +27,7 @@
   const isIG = host === "instagram.com" || host.endsWith(".instagram.com");
   const isYT = host === "youtube.com" || host === "m.youtube.com";
   const isBsky = host === "bsky.app";
+  const isThreads = host === "threads.net" || host === "threads.com";
   const seen = new Map(); // post id -> raw object, oldest first
   const SEEN_MAX = 4000;
 
@@ -43,7 +44,7 @@
   // on <html> for relay.js (which finds the profile for the scan button).
   let me = null;
   function readMe() {
-    if (isX || isIG || isYT || isBsky || me) return me;
+    if (isX || isIG || isYT || isBsky || isThreads || me) return me;
     try {
       const el = document.getElementById("__UNIVERSAL_DATA_FOR_REHYDRATION__");
       me = JSON.parse(el.textContent).__DEFAULT_SCOPE__["webapp.app-context"].user.uniqueId || null;
@@ -55,7 +56,7 @@
   document.addEventListener("DOMContentLoaded", readMe);
   // Watch for the element only until it is read or the page has loaded.
   const meWatch = new MutationObserver(() => readMe() && meWatch.disconnect());
-  if (!isX && !isIG && !isYT && !isBsky && !me) {
+  if (!isX && !isIG && !isYT && !isBsky && !isThreads && !me) {
     meWatch.observe(document.documentElement, { childList: true, subtree: true });
     window.addEventListener("load", () => meWatch.disconnect(), { once: true });
   }
@@ -101,6 +102,58 @@
       return;
     }
     for (const k in v) indexIG(v[k], found);
+  }
+
+  function indexBsky(v) {
+    if (!v || typeof v !== "object") return;
+    if (Array.isArray(v)) return v.forEach(indexBsky);
+    if (typeof v.uri === "string" && v.uri.startsWith("at://") && v.record && v.author) {
+      remember(v.uri, v);
+    }
+    for (const k in v) if (k !== "reply" && k !== "parent" && k !== "root") indexBsky(v[k]);
+  }
+
+  const isThreadsPost = (v) =>
+    v &&
+    typeof v.code === "string" &&
+    (v.user || v.caption !== undefined || "taken_at" in v) &&
+    (v.text_post_app_info || v.caption !== undefined || v.image_versions2 || v.video_versions);
+
+  function indexThreads(v, found) {
+    if (!v || typeof v !== "object") return;
+    if (Array.isArray(v)) return v.forEach((x) => indexThreads(x, found));
+    if (isThreadsPost(v)) {
+      const u = v.user || {};
+      const handle = u.username || null;
+      const url = handle ? `https://threads.com/@${handle}/post/${v.code}` : `https://threads.com/t/${v.code}`;
+      const media = [];
+      const parts = Array.isArray(v.carousel_media) && v.carousel_media.length ? v.carousel_media : [v];
+      for (const p of parts) {
+        const c = (p.image_versions2 && p.image_versions2.candidates) || [];
+        const best = c.reduce((a, b) => ((b.width || 0) > ((a && a.width) || 0) ? b : a), null);
+        const vid = (p.video_versions || [])[0];
+        if (vid?.url) {
+          media.push({ kind: "video", url: vid.url, thumb_url: best?.url || null, width: vid.width || best?.width || null, height: vid.height || best?.height || null });
+        } else if (best?.url) {
+          media.push({ kind: "image", url: best.url, width: best.width || null, height: best.height || null, alt: p.accessibility_caption || null });
+        }
+      }
+      const item = {
+        url,
+        platform: "threads",
+        author_handle: handle,
+        author_name: u.full_name || null,
+        author_avatar: u.profile_pic_url || null,
+        text: (v.caption && v.caption.text) || "",
+        created_at: typeof v.taken_at === "number" ? v.taken_at : null,
+        media,
+      };
+      if (v.pk != null) remember(String(v.pk), item);
+      if (v.code) remember(String(v.code), item);
+      if (found && handle) found.push(item);
+      return;
+    }
+    for (const k in v) indexThreads(v[k], found);
   }
 
   // Only what the core reads: one picture size, one video file.
@@ -237,9 +290,33 @@
       return;
     }
     if (isBsky) {
-      const tag = url.includes("app.bsky.bookmark.getBookmarks") ? "bluesky/kaydedilenler" : "bluesky/begenilenler";
-      const n = (json.bookmarks || json.feed || []).length;
-      if (n) post("bluesky_list", { tag, payload: json });
+      indexBsky(json);
+      if (url.includes("app.bsky.bookmark.createBookmark")) {
+        let uri = null;
+        try {
+          const b = JSON.parse(reqBody);
+          uri = b.uri || b.subject?.uri;
+        } catch {}
+        const obj = uri && seen.get(uri);
+        if (obj) post("bluesky_list", { tag: "bluesky/kaydedilenler", payload: { bookmarks: [{ item: obj }] } });
+        else post("diag", { event: "skip", reason: "Bluesky: yer imine eklenen gönderi önbellekte yok", uri });
+        return;
+      }
+      if (url.includes("app.bsky.bookmark.getBookmarks") || url.includes("app.bsky.feed.getActorLikes")) {
+        const tag = url.includes("app.bsky.bookmark.getBookmarks") ? "bluesky/kaydedilenler" : "bluesky/begenilenler";
+        const n = (json.bookmarks || json.feed || []).length;
+        if (n) post("bluesky_list", { tag, payload: json });
+      }
+      return;
+    }
+    if (isThreads) {
+      const found = [];
+      indexThreads(json, found);
+      const savedPage = location.pathname.includes("/saved") || location.pathname.includes("/liked") || text.includes("saved_media") || text.includes("liked");
+      if (savedPage && found.length) {
+        const tag = location.pathname.includes("/liked") ? "threads/begenilenler" : "threads/kaydedilenler";
+        post("threads_list", { tag, items: found });
+      }
       return;
     }
     if (isIG) {
@@ -293,8 +370,10 @@
         : isYT
           ? url.includes("/youtubei/v1/browse")
           : isBsky
-            ? url.includes("/xrpc/app.bsky.bookmark.getBookmarks") || url.includes("/xrpc/app.bsky.feed.getActorLikes")
-            : url.includes("/api/");
+            ? url.includes("/xrpc/app.bsky.")
+            : isThreads
+              ? url.includes("/graphql") || url.includes("/api/v1/")
+              : url.includes("/api/");
 
   const origFetch = window.fetch;
   window.fetch = async function (input, init) {

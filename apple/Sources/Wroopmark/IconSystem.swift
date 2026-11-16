@@ -42,6 +42,7 @@ enum FolderIcons {
         case .pinterest: return symbol("pin")
         case .local: return symbol("externaldrive.fill")
         case .bluesky: return symbol("cloud.fill")
+        case .threads: return symbol("at")
         case .web: return get("other", svg: otherSvg)
         }
     }

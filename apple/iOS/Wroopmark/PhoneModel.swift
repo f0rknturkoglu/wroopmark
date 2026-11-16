@@ -1,3 +1,4 @@
+import AVFoundation
 import Observation
 import SwiftUI
 import UIKit
@@ -66,6 +67,10 @@ final class PhoneModel {
     var summarizing = Set<String>()
     @ObservationIgnored private var embedTask: Task<Void, Never>?
     @ObservationIgnored private var embedPausedUntil: Date?
+
+    // Import (v0.9)
+    var isImporting = false
+    var importMessage: String?
 
     // Sync (PhoneSync.swift)
     var syncStatus: SyncStatus?
@@ -409,6 +414,124 @@ final class PhoneModel {
             items.removeAll { $0.id == id }
             total = max(0, total - 1)
             await refreshMeta()
+        }
+    }
+
+    // MARK: Import from Files (v0.9)
+
+    static let mediaExtensions: Set<String> = ["mp4", "mov", "m4v", "3gp", "jpg", "jpeg", "png", "heic", "gif", "webp", "avif"]
+    private static let dataExtensions: Set<String> = ["html", "htm", "json", "js", "csv", "txt"]
+
+    func importURLs(_ urls: [URL]) async {
+        guard !urls.isEmpty, !isImporting else { return }
+        isImporting = true
+        importMessage = nil
+        defer { isImporting = false }
+
+        let stage = FileManager.default.temporaryDirectory.appendingPathComponent("wm-import-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: stage) }
+        try? FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
+
+        let staged: [URL] = await Task.detached(priority: .userInitiated) {
+            let fm = FileManager.default
+            let coordinator = NSFileCoordinator()
+            var copied: [URL] = []
+            for (idx, src) in urls.enumerated() {
+                let accessed = src.startAccessingSecurityScopedResource()
+                defer { if accessed { src.stopAccessingSecurityScopedResource() } }
+                let dst = stage.appendingPathComponent("\(idx)-\(src.lastPathComponent)")
+                var coordErr: NSError?
+                coordinator.coordinate(readingItemAt: src, options: [], error: &coordErr) { readURL in
+                    try? fm.copyItem(at: readURL, to: dst)
+                }
+                if fm.fileExists(atPath: dst.path) { copied.append(dst) }
+            }
+            return copied
+        }.value
+
+        guard !staged.isEmpty else {
+            importMessage = "Seçilen dosya okunamadı."
+            return
+        }
+
+        var media: [URL] = []
+        var archives: [URL] = []
+        for url in staged {
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+            if isDir {
+                (Self.directoryHoldsData(url) ? archives.append(url) : media.append(url))
+            } else if Self.mediaExtensions.contains(url.pathExtension.lowercased()) {
+                media.append(url)
+            } else {
+                archives.append(url)
+            }
+        }
+
+        var lines: [String] = []
+        for url in archives {
+            let displayName = url.lastPathComponent.replacingOccurrences(of: #"^\d+-"#, with: "", options: .regularExpression)
+            do {
+                let r: ArchiveReport = try await core.call(.call("import_archive", ["path": .string(url.path)]))
+                var line = "\(displayName): \(r.found) kayıt bulundu, \(r.new) yeni"
+                if r.existing > 0 { line += ", \(r.existing) zaten vardı" }
+                if r.new > 0 { line += ". Ayrıntılar arka planda gelecek." }
+                lines.append(line)
+            } catch {
+                lines.append("\(displayName): \(error.localizedDescription)")
+            }
+        }
+        if !media.isEmpty {
+            do {
+                let r: FilesReport = try await core.call(.call("import_files", ["paths": .strings(media.map(\.path))]))
+                var line = "\(r.files) dosya: \(r.new) yeni kayıt"
+                if r.attached > 0 { line += ", \(r.attached) tanesi arşivdeki gönderisine bağlandı" }
+                if r.existing > 0 { line += ", \(r.existing) zaten vardı" }
+                if r.failed > 0 { line += ", \(r.failed) okunamadı" }
+                lines.append(line)
+            } catch {
+                lines.append(error.localizedDescription)
+            }
+        }
+
+        importMessage = lines.joined(separator: "\n")
+        await makePosters()
+        await reload()
+        await refreshMeta()
+        fetchShared()
+        startEmbedding()
+        syncSoon()
+    }
+
+    private static func directoryHoldsData(_ dir: URL) -> Bool {
+        guard let e = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else {
+            return false
+        }
+        var seen = 0
+        for case let url as URL in e {
+            seen += 1
+            if seen > 5000 { break }
+            if dataExtensions.contains(url.pathExtension.lowercased()) { return true }
+        }
+        return false
+    }
+
+    private func makePosters() async {
+        struct Row: Decodable, Sendable {
+            let id: String
+            let videoFile: String
+            let path: String
+        }
+        guard let rows: [Row] = try? await core.call(.call("posterless", ["limit": .int(20)])), !rows.isEmpty else { return }
+        for row in rows {
+            let gen = AVAssetImageGenerator(asset: AVURLAsset(url: URL(fileURLWithPath: row.path)))
+            gen.appliesPreferredTrackTransform = true
+            gen.maximumSize = CGSize(width: 1280, height: 1280)
+            guard let (cg, _) = try? await gen.image(at: CMTime(seconds: 0.5, preferredTimescale: 600)),
+                  let data = UIImage(cgImage: cg).jpegData(compressionQuality: 0.82) else { continue }
+            let jpg = FileManager.default.temporaryDirectory.appendingPathComponent("wm-poster-\(UUID().uuidString).jpg")
+            defer { try? FileManager.default.removeItem(at: jpg) }
+            guard (try? data.write(to: jpg)) != nil else { continue }
+            _ = try? await core.run(.call("set_poster", ["id": .string(row.id), "video_file": .string(row.videoFile), "path": .string(jpg.path)]))
         }
     }
 }

@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 20;
+const SCHEMA_VERSION: i64 = 21;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -316,6 +316,14 @@ BEGIN
   INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'highlights');
 END;";
 
+/// v20 → v21 (v0.9): parent context and replies around an X post.
+const MIGRATE_21: &str = "ALTER TABLE items ADD COLUMN replies TEXT;
+CREATE TRIGGER IF NOT EXISTS sync_item_replies AFTER UPDATE OF replies ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND OLD.replies IS NOT NEW.replies
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'content');
+END;";
+
 /// v17 → v18: files another device has not uploaded yet are waited for too
 /// (`since`: when noted). The logs are read once more, so a phone that saw
 /// the Mac's videos before they were in iCloud learns their names.
@@ -325,11 +333,12 @@ DELETE FROM sync_cursor;";
 
 /// Every sync trigger, for tests that rebuild an old schema.
 #[cfg(test)]
-const SYNC_TRIGGERS: [&str; 16] = [
+const SYNC_TRIGGERS: [&str; 17] = [
     "sync_item_ins",
     "sync_item_content",
     "sync_item_media",
     "sync_item_highlights",
+    "sync_item_replies",
     "sync_item_folder",
     "sync_item_note",
     "sync_item_reviewed",
@@ -358,7 +367,7 @@ const VIDEO_RETRY_SECS: i64 = 6 * 3600;
 const LINK_TRIES: i64 = 3;
 const LINK_RETRY_SECS: i64 = 3600;
 
-const ITEM_COLS: &str = "i.pk, i.id, i.platform, i.url, i.author_handle, i.author_name, i.author_avatar, i.title, i.text, i.created_at, i.saved_at, i.media, i.quote, i.note, i.folder_id, i.video_tries, i.summary, i.stub, i.ai_tags, i.thread, i.snapshot";
+const ITEM_COLS: &str = "i.pk, i.id, i.platform, i.url, i.author_handle, i.author_name, i.author_avatar, i.title, i.text, i.created_at, i.saved_at, i.media, i.quote, i.note, i.folder_id, i.video_tries, i.summary, i.stub, i.ai_tags, i.thread, i.snapshot, i.replies";
 
 /// Hosts that only wrap the post's own media; never interesting as links.
 const NOISE_HOSTS: [&str; 4] = ["pic.twitter.com", "pic.x.com", "t.co", "pbs.twimg.com"];
@@ -624,6 +633,7 @@ fn read_item(row: &Row) -> rusqlite::Result<(i64, Item)> {
             ai_tags: row.get::<_, Option<String>>(18)?.and_then(|a| serde_json::from_str(&a).ok()).unwrap_or_default(),
             thread: row.get::<_, Option<String>>(19)?.and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
             snapshot: row.get(20)?,
+            replies: row.get::<_, Option<String>>(21)?.and_then(|r| serde_json::from_str(&r).ok()).unwrap_or_default(),
             ..Default::default()
         },
     ))
@@ -653,15 +663,18 @@ const LINK_COLS: &str = "l.id, l.url, l.host, l.title, l.description, l.image, l
 #[allow(clippy::type_complexity)]
 fn reindex_item(conn: &Connection, pk: i64) -> Result<()> {
     type Row8 = (Option<String>, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>);
-    let ((title, text, extra, note, author_h, author_n, quote, ocr), (thread, highlights)): (Row8, (Option<String>, Option<String>)) = conn
-        .query_row(
-            "SELECT title, text, extra, note, author_handle, author_name, quote, ocr, thread, highlights FROM items WHERE pk = ?1",
-            [pk],
-            |r| Ok(((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?), (r.get(8)?, r.get(9)?))),
-        )?;
+    let ((title, text, extra, note, author_h, author_n, quote, ocr), (thread, highlights, replies)): (
+        Row8,
+        (Option<String>, Option<String>, Option<String>),
+    ) = conn.query_row(
+        "SELECT title, text, extra, note, author_handle, author_name, quote, ocr, thread, highlights, replies FROM items WHERE pk = ?1",
+        [pk],
+        |r| Ok(((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?), (r.get(8)?, r.get(9)?, r.get(10)?))),
+    )?;
     let thread: Vec<Item> = thread.and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     let quote: Option<Item> = quote.and_then(|q| serde_json::from_str(&q).ok());
     let highlights: Vec<Highlight> = highlights.and_then(|h| serde_json::from_str(&h).ok()).unwrap_or_default();
+    let replies: Vec<Item> = replies.and_then(|r| serde_json::from_str(&r).ok()).unwrap_or_default();
 
     let push_part = |buf: &mut String, sep: char, s: &str| {
         if !buf.is_empty() {
@@ -699,6 +712,9 @@ fn reindex_item(conn: &Connection, pk: i64) -> Result<()> {
             push_part(&mut body_raw, '\n', n);
         }
     }
+    for r in &replies {
+        push_part(&mut body_raw, '\n', &r.text);
+    }
     {
         let mut stmt = conn.prepare_cached("SELECT l.url FROM item_links il JOIN links l ON l.id = il.link WHERE il.item = ?1")?;
         let mut rows = stmt.query([pk])?;
@@ -722,6 +738,14 @@ fn reindex_item(conn: &Connection, pk: i64) -> Result<()> {
             push_part(&mut author_raw, ' ', h);
         }
         if let Some(n) = q.author_name.as_deref() {
+            push_part(&mut author_raw, ' ', n);
+        }
+    }
+    for r in &replies {
+        if let Some(h) = r.author_handle.as_deref() {
+            push_part(&mut author_raw, ' ', h);
+        }
+        if let Some(n) = r.author_name.as_deref() {
             push_part(&mut author_raw, ' ', n);
         }
     }
@@ -862,6 +886,8 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
                 Has::Ocr => "coalesce(i.ocr, '') != ''",
                 Has::Quote => "i.quote IS NOT NULL",
                 Has::Highlight => "coalesce(i.highlights, '') != '' AND i.highlights != '[]'",
+                Has::Thread => "coalesce(i.thread, '') != '' AND i.thread != '[]'",
+                Has::Reply => "coalesce(i.replies, '') != '' AND i.replies != '[]'",
             };
             wh.push(format!("{neg}({cond})"));
         }
@@ -959,14 +985,20 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
     if let Some(q) = item.quote.as_mut() {
         drop_foreign_files(&mut q.media);
     }
-    let existing: Option<(i64, String, Option<String>, Option<String>)> = tx
-        .query_row("SELECT pk, media, quote, thread FROM items WHERE id = ?1", [&item.id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+    type ExistingRow = (i64, String, Option<String>, Option<String>, Option<String>);
+    let existing: Option<ExistingRow> = tx
+        .query_row("SELECT pk, media, quote, thread, replies FROM items WHERE id = ?1", [&item.id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+        })
         .optional()?;
-    if let Some((_, old, old_quote, old_thread)) = &existing {
+    if let Some((_, old, old_quote, old_thread, old_replies)) = &existing {
         // A re-import of the first post (bookmark list) knows nothing of its
         // thread; the archive keeps it, pictures included.
         if item.thread.is_empty() {
             item.thread = old_thread.as_deref().and_then(|t| serde_json::from_str(t).ok()).unwrap_or_default();
+        }
+        if item.replies.is_empty() {
+            item.replies = old_replies.as_deref().and_then(|r| serde_json::from_str(r).ok()).unwrap_or_default();
         }
         merge_thread_media(item);
         let old: Vec<Media> = serde_json::from_str(old).unwrap_or_default();
@@ -986,6 +1018,7 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
     let quote = item.quote.as_deref().map(serde_json::to_string).transpose()?;
     let media = serde_json::to_string(&item.media)?;
     let thread = if item.thread.is_empty() { None } else { Some(serde_json::to_string(&item.thread)?) };
+    let replies = if item.replies.is_empty() { None } else { Some(serde_json::to_string(&item.replies)?) };
 
     let (pk, created) = match existing {
         Some((pk, ..)) => {
@@ -994,7 +1027,7 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
                    extra=coalesce(?9, extra), note=coalesce(?10, note), created_at=coalesce(?11, created_at), updated_at=?12,
                    media=?13, quote=?14, has_image=?15, has_video=?16, media_pending=?17, raw=coalesce(?18, raw),
                    saved_at=CASE WHEN ?19 > 0 THEN ?19 ELSE saved_at END,
-                   folder_id=coalesce(?20, folder_id), thread=coalesce(?21, thread)
+                   folder_id=coalesce(?20, folder_id), thread=coalesce(?21, thread), replies=coalesce(?22, replies)
                  WHERE pk=?1",
                 params![
                     pk,
@@ -1017,7 +1050,8 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
                     raw,
                     item.saved_at,
                     item.folder_id,
-                    thread
+                    thread,
+                    replies
                 ],
             )?;
             (pk, false)
@@ -1026,8 +1060,8 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
             let saved = if item.saved_at > 0 { item.saved_at } else { ts };
             tx.execute(
                 "INSERT INTO items(id, platform, url, author_handle, author_name, author_avatar, title, text, extra, note,
-                   created_at, saved_at, updated_at, media, quote, has_image, has_video, media_pending, raw, folder_id, thread)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
+                   created_at, saved_at, updated_at, media, quote, has_image, has_video, media_pending, raw, folder_id, thread, replies)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
                 params![
                     item.id,
                     item.platform.as_str(),
@@ -1049,7 +1083,8 @@ fn upsert_in(tx: &Connection, item: &mut Item) -> Result<Saved> {
                     pending,
                     raw,
                     item.folder_id,
-                    thread
+                    thread,
+                    replies
                 ],
             )?;
             (tx.last_insert_rowid(), true)
@@ -1114,7 +1149,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} {MIGRATE_20} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} {MIGRATE_20} {MIGRATE_21} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -1176,6 +1211,9 @@ impl Store {
         }
         if (1..20).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_20} PRAGMA user_version = 20; COMMIT;"))?;
+        }
+        if (1..21).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_21} PRAGMA user_version = 21; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -1347,8 +1385,8 @@ impl Store {
             .conn
             .query_row(&format!("SELECT {ITEM_COLS}, i.extra, i.ocr FROM items i WHERE i.id = ?1"), [id], |r| {
                 let (pk, mut item) = read_item(r)?;
-                item.extra = r.get(21)?;
-                item.ocr = r.get(22)?;
+                item.extra = r.get(22)?;
+                item.ocr = r.get(23)?;
                 Ok((pk, item))
             })
             .optional()?;
@@ -2369,6 +2407,7 @@ mod tests {
                      ALTER TABLE items DROP COLUMN stub; ALTER TABLE items DROP COLUMN stub_tries; DROP TABLE IF EXISTS rules; DROP TABLE IF EXISTS vectors;
                      ALTER TABLE items DROP COLUMN thread; ALTER TABLE items DROP COLUMN snapshot; ALTER TABLE items DROP COLUMN snapshot_tries;
                      ALTER TABLE items DROP COLUMN article; ALTER TABLE items DROP COLUMN article_ready; ALTER TABLE items DROP COLUMN highlights;
+                     ALTER TABLE items DROP COLUMN replies;
                      PRAGMA user_version = 3;",
                 )
                 .unwrap();

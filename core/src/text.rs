@@ -63,13 +63,14 @@ pub fn extract_urls(text: &str) -> Vec<String> {
 
 /// Query parameters that only track the click, never change the content.
 fn is_tracking_param(key: &str, is_x: bool) -> bool {
-    const TRACKING_KEYS: [&str; 23] = [
+    const TRACKING_KEYS: [&str; 24] = [
         "fbclid",
         "gclid",
         "dclid",
         "msclkid",
         "igshid",
         "igsh",
+        "xmt",
         "mc_cid",
         "mc_eid",
         "_hsenc",
@@ -99,6 +100,8 @@ fn canon_host(h: &str) -> Cow<'_, str> {
     let trimmed = lower.strip_prefix("www.").unwrap_or(&lower);
     if matches!(trimmed, "twitter.com" | "mobile.twitter.com" | "m.twitter.com" | "mobile.x.com") {
         Cow::Borrowed("x.com")
+    } else if trimmed == "threads.net" {
+        Cow::Borrowed("threads.com")
     } else {
         match lower {
             Cow::Owned(s) => {
@@ -181,7 +184,9 @@ fn platform_post_id(platform: Platform, url: &Url) -> Option<String> {
             let q = url.query_pairs().find(|(k, _)| k == "story_fbid" || k == "fbid" || k == "v");
             q.map(|(_, v)| v.into_owned()).or_else(|| after("posts").or_else(|| after("videos")))
         }
-        Platform::Reddit => segs.iter().position(|s| *s == "comments").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
+        Platform::Reddit => segs.iter().position(|s| *s == "comments").and_then(|i| {
+            if let Some(cid) = segs.get(i + 3).filter(|c| !c.is_empty()) { Some(format!("t1_{cid}")) } else { segs.get(i + 1).map(|s| s.to_string()) }
+        }),
         Platform::Youtube => {
             let q = url.query_pairs().find(|(k, _)| k == "v").map(|(_, v)| v.into_owned());
             let shorts = segs.iter().position(|s| *s == "shorts").and_then(|i| segs.get(i + 1)).map(|s| s.to_string());
@@ -199,6 +204,7 @@ fn platform_post_id(platform: Platform, url: &Url) -> Option<String> {
         }
         Platform::Hackernews => url.query_pairs().find(|(k, _)| k == "id").map(|(_, v)| v.into_owned()),
         Platform::Bluesky => segs.iter().position(|s| *s == "post").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
+        Platform::Threads => segs.iter().position(|s| *s == "post" || *s == "t").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
         Platform::Arxiv => segs.iter().position(|s| *s == "abs" || *s == "pdf").and_then(|i| segs.get(i + 1)).map(|s| s.to_string()),
         Platform::Web | Platform::Local => None,
     }
@@ -265,6 +271,7 @@ mod tests {
     #[test]
     fn normalizes_urls() {
         assert_eq!(normalize_url("https://twitter.com/jack/status/20?s=20&t=abc#x").as_deref(), Some("https://x.com/jack/status/20"));
+        assert_eq!(normalize_url("https://www.threads.net/@zuck/post/C123?xmt=1").as_deref(), Some("https://threads.com/@zuck/post/C123"));
         assert_eq!(normalize_url("http://www.Example.com/a/b/?utm_source=x&id=3").as_deref(), Some("https://example.com/a/b?id=3"));
         assert_eq!(normalize_url("https://example.com/").as_deref(), Some("https://example.com"));
         assert_eq!(normalize_url("ftp://example.com"), None);
@@ -275,6 +282,9 @@ mod tests {
         assert_eq!(item_id_for_url("https://twitter.com/a/status/123?s=1"), (Platform::X, "x:123".into()));
         assert_eq!(item_id_for_url("https://www.tiktok.com/@u/video/7301?is_from_webapp=1"), (Platform::Tiktok, "tiktok:7301".into()));
         assert_eq!(item_id_for_url("https://tr.pinterest.com/pin/998/"), (Platform::Pinterest, "pinterest:998".into()));
+        assert_eq!(item_id_for_url("https://www.threads.net/@u/post/C99ab"), (Platform::Threads, "threads:C99ab".into()));
+        assert_eq!(item_id_for_url("https://www.reddit.com/r/rust/comments/abc12/baslik/"), (Platform::Reddit, "reddit:abc12".into()));
+        assert_eq!(item_id_for_url("https://www.reddit.com/r/rust/comments/abc12/baslik/c9x/"), (Platform::Reddit, "reddit:t1_c9x".into()));
         let (p, id) = item_id_for_url("https://blog.rust-lang.org/a?utm_source=x");
         assert_eq!(p, Platform::Web);
         assert_eq!(id, item_id_for_url("https://blog.rust-lang.org/a").1);

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "wroopmark",
-  "version": "0.4.0",
-  "description": "X, TikTok, Reddit, YouTube, Instagram, GitHub, Hacker News ve web sayfalarını çevrimdışı wroopmark arşivine kaydeder.",
+  "version": "0.9.0",
+  "description": "X, TikTok, Reddit, YouTube, Instagram, Bluesky, Threads, GitHub ve web sayfalarını çevrimdışı wroopmark arşivine kaydeder.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0ZhkDq9WoyDir+hq4EOdirc1cN24ZnVPAB1Z0MJQvmRogkGGM7o0AdCfaMHgIiB8SJ+Yj2dwGhicZd4vQAPuhLm8DzXi24eh76B4vUmXb9qsMHDRegVTZVTT/SWC6XJux98TBlWaaL3xTb75iglYrgROMiGZ0W9HFFnRFAwvKoirr7bc9ZrbsdN5lUWlAbW4C4lQGaxilzVqCunEIAKtvXthl+sluq29mxGXx2ZbHIRBITt8PHyTs3Wmbbu19QJS0nXhwWGzopSuXYnfhY1KVDzpsK97Ep/dZ8liQ3WJKl7OnrQffd9Ly6FJ7zfJ5RUjLfhh9MPZlm/UYfqJdYwtlwIDAQAB",
   "minimum_chrome_version": "116",
   "permissions": [
@@ -24,7 +24,9 @@
     "https://news.ycombinator.com/*",
     "https://lobste.rs/*",
     "https://arxiv.org/*",
-    "https://bsky.app/*"
+    "https://bsky.app/*",
+    "https://*.threads.net/*",
+    "https://*.threads.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -37,7 +39,9 @@
         "https://www.tiktok.com/*",
         "https://www.instagram.com/*",
         "https://www.youtube.com/*",
-        "https://bsky.app/*"
+        "https://bsky.app/*",
+        "https://*.threads.net/*",
+        "https://*.threads.com/*"
       ],
       "js": [
         "hook.js"
@@ -52,7 +56,9 @@
         "https://www.tiktok.com/*",
         "https://www.instagram.com/*",
         "https://www.youtube.com/*",
-        "https://bsky.app/*"
+        "https://bsky.app/*",
+        "https://*.threads.net/*",
+        "https://*.threads.com/*"
       ],
       "js": [
         "relay.js"

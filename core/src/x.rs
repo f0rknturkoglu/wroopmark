@@ -161,6 +161,7 @@ fn parse_tweet_depth(result: &Value, depth: u8) -> Option<Item> {
         summary: None,
         ai_tags: vec![],
         thread: vec![],
+        replies: vec![],
         article: None,
         snapshot: None,
         stub: false,
@@ -305,6 +306,78 @@ pub fn self_threads(v: &serde_json::Value) -> Vec<Vec<Item>> {
     out
 }
 
+/// Extracts parent tweets (context above a bookmarked reply) and other users'
+/// replies to any saved post in a `TweetDetail` response.
+pub fn replies_for(v: &Value, owners: &HashSet<String>) -> Vec<(String, Vec<Item>)> {
+    if owners.is_empty() {
+        return vec![];
+    }
+    let items = parse_timeline(v);
+    let by_id: std::collections::HashMap<&str, &Item> = items.iter().map(|i| (i.id.as_str(), i)).collect();
+    let threads = self_threads(v);
+    let mut out = vec![];
+    for owner_id in owners {
+        let Some(&owner) = by_id.get(owner_id.as_str()) else { continue };
+        let mut thread_ids: HashSet<String> = HashSet::from([owner_id.clone()]);
+        if let Some(chain) = threads.iter().find(|c| c.iter().any(|x| x.id == *owner_id)) {
+            for c in chain {
+                thread_ids.insert(c.id.clone());
+            }
+        }
+        let mut parents = vec![];
+        let mut cur = owner;
+        while parents.len() < 5
+            && let Some(p) = reply_to(cur).and_then(|id| by_id.get(format!("x:{id}").as_str()).copied())
+        {
+            if thread_ids.contains(&p.id) || parents.iter().any(|x: &&Item| x.id == p.id) {
+                break;
+            }
+            parents.push(p);
+            cur = p;
+        }
+        parents.reverse();
+
+        let mut replies: Vec<Item> = vec![];
+        let mut known: HashSet<String> = thread_ids.clone();
+        let mut added = true;
+        while added && parents.len() + replies.len() < 25 {
+            added = false;
+            for it in &items {
+                if parents.len() + replies.len() >= 25 {
+                    break;
+                }
+                if known.contains(&it.id) || parents.iter().any(|p| p.id == it.id) {
+                    continue;
+                }
+                if reply_to(it).is_some_and(|p| known.contains(&format!("x:{p}"))) {
+                    known.insert(it.id.clone());
+                    let mut clean = it.clone();
+                    clean.raw = None;
+                    clean.thread.clear();
+                    clean.replies.clear();
+                    replies.push(clean);
+                    added = true;
+                }
+            }
+        }
+        let mut combined: Vec<Item> = parents
+            .into_iter()
+            .map(|p| {
+                let mut c = p.clone();
+                c.raw = None;
+                c.thread.clear();
+                c.replies.clear();
+                c
+            })
+            .collect();
+        combined.extend(replies);
+        if !combined.is_empty() {
+            out.push((owner_id.clone(), combined));
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,5 +447,33 @@ mod tests {
         let q = a.quote.as_ref().unwrap();
         assert_eq!((q.id.as_str(), q.author_handle.as_deref()), ("x:9", Some("dhh")));
         assert!(q.raw.is_none() && a.raw.is_some());
+    }
+
+    #[test]
+    fn extracts_replies_and_parent_context() {
+        let mut root = tweet("10", "soru");
+        root["core"]["user_results"]["result"]["core"]["screen_name"] = json!("ali");
+        let mut saved = tweet("11", "cevap");
+        saved["legacy"]["in_reply_to_status_id_str"] = json!("10");
+        let mut self_next = tweet("12", "devam");
+        self_next["legacy"]["in_reply_to_status_id_str"] = json!("11");
+        let mut reader_reply = tweet("13", "teşekkürler");
+        reader_reply["core"]["user_results"]["result"]["core"]["screen_name"] = json!("veli");
+        reader_reply["legacy"]["in_reply_to_status_id_str"] = json!("12");
+
+        let page = json!({ "data": { "threaded_conversation_with_injections_v2": { "instructions": [{
+            "type": "TimelineAddEntries",
+            "entries": [
+                { "entryId": "t-10", "content": { "itemContent": { "tweet_results": { "result": root } } } },
+                { "entryId": "t-11", "content": { "itemContent": { "tweet_results": { "result": saved } } } },
+                { "entryId": "t-12", "content": { "itemContent": { "tweet_results": { "result": self_next } } } },
+                { "entryId": "t-13", "content": { "itemContent": { "tweet_results": { "result": reader_reply } } } }
+            ]
+        }]}}});
+        let owners = HashSet::from(["x:11".to_string()]);
+        let got = replies_for(&page, &owners);
+        assert_eq!(got.len(), 1);
+        let ids: Vec<&str> = got.first().map(|(_, r)| r.iter().map(|i| i.id.as_str()).collect()).unwrap_or_default();
+        assert_eq!(ids, vec!["x:10", "x:13"]);
     }
 }

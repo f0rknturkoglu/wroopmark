@@ -27,6 +27,8 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
     let stub: Bool
     /// The author's own follow-up posts (X thread), oldest first.
     let thread: [Item]
+    /// Parent context and replies around an X post.
+    let replies: [Item]
     /// The saved copy of the web page (`<hash>.webarchive`).
     let snapshot: String?
 
@@ -38,7 +40,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, platform, url, authorHandle, authorName, title, text, extra, ocr, createdAt, savedAt, media, links, quote, tags, note
-        case summary, aiTags, stub, thread, snapshot
+        case summary, aiTags, stub, thread, replies, snapshot
         case folderId = "folder_id"
     }
 
@@ -65,6 +67,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         aiTags = try c.decodeIfPresent([String].self, forKey: .aiTags) ?? []
         stub = try c.decodeIfPresent(Bool.self, forKey: .stub) ?? false
         thread = try c.decodeIfPresent([Item].self, forKey: .thread) ?? []
+        replies = try c.decodeIfPresent([Item].self, forKey: .replies) ?? []
         snapshot = try c.decodeIfPresent(String.self, forKey: .snapshot)
     }
 
@@ -90,6 +93,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         aiTags: [String] = [],
         stub: Bool = false,
         thread: [Item] = [],
+        replies: [Item] = [],
         snapshot: String? = nil
     ) {
         self.id = id
@@ -113,6 +117,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
         self.aiTags = aiTags
         self.stub = stub
         self.thread = thread
+        self.replies = replies
         self.snapshot = snapshot
     }
 
@@ -139,6 +144,7 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
             aiTags: aiTags,
             stub: stub,
             thread: thread,
+            replies: replies,
             snapshot: snapshot
         )
     }
@@ -149,7 +155,8 @@ struct Item: Decodable, Identifiable, Hashable, Sendable {
             && a.title == b.title && a.ocr == b.ocr && a.extra == b.extra && a.savedAt == b.savedAt
             && a.links == b.links && a.quote?.item == b.quote?.item && a.folderId == b.folderId
             && a.summary == b.summary && a.aiTags == b.aiTags && a.stub == b.stub
-            && a.thread.map(\.id) == b.thread.map(\.id) && a.snapshot == b.snapshot
+            && a.thread.map(\.id) == b.thread.map(\.id) && a.replies.map(\.id) == b.replies.map(\.id)
+            && a.snapshot == b.snapshot
     }
 
     func hash(into h: inout Hasher) { h.combine(id) }
@@ -330,7 +337,7 @@ struct VideoTool: Decodable, Hashable, Sendable {
 }
 
 enum Platform: String, CaseIterable, Identifiable, Sendable {
-    case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, bluesky, local, web
+    case x, tiktok, pinterest, facebook, reddit, youtube, instagram, github, hackernews, arxiv, bluesky, threads, local, web
 
     var id: String { rawValue }
 
@@ -347,6 +354,7 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         case .hackernews: "Hacker News"
         case .arxiv: "arXiv"
         case .bluesky: "Bluesky"
+        case .threads: "Threads"
         case .local: "Dosya"
         case .web: "Web"
         }
@@ -365,6 +373,7 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         case .hackernews: "y.square.fill"
         case .arxiv: "doc.text.fill"
         case .bluesky: "cloud.fill"
+        case .threads: "at"
         case .local: "externaldrive.fill"
         case .web: "globe"
         }

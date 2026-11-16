@@ -288,7 +288,7 @@ impl Store {
         let rows = stmt
             .query_map([limit], |r| {
                 let (pk, mut item) = read_item(r)?;
-                item.ocr = r.get(21)?;
+                item.ocr = r.get(22)?;
                 Ok((pk, item))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -433,6 +433,33 @@ impl Store {
             "UPDATE items SET thread = ?2, media = ?3, has_image = ?4, has_video = ?5, media_pending = ?6, updated_at = ?7 WHERE pk = ?1",
             params![pk, serde_json::to_string(&item.thread)?, serde_json::to_string(&item.media)?, img, vid, pending, now()],
         )?;
+        reindex_item(&tx, pk)?;
+        tx.commit()?;
+        Ok(true)
+    }
+
+    /// Merges parent context and replies for an X post (up to 25).
+    pub fn set_replies(&mut self, id: &str, replies: Vec<Item>) -> Result<bool> {
+        let Some(mut item) = self.get(id)? else { return Ok(false) };
+        let before = item.replies.len();
+        for mut r in replies {
+            if item.replies.len() >= 25 {
+                break;
+            }
+            if r.id == item.id || item.replies.iter().any(|e| e.id == r.id) || item.thread.iter().any(|t| t.id == r.id) {
+                continue;
+            }
+            r.raw = None;
+            r.thread.clear();
+            r.replies.clear();
+            item.replies.push(r);
+        }
+        if item.replies.len() == before {
+            return Ok(false);
+        }
+        let tx = self.write()?;
+        let pk = pk_of(&tx, id)?;
+        tx.execute("UPDATE items SET replies = ?2, updated_at = ?3 WHERE pk = ?1", params![pk, serde_json::to_string(&item.replies)?, now()])?;
         reindex_item(&tx, pk)?;
         tx.commit()?;
         Ok(true)

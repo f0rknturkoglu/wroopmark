@@ -5,6 +5,7 @@ struct PhoneSettingsView: View {
     @Environment(PhoneModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var picking = false
+    @State private var pickingImport = false
     @State private var confirmOffload = false
 
     var body: some View {
@@ -81,6 +82,28 @@ struct PhoneSettingsView: View {
                             LabeledContent("Telefonda boş alan", value: ByteCountFormatter.string(fromByteCount: free, countStyle: .file))
                         }
                     }
+                }
+
+                Section {
+                    Button {
+                        pickingImport = true
+                    } label: {
+                        HStack {
+                            Label("Dosyalardan içe aktar…", systemImage: "square.and.arrow.down")
+                            if model.isImporting { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(model.isImporting)
+                    if let msg = model.importMessage, !msg.isEmpty {
+                        Text(msg).font(.footnote).foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("İçe aktar")
+                } footer: {
+                    Text("TikTok, Instagram, Threads, X veya Reddit veri paketi (.zip ya da klasör), tarayıcı bookmarks.html, Pocket/Raindrop CSV, ya da video ve görseller.")
+                }
+                .fileImporter(isPresented: $pickingImport, allowedContentTypes: [.item, .folder], allowsMultipleSelection: true) { result in
+                    if case .success(let urls) = result { Task { await model.importURLs(urls) } }
                 }
 
                 Section {

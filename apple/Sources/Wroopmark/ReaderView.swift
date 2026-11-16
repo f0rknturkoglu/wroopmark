@@ -77,7 +77,7 @@ enum ReaderDocument {
     /// A post (X, TikTok, …) as an article: its text, pictures, quote and
     /// the rest of its thread.
     private static func postBody(_ item: Item) -> String {
-        let all = ([item.text] + item.thread.map(\.text) + [item.quote?.item.text ?? ""]).joined(separator: " ")
+        let all = ([item.text] + item.thread.map(\.text) + item.replies.map(\.text) + [item.quote?.item.text ?? ""]).joined(separator: " ")
         var out = header(item, words: all)
         let threadFiles = Set(item.thread.flatMap(\.media).map(\.url))
         out += "<div class=\"post\">\(paragraphs(item.text))</div>"
@@ -88,6 +88,12 @@ enum ReaderDocument {
         for part in item.thread {
             let files = Set(part.media.map(\.url))
             out += "<div class=\"part\">\(paragraphs(part.text))\(media(item.media.filter { files.contains($0.url) }))</div>"
+        }
+        if !item.replies.isEmpty {
+            out += "<h2>Yanıtlar</h2>"
+            for r in item.replies {
+                out += "<div class=\"part\"><div class=\"meta\">\(esc(r.author ?? ""))</div>\(paragraphs(r.text))</div>"
+            }
         }
         if let s = item.summary, !s.isEmpty {
             out += "<div class=\"summary\"><div class=\"meta\">Özet</div>\(paragraphs(s))</div>"

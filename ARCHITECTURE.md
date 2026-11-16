@@ -51,7 +51,8 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
 - Sözdizimi: `rust async tag:dev -tag:okundu from:@jack platform:x has:image
   before:2025-06 after:2024 "tam ifade" -kelime is:untagged is:tagged`,
   ayrıca `has:ocr` (görselde yazı), `has:quote`, `has:highlight` (okuyucu vurgusu),
-  `is:reviewed` (ayıklamada saklanan), `savedafter:` / `savedbefore:` (kaydedilme tarihi),
+  `has:thread`, `has:reply` (X zinciri / yanıtları), `is:reviewed` (ayıklamada saklanan),
+  `savedafter:` / `savedbefore:` (kaydedilme tarihi),
   `folder:ad` (alt klasörler dahil), `is:unfiled`, `id:x:123` (tam o kayıt).
   Her süzgeç başına `-` alarak tersine döner: `-from:@jack`, `-@jack`,
   `-platform:tiktok`, `-has:video`, `-is:untagged`.
@@ -184,16 +185,17 @@ olarak okunur (`resources/read`). Ajan bağlanınca açılır, boru kapanınca �
 
 | Kaynak | Yol |
 |---|---|
-| X yer imleri | Eklenti, x.com'un kendi GraphQL cevaplarını dinler. `/i/bookmarks` bir kez kaydırılınca tüm arşiv gelir. Yer imine eklediğin anda (`CreateBookmark`) o tweet daha önce görülen timeline cevabından alınıp kaydedilir. API ücreti yok, giriş bilgisi bizde değil. |
+| X yer imleri | Eklenti, x.com'un kendi GraphQL cevaplarını dinler. `/i/bookmarks` kaydırılınca ve yer imine eklediğin anda (`CreateBookmark`), otomatik eşitleme açıksa (`autoSync`, varsayılan açık) tweet'ler bekletilmeden doğrudan yerel kütüphaneye yazılır. API ücreti yok, giriş bilgisi bizde değil. |
 | Tek tweet URL'si | `publish.twitter.com/oembed` (metin + yazar, görselsiz) |
 | TikTok | Eklenti: Kaydedilenler / Beğenilenler listeleri (sayfanın kendi API yanıtları); fotoğraf gönderilerinin tüm görselleri |
 | Instagram | Eklenti: Kaydedilenler sayfasının kendi API yanıtları (REST ya da GraphQL); kaydet düğmesine basınca o gönderi |
-| Reddit | Eklenti: `/user/<ad>/saved.json` kullanıcının kendi oturumuyla, 100'er 100'er (gönderi + yorum) |
-| X zincirleri | Eklenti: tweet sayfasının `TweetDetail` cevabı çekirdeğe gider (`import_x_thread`); aynı yazarın birbirine yanıt veren tweet'leri (`in_reply_to_status_id`) bulunur, zincirin arşivdeki ilk kaydına `thread` olarak eklenir. Görselleri kaydın `media`'sına katılır (iner, kopya taramasına girer); yer imi listesi kaydı yeniden getirse de zincir korunur. |
+| Reddit | Eklenti: `/user/<ad>/saved.json` kullanıcının kendi oturumuyla, 100'er 100'er (gönderi + yorum); bağlantı içe aktarımında `{url}.json?raw_json=1` |
+| X zincirleri ve yanıtlar | Eklenti: tweet sayfasının `TweetDetail` cevabı çekirdeğe gider (`import_x_thread`); aynı yazarın birbirine yanıt veren tweet'leri (`in_reply_to_status_id`) `thread` olarak, üst bağlam ve başkalarının yanıtları ise `replies` sütununa (şema v21) eklenir, FTS'te indekslenir ve iki yönlü senkronlanır. |
 | YouTube | Eklenti: yalnızca Daha Sonra İzle (`WL`) ve Beğenilenler (`LL`): sayfadaki `ytInitialData` + `youtubei/v1/browse` devamları, `playlistVideoRenderer`'lar sadeleştirilip kuyruğa (`youtube.rs`). Video inmez, kapak iner. |
-| Bluesky | Eklenti: `app.bsky.bookmark.getBookmarks` ve `getActorLikes` cevaplarındaki `postView`'lar (`bluesky.rs`): görseller, video (HLS, yt-dlp ile), alıntı, linkler. Yanıt bağlamı (`reply.parent`) alınmaz. |
+| Bluesky | Eklenti: `app.bsky.bookmark.getBookmarks`, `getActorLikes` ve yer imine ekleme anındaki `createBookmark` cevaplarındaki `postView`'lar (`bluesky.rs`): görseller, video (HLS, yt-dlp ile), alıntı, linkler. |
+| Threads | Eklenti (`threads.com` / `threads.net` GraphQL listeleri) ve Meta veri paketi (`parse_threads_json`); URL normalleştirmede `threads.net → threads.com` ve `?xmt=` temizlenir. |
 | Pinterest / Facebook / web | Sayfanın `og:` etiketleri + makale metni |
-| Toplu | `bookmarks.html`, TikTok / Instagram / X veri paketleri (zip, klasör ya da tek dosya; zip sistemin `ditto`'suyla açılır), Pocket / Raindrop / Reddit CSV (`archive.rs`). Çoğu yalnızca link + tarih verir: kayıt doğru id'yle *stub* olarak girer (`items.stub = 1`), metin / yazar / medya arka planda `fetcher.capture` ile tek tek, acele etmeden gelir (en çok 3 deneme). Zaten olan kayda yalnızca etiket eklenir, içeriği ezilmez. İzleme / tarama geçmişi alınmaz. |
+| Toplu | `bookmarks.html`, TikTok / Instagram / Threads / X veri paketleri (zip, klasör ya da tek dosya; zip saf Rust `flate2` ile açılır, iPhone/iPad'de de çalışır, Mac'te gerekirse `ditto`), Pocket / Raindrop / Reddit GDPR CSV (`archive.rs`: `saved_posts`, `saved_comments`, `post_votes`, `comment_votes`). Çoğu yalnızca link + tarih verir: kayıt doğru id'yle *stub* olarak girer (`items.stub = 1`), metin / yazar / medya arka planda `fetcher.capture` ile tek tek, acele etmeden gelir (en çok 3 deneme). Zaten olan kayda yalnızca etiket eklenir, içeriği ezilmez. İzleme / tarama geçmişi alınmaz. |
 | Diskteki dosyalar | Video ve görseller medya deposuna kopyalanır (`localfile.rs`). Adında TikTok numarası (19 hane) ya da yt-dlp `[id]`'si olan video o gönderiye bağlanır: kayıt varsa videosu olur, yoksa stub açılır. Diğerleri `local:<içerik hash>` kayıt (aynı dosya iki kez girmez). Kapağı olmayan videolara uygulama AVFoundation ile kapak çizer (`posterless` / `set_poster`). |
 
 Görseller, video kapakları ve (Ayarlar'dan kapatılabilir) videolar indirilir.
@@ -291,9 +293,15 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
 - iPhone'da anlamsal arama (`wm_set_ai` geri çağrısıyla cihaz içi model),
   cihazda özet/etiket önerisi, benzerleri ve "Bugün" (geçmişte bugün + arşivden 5 kayıt).
 
-**v0.9: Sosyal**
-- X yanıtları; eklentiyle sürekli X/Bluesky yer imi eşitleme; Reddit, Threads içe
-  alma; iPhone'da içe alma.
+**v0.9: Sosyal** ✅
+- X yanıtları (üst bağlam + başkalarının yanıtları, aramaya ve senkrona girer,
+  Mac/iPhone/okuyucu ve akış kartından açılır).
+- Eklentiyle sürekli X / Bluesky / sosyal yer imi eşitleme (`autoSync`), canlı
+  Bluesky `createBookmark` yakalama.
+- Threads platformu ve Threads / Reddit GDPR veri paketi içe alma (`threads.com`,
+  Reddit `.json` doldurma).
+- Saf Rust `.zip` açıcı (`flate2`) + iPhone/iPad Dosyalar'dan toplu veri paketi
+  ve medya içe alma.
 
 **v1.0: App Store**
 - TestFlight, ekran görüntüleri, İngilizce, fiyat. Sonra: günlük sıkıştırma,

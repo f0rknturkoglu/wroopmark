@@ -447,6 +447,7 @@ private struct FeedPage: View {
     let delete: () -> Void
     @State private var showPause = false
     @State private var expanded = false
+    @State private var showReplies = false
 
     private var item: Item { entry.item }
     /// Text goes in the middle of a page without pictures, at the bottom
@@ -469,6 +470,10 @@ private struct FeedPage: View {
             .clipped()
             .overlay(alignment: .bottom) { overlay }
             .onChange(of: active) { _, on in if !on { showPause = false } }
+            .sheet(isPresented: $showReplies) {
+                RepliesSheet(item: item)
+                    .presentationDetents([.medium, .large])
+            }
     }
 
     private var overlay: some View {
@@ -503,6 +508,12 @@ private struct FeedPage: View {
                                 .font(.caption.weight(.semibold))
                         }
                     }
+                    if !item.replies.isEmpty {
+                        Button { showReplies = true } label: {
+                            Label("Yanıtlar · \(item.replies.count)", systemImage: "bubble.left.and.bubble.right")
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
                     if !item.tags.isEmpty {
                         Text(item.tags.map { "#\($0)" }.joined(separator: " "))
                             .font(.caption.weight(.semibold))
@@ -515,6 +526,9 @@ private struct FeedPage: View {
                         sideButton(player.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: player.muted ? "Sesi aç" : "Sesi kapat") {
                             player.muted.toggle()
                         }
+                    }
+                    if !item.replies.isEmpty {
+                        sideButton("bubble.left.and.bubble.right", label: "Yanıtlar") { showReplies = true }
                     }
                     sideButton("info.circle", label: "Ayrıntılar", action: details)
                     sideButton("trash", label: "Sil", action: delete)
@@ -730,6 +744,40 @@ private struct ProgressBar: View {
         .accessibilityElement()
         .accessibilityLabel("Video ilerlemesi")
         .accessibilityValue("%\(Int(player.progress * 100))")
+    }
+}
+
+/// Replies and parent context of a post shown over the feed.
+private struct RepliesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: Item
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !item.text.isEmpty {
+                    Section("Gönderi") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let a = item.author { Text(a).font(.footnote.weight(.semibold)).foregroundStyle(.secondary) }
+                            Text(item.text).font(.callout)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                Section("Yanıtlar") {
+                    ForEach(item.replies) { r in
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let a = r.author { Text(a).font(.footnote.weight(.semibold)).foregroundStyle(.secondary) }
+                            if !r.text.isEmpty { Text(r.text).font(.callout).textSelection(.enabled) }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
+            .navigationTitle("Yanıtlar · \(item.replies.count)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Kapat") { dismiss() } } }
+        }
     }
 }
 

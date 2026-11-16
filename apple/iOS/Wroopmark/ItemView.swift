@@ -27,6 +27,7 @@ struct ItemView: View {
                     MediaStrip(media: item.media.filter { !threadURLs.contains($0.url) }) { viewer = $0 }
                     if let q = item.quote?.item { QuoteBox(item: q) { viewer = $0 } }
                     if !item.thread.isEmpty { thread(item) }
+                    if !item.replies.isEmpty { replies(item) }
                     if let s = item.summary, !s.isEmpty {
                         Label { Text(s) } icon: { Image(systemName: "sparkles") }
                             .font(.callout)
@@ -160,6 +161,23 @@ struct ItemView: View {
                         MediaStrip(media: item.media.filter { urls.contains($0.url) }) { viewer = $0 }
                     }
                 }
+            }
+        }
+    }
+
+    private func replies(_ item: Item) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Yanıtlar · \(item.replies.count)", systemImage: "bubble.left.and.bubble.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ForEach(item.replies) { r in
+                VStack(alignment: .leading, spacing: 4) {
+                    if let a = r.author { Text(a).font(.footnote.weight(.semibold)).foregroundStyle(.secondary) }
+                    if !r.text.isEmpty { Text(r.text).font(.callout).textSelection(.enabled) }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 10))
             }
         }
     }

@@ -9,6 +9,8 @@ const PLATFORM_NAMES = {
   reddit: "Reddit",
   youtube: "YouTube",
   instagram: "Instagram",
+  bluesky: "Bluesky",
+  threads: "Threads",
   github: "GitHub",
   hackernews: "Hacker News",
   arxiv: "arXiv",
@@ -137,14 +139,37 @@ async function setupSiteImport() {
       await chrome.tabs.update(tab.id, { url: "https://www.youtube.com/playlist?list=WL" });
       setMsg($("collectMsg"), "Listeyi sonuna kadar kaydır (ya da Otomatik Kaydır), sonra Aktar. Beğendiğin videolar: list=LL.");
     };
+  } else if (host === "x.com" || host === "twitter.com") {
+    row.style.display = "";
+    btn.textContent = "🔖 X yer imlerini aç ve eşitle";
+    btn.onclick = async () => {
+      await chrome.tabs.update(tab.id, { url: "https://x.com/i/bookmarks" });
+      setMsg($("collectMsg"), "Yer imlerin açılıyor; kaydırdıkça otomatik eşitlenir.");
+    };
   } else if (host === "bsky.app") {
     row.style.display = "";
     btn.textContent = "🔖 Bluesky kaydedilenleri aç";
     btn.onclick = async () => {
       await chrome.tabs.update(tab.id, { url: "https://bsky.app/saved" });
-      setMsg($("collectMsg"), "Kaydedilenler'de aşağı kaydır, sonra Aktar. Beğenilerin profilindeki Beğeniler sekmesinden gelir.");
+      setMsg($("collectMsg"), "Kaydedilenler açılıyor; yer imine basınca da hemen eşitlenir.");
+    };
+  } else if (host === "threads.net" || host === "threads.com") {
+    row.style.display = "";
+    btn.textContent = "🧵 Threads kaydedilenleri aç";
+    btn.onclick = async () => {
+      await chrome.tabs.update(tab.id, { url: "https://www.threads.com/saved" });
+      setMsg($("collectMsg"), "Kaydedilenler'de aşağı kaydır (ya da Otomatik Kaydır); gönderiler eşitlenir.");
     };
   }
+}
+
+async function initAutoSync() {
+  const { autoSync } = await chrome.storage.local.get("autoSync");
+  $("autoSyncToggle").checked = autoSync !== false;
+  $("autoSyncToggle").addEventListener("change", async (e) => {
+    await chrome.storage.local.set({ autoSync: e.target.checked });
+    syncCollected();
+  });
 }
 
 // --- Collected Queue Management ---------------------------------------------
@@ -168,13 +193,21 @@ async function syncCollected() {
     if (r.data.instagram > 0) parts.push(`${r.data.instagram} Instagram`);
     if (r.data.youtube > 0) parts.push(`${r.data.youtube} YouTube`);
     if (r.data.bluesky > 0) parts.push(`${r.data.bluesky} Bluesky`);
+    if (r.data.threads > 0) parts.push(`${r.data.threads} Threads`);
     if (pages > 0) parts.push(`${pages} sayfa/link`);
     $("collectedSummary").textContent = `Kuyrukta: ${parts.join(" · ")}. Tek tıkla aktarabilirsiniz.`;
   } else {
     $("collectedBadge").classList.add("empty");
     $("importCollectedBtn").disabled = true;
     $("clearCollectedBtn").style.display = "none";
-    $("collectedSummary").textContent = "Sayfada gezindikçe veya kaydırdıkça gönderiler ve linkler burada birikir.";
+    const { lastAutoSync } = await chrome.storage.session.get("lastAutoSync");
+    if ($("autoSyncToggle").checked && lastAutoSync) {
+      $("collectedSummary").textContent = `✓ ${lastAutoSync.platform} otomatik eşitlendi (${lastAutoSync.total} gönderi, +${lastAutoSync.newCount} yeni).`;
+    } else {
+      $("collectedSummary").textContent = $("autoSyncToggle").checked
+        ? "Yer imlerin ve kaydettiklerin açtıkça kendiliğinden kütüphaneye gider."
+        : "Sayfada gezindikçe veya kaydırdıkça gönderiler ve linkler burada birikir.";
+    }
   }
 }
 
@@ -320,8 +353,8 @@ chrome.storage.session.onChanged.addListener(() => {
 });
 
 // Initial boot
+initAutoSync().then(syncCollected);
 refreshStatus();
 showSavedHere();
 setupSiteImport();
-syncCollected();
 syncScrollStatus();

@@ -343,6 +343,7 @@ impl Fetcher {
         let mut item = match platform {
             Platform::X => self.x_oembed(url)?,
             Platform::Tiktok => self.tiktok(url)?,
+            Platform::Reddit => self.reddit(url).or_else(|_| self.generic(url))?,
             _ => self.generic(url)?,
         };
         // Redirects (pin.it, vm.tiktok.com, t.co) settle on the real post.
@@ -381,6 +382,19 @@ impl Fetcher {
             media: page.image.into_iter().map(Media::image).collect(),
             ..Default::default()
         })
+    }
+
+    fn reddit(&self, url: &str) -> Result<Item> {
+        let parsed = Url::parse(url).map_err(|_| FetchError::InvalidUrl(url.to_string()))?;
+        let path = parsed.path().trim_end_matches('/');
+        if !path.contains("/comments/") {
+            return Err(FetchError::EmptyBody(url.to_string()));
+        }
+        let json_url = format!("https://www.reddit.com{path}.json?raw_json=1");
+        let v = self.get_json(&json_url)?;
+        let items = crate::reddit::parse_listing(&v);
+        let (_, want_id) = item_id_for_url(url);
+        items.iter().find(|i| i.id == want_id).cloned().or_else(|| items.into_iter().next()).ok_or_else(|| FetchError::EmptyBody(url.to_string()))
     }
 
     fn x_oembed(&self, url: &str) -> Result<Item> {

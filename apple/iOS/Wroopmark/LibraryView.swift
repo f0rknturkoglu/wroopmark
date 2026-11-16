@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The library: a list that opens posts on the iPhone, three columns
 /// (scopes, list, post) on the iPad.
@@ -256,25 +257,49 @@ struct AddURLView: View {
     @State private var url = ""
     @State private var tags = ""
     @State private var saving = false
+    @State private var pickingImport = false
 
     var body: some View {
         NavigationStack {
             Form {
-                HStack {
-                    TextField("https://…", text: $url)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    // The system paste button: no "allow paste" prompt.
-                    PasteButton(payloadType: String.self) { texts in
-                        if let link = texts.lazy.compactMap { firstLink(in: $0) }.first { url = link }
+                Section("Bağlantı") {
+                    HStack {
+                        TextField("https://…", text: $url)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        // The system paste button: no "allow paste" prompt.
+                        PasteButton(payloadType: String.self) { texts in
+                            if let link = texts.lazy.compactMap { firstLink(in: $0) }.first { url = link }
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonBorderShape(.capsule)
                     }
-                    .labelStyle(.iconOnly)
-                    .buttonBorderShape(.capsule)
+                    TextField("Etiketler (virgülle)", text: $tags)
+                        .textInputAutocapitalization(.never)
+                    if saving { HStack { ProgressView(); Text("Sayfa indiriliyor…") } }
                 }
-                TextField("Etiketler (virgülle)", text: $tags)
-                    .textInputAutocapitalization(.never)
-                if saving { HStack { ProgressView(); Text("Sayfa indiriliyor…") } }
+                Section {
+                    Button {
+                        pickingImport = true
+                    } label: {
+                        HStack {
+                            Label("Dosyadan içe aktar…", systemImage: "square.and.arrow.down")
+                            if model.isImporting { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(saving || model.isImporting)
+                } footer: {
+                    Text("Veri paketi (.zip), yer imleri (bookmarks.html), CSV ya da video/görsel.")
+                }
+            }
+            .fileImporter(isPresented: $pickingImport, allowedContentTypes: [.item, .folder], allowsMultipleSelection: true) { result in
+                if case .success(let urls) = result {
+                    Task {
+                        await model.importURLs(urls)
+                        dismiss()
+                    }
+                }
             }
             .navigationTitle("Bağlantı")
             .navigationBarTitleDisplayMode(.inline)

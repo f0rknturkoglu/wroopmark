@@ -168,13 +168,14 @@ Kütüphane: `~/Library/Application Support/wroopmark/` (veritabanı + `media/`)
 | X yer imleri | Eklenti açıkken `x.com/i/bookmarks`'ı kaydır (ya da popup → Otomatik Kaydır), popup → Aktar. Yer imine eklediğin tweet de kuyruğa girer. |
 | TikTok | Profil → Favoriler / Beğenilenler'i kaydır, popup → Aktar. Videolar yt-dlp ile ya da sayfanın içinden iner. |
 | Instagram | Profil → Kaydedilenler'i kaydır (popup'taki düğme oraya götürür), popup → Aktar. |
-| X zincirleri | Kaydettiğin bir tweet'in zincirini x.com'da aç; yazarın devam tweet'leri (görselleriyle) o kayda eklenir. Ayrıca bir şey yapman gerekmez. |
-| YouTube | youtube.com'da popup → **Daha Sonra İzle'yi aç**, listeyi kaydır, popup → Aktar. Beğendiğin videolar için `playlist?list=LL`. Videolar inmez; kapak, başlık, kanal kalır. |
-| Bluesky | bsky.app'te popup → **Bluesky kaydedilenleri aç**, kaydır, popup → Aktar. Profilindeki Beğeniler sekmesi de aynı şekilde. |
-| Reddit | reddit.com'da popup → **Reddit kaydedilenlerini aktar** (tüm gönderi ve yorumlar). Videolar sessiz iner: Reddit'in verdiği tek dosyada ses yok. |
+| X zincirleri ve yanıtlar | Kaydettiğin bir tweet'in konuşmasını x.com'da aç; yazarın devam tweet'leri ve gelen yanıtlar o kayda eklenir. |
+| YouTube | youtube.com'da popup → **Daha Sonra İzle'yi aç**, listeyi kaydır. Beğendiğin videolar için `playlist?list=LL`. Videolar inmez; kapak, başlık, kanal kalır. |
+| Bluesky | bsky.app'te popup → **Bluesky kaydedilenleri aç**, kaydır ya da gönderiyi yer imine ekle. Profilindeki Beğeniler sekmesi de aynı şekilde. |
+| Threads | threads.com'da popup → **Threads kaydedilenleri aç** ya da `/saved` sayfasını kaydır; ayrıca Instagram/Threads veri paketinden (`saved_threads.json`, `liked_threads.json`) içe aktarılır. |
+| Reddit | reddit.com'da popup → **Reddit kaydedilenlerini aktar** ya da Reddit veri paketinden (`saved_posts.csv`, `saved_comments.csv`, `post_votes.csv`). |
 | Herhangi bir sayfa | Popup → Kaydet (etiket, not, klasör), ⌥⇧S, ya da sağ tık → wroopmark'a kaydet / klasöre kaydet. |
-| Uygulamadan | ⌘N, linki pencereye sürükle-bırak, menü çubuğu simgesi, her yerde ⌃⌥⌘S (panodaki link). |
-| Veri paketi, yer imleri | ⇧⌘I ya da dosyayı pencereye bırak: `bookmarks.html`, TikTok / Instagram / X'in "verilerini indir" paketi (.zip ya da klasör), Pocket / Raindrop CSV. Çoğu yalnızca link verir; metin, yazar ve medya arka planda gelir. İzleme geçmişi alınmaz. |
+| Uygulamadan | ⌘N, linki pencereye sürükle-bırak, menü çubuğu simgesi, her yerde ⌃⌥⌘S (panodaki link). iPhone/iPad'de **+** veya **Ayarlar → Dosyalardan içe aktar**. |
+| Veri paketi, yer imleri | ⇧⌘I ya da dosyayı pencereye bırak (iPhone'da Ayarlar → Dosyalardan içe aktar): `bookmarks.html`, TikTok / Instagram / Threads / X / Reddit veri paketi (.zip ya da klasör), Pocket / Raindrop CSV. Çoğu yalnızca link verir; metin, yazar ve medya arka planda gelir. İzleme geçmişi alınmaz. |
 | Diskteki dosyalar | Video ve görselleri (ya da klasörü) pencereye bırak. Adında TikTok numarası olan video (`7194…​.mp4`, `SnapTik…_7194….mp4`) o gönderiye bağlanır; yt-dlp adları (`Başlık [id].mp4`) YouTube'a. |
 
 ### Arama
@@ -185,7 +186,7 @@ Kütüphane: `~/Library/Application Support/wroopmark/` (veritabanı + `media/`)
 | `tag:dev` `-tag:okundu` | etiket (alt etiketler dahil: `dev` → `dev/rust`) |
 | `from:@jack` `-@jack` | kişi |
 | `platform:x` `platform:tiktok` | platform |
-| `has:image` `has:video` `has:link` `has:note` `has:ocr` `has:quote` `has:highlight` | içerik |
+| `has:image` `has:video` `has:link` `has:note` `has:ocr` `has:quote` `has:highlight` `has:thread` `has:reply` | içerik |
 | `folder:ders` `is:unfiled` `is:infolder` | klasör (alt klasörler dahil) |
 | `is:untagged` `is:tagged` `is:reviewed` | durum |
 | `after:2024-01` `before:2025` `savedafter:` `savedbefore:` | paylaşılma / kaydedilme tarihi |

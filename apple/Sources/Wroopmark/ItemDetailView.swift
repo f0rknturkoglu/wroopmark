@@ -112,6 +112,9 @@ struct ItemDetailView: View {
                 if !liveItem.thread.isEmpty {
                     ThreadSection(item: liveItem)
                 }
+                if !liveItem.replies.isEmpty {
+                    RepliesSection(item: liveItem)
+                }
                 HStack(spacing: Theme.Spacing.sm) {
                     Button {
                         showReader = true

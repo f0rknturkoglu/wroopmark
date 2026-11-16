@@ -114,6 +114,8 @@ pub enum Has {
     Ocr,
     Quote,
     Highlight,
+    Thread,
+    Reply,
 }
 
 /// Splits on whitespace, keeping `"quoted phrases"` (and `key:"quoted"`) whole.
@@ -263,6 +265,10 @@ impl Query {
                         Some(Has::Quote)
                     } else if eq_any_ci(val, &["highlight", "highlights", "vurgu"]) {
                         Some(Has::Highlight)
+                    } else if eq_any_ci(val, &["thread", "threads", "zincir"]) {
+                        Some(Has::Thread)
+                    } else if eq_any_ci(val, &["reply", "replies", "yanit", "yanitlar"]) {
+                        Some(Has::Reply)
                     } else {
                         None
                     };

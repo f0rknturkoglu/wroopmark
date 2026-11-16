@@ -171,10 +171,12 @@ impl Library {
             }
             // A page that answers is done even if it says little; Instagram
             // answers everyone with its login page, which is not the post.
-            let got =
-                self.fetcher.capture(&stub.url).ok().filter(|c| {
-                    stub.platform != Platform::Instagram || !c.text.trim().is_empty() || !c.media.is_empty() || c.author_handle.is_some()
-                });
+            let got = self.fetcher.capture(&stub.url).ok().filter(|c| {
+                !matches!(stub.platform, Platform::Instagram | Platform::Threads)
+                    || !c.text.trim().is_empty()
+                    || !c.media.is_empty()
+                    || c.author_handle.is_some()
+            });
             let mut store = self.lock_store()?;
             let Some(mut item) = got else {
                 store.stub_failed(&stub.id)?;
@@ -842,6 +844,13 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
                 let rest: Vec<Item> = chain.iter().filter(|i| &i.id != owner).cloned().collect();
                 if lib.lock_store()?.set_thread(owner, rest)? {
                     updated.push(owner.clone());
+                }
+            }
+            let timeline_ids: Vec<String> = crate::x::parse_timeline(&payload).into_iter().map(|i| i.id).collect();
+            let have: HashSet<String> = lib.lock_store()?.existing_ids(&timeline_ids)?.into_iter().collect();
+            for (owner, replies) in crate::x::replies_for(&payload, &have) {
+                if lib.lock_store()?.set_replies(&owner, replies)? && !updated.contains(&owner) {
+                    updated.push(owner);
                 }
             }
             if !updated.is_empty() {

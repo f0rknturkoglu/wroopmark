@@ -74,9 +74,25 @@ function defaultCollected() {
     yt_ids: [],
     bsky_payloads: [],
     bsky_ids: [],
+    threads_payloads: [],
+    threads_ids: [],
     page_items: [],
     page_urls: [],
   };
+}
+
+async function isAutoSync() {
+  const { autoSync } = await chrome.storage.local.get("autoSync");
+  return autoSync !== false;
+}
+
+async function sendAutoSync(platform, cmd, args) {
+  const r = await call(cmd, args);
+  if (!r.ok) return null;
+  await chrome.storage.session.set({
+    lastAutoSync: { at: Date.now(), platform, newCount: r.data?.new || 0, total: r.data?.ids?.length || 0 },
+  });
+  return r.data;
 }
 
 async function getCollected() {
@@ -102,6 +118,7 @@ function getTotalCollectedCount(c) {
     (c.ig_codes?.length || 0) +
     (c.yt_ids?.length || 0) +
     (c.bsky_ids?.length || 0) +
+    (c.threads_ids?.length || 0) +
     (c.page_items?.length || 0)
   );
 }
@@ -151,9 +168,17 @@ async function onCapture(msg, tabId) {
 }
 
 async function handleCapture({ kind, payload }, tabId) {
+  const auto = await isAutoSync();
   const c = await getCollected();
 
   if (kind === "x_timeline" || kind === "x_tweet") {
+    if (auto) {
+      const d = await sendAutoSync("X", "import_x", { payload });
+      if (d) {
+        log(`X otomatik eşitlendi: ${d.ids?.length || 0} gönderi (+${d.new || 0} yeni)`);
+        return;
+      }
+    }
     const ids = extractTweetIds(payload);
     let added = 0;
     for (const id of ids) {
@@ -169,6 +194,14 @@ async function handleCapture({ kind, payload }, tabId) {
   }
 
   if (kind === "tiktok_list" || kind === "tiktok_item") {
+    if (auto) {
+      const d = await sendAutoSync("TikTok", "import_tiktok", { payload });
+      if (d) {
+        log(`TikTok otomatik eşitlendi: ${d.ids?.length || 0} video (+${d.new || 0} yeni)`);
+        if (tabId != null && d.ids?.length) fetchMissingVideos(tabId, d.ids);
+        return;
+      }
+    }
     const ids = extractTikTokIds(payload);
     let added = 0;
     for (const id of ids) {
@@ -184,6 +217,13 @@ async function handleCapture({ kind, payload }, tabId) {
   }
 
   if (kind === "instagram_list") {
+    if (auto) {
+      const d = await sendAutoSync("Instagram", "import_instagram", { payload });
+      if (d) {
+        log(`Instagram otomatik eşitlendi: ${d.ids?.length || 0} gönderi (+${d.new || 0} yeni)`);
+        return;
+      }
+    }
     c.ig_codes ||= [];
     c.ig_payloads ||= [];
     let added = 0;
@@ -202,11 +242,18 @@ async function handleCapture({ kind, payload }, tabId) {
   // Not queued: it only completes posts already in the library.
   if (kind === "x_thread") {
     const r = await call("import_x_thread", { payload });
-    if (r.ok && r.data?.length) log(`X: zincir eklendi: ${r.data.join(", ")}`);
+    if (r.ok && r.data?.length) log(`X: zincir/yanıtlar eklendi: ${r.data.join(", ")}`);
     return;
   }
 
   if (kind === "youtube_list") {
+    if (auto) {
+      const d = await sendAutoSync("YouTube", "import_youtube", { payload: { items: payload.items }, tags: [payload.tag] });
+      if (d) {
+        log(`YouTube otomatik eşitlendi: ${d.ids?.length || 0} video (+${d.new || 0} yeni)`);
+        return;
+      }
+    }
     c.yt_ids ||= [];
     c.yt_payloads ||= [];
     const fresh = (payload?.items || []).filter((v) => v?.videoId && !c.yt_ids.includes(v.videoId));
@@ -218,6 +265,13 @@ async function handleCapture({ kind, payload }, tabId) {
   }
 
   if (kind === "bluesky_list") {
+    if (auto) {
+      const d = await sendAutoSync("Bluesky", "import_bluesky", { payload: payload.payload, tags: [payload.tag] });
+      if (d) {
+        log(`Bluesky otomatik eşitlendi: ${d.ids?.length || 0} gönderi (+${d.new || 0} yeni)`);
+        return;
+      }
+    }
     c.bsky_ids ||= [];
     c.bsky_payloads ||= [];
     const posts = (payload?.payload?.bookmarks || payload?.payload?.feed || []).map((b) => b?.item?.uri || b?.post?.uri || b?.subject?.uri).filter(Boolean);
@@ -226,6 +280,26 @@ async function handleCapture({ kind, payload }, tabId) {
     if (fresh.length) c.bsky_payloads.push(payload);
     await setCollected(c);
     log(`Bluesky: ${posts.length} gönderi görüldü (+${fresh.length} yeni, kuyrukta: ${c.bsky_ids.length})`);
+    return;
+  }
+
+  if (kind === "threads_list") {
+    const items = payload?.items || [];
+    const tag = payload?.tag || "threads/kaydedilenler";
+    if (auto && items.length) {
+      const d = await sendAutoSync("Threads", "import_items", { items, tags: [tag] });
+      if (d) {
+        log(`Threads otomatik eşitlendi: ${d.ids?.length || 0} gönderi (+${d.new || 0} yeni)`);
+        return;
+      }
+    }
+    c.threads_ids ||= [];
+    c.threads_payloads ||= [];
+    const fresh = items.filter((it) => it?.url && !c.threads_ids.includes(it.url));
+    for (const it of fresh) c.threads_ids.push(it.url);
+    if (fresh.length) c.threads_payloads.push({ tag, items: fresh });
+    await setCollected(c);
+    log(`Threads: ${items.length} gönderi görüldü (+${fresh.length} yeni, kuyrukta: ${c.threads_ids.length})`);
     return;
   }
 
@@ -319,6 +393,14 @@ async function importCollected() {
   }
   for (const p of c.bsky_payloads || []) {
     const report = await call("import_bluesky", { payload: p.payload, tags: [p.tag] });
+    if (report.ok) {
+      totalNew += report.data?.new || 0;
+      totalUpdated += report.data?.updated || 0;
+      if (report.data?.ids) importedIds.push(...report.data.ids);
+    }
+  }
+  for (const p of c.threads_payloads || []) {
+    const report = await call("import_items", { items: p.items, tags: [p.tag] });
     if (report.ok) {
       totalNew += report.data?.new || 0;
       totalUpdated += report.data?.updated || 0;
@@ -1089,6 +1171,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
             instagram: c.ig_codes?.length || 0,
             youtube: c.yt_ids?.length || 0,
             bluesky: c.bsky_ids?.length || 0,
+            threads: c.threads_ids?.length || 0,
             pages: c.page_items?.length || 0,
           },
         });

@@ -272,6 +272,19 @@
     padding: 1px 5px;
     font-size: 10.5px;
   }
+  .auto-sync {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .auto-sync input {
+    width: auto;
+    margin: 0;
+    accent-color: var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -290,7 +303,10 @@
         <div class="card-title">
           <span>📦 Toplanan İçerikler</span>
         </div>
-        <span class="badge-count empty" id="collectedBadge">0</span>
+        <div class="row">
+          <label class="auto-sync" title="Açıkken yer imleri gezinirken kendiliğinden aktarılır"><input type="checkbox" id="autoSyncToggle"> Otomatik</label>
+          <span class="badge-count empty" id="collectedBadge">0</span>
+        </div>
       </div>
       <div class="card-sub" id="collectedSummary">
         Sayfada gezindikçe gönderiler ve linkler burada birikir; tek tıkla kütüphaneye aktarabilirsiniz.

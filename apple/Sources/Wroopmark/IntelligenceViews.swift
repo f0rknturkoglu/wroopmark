@@ -261,3 +261,38 @@ struct ThreadSection: View {
         }
     }
 }
+
+/// Parent context and replies around a saved X post.
+struct RepliesSection: View {
+    let item: Item
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            Label("Yanıtlar · \(item.replies.count)", systemImage: "bubble.left.and.bubble.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ForEach(item.replies) { r in
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    if let a = r.author {
+                        Text(a)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    if !r.text.isEmpty {
+                        Text(r.text)
+                            .font(.callout)
+                            .lineSpacing(3)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(Theme.Spacing.md)
+                .background(Theme.Stroke.subtleFill, in: .rect(cornerRadius: Theme.Radius.sm))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                }
+            }
+        }
+    }
+}

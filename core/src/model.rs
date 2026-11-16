@@ -19,6 +19,7 @@ pub enum Platform {
     Hackernews,
     Arxiv,
     Bluesky,
+    Threads,
     /// A file imported from disk (old downloads, screen recordings…).
     Local,
     #[default]
@@ -26,7 +27,7 @@ pub enum Platform {
 }
 
 impl Platform {
-    pub const ALL: [Platform; 13] = [
+    pub const ALL: [Platform; 14] = [
         Self::X,
         Self::Facebook,
         Self::Tiktok,
@@ -38,6 +39,7 @@ impl Platform {
         Self::Hackernews,
         Self::Arxiv,
         Self::Bluesky,
+        Self::Threads,
         Self::Local,
         Self::Web,
     ];
@@ -55,6 +57,7 @@ impl Platform {
             Self::Hackernews => "hackernews",
             Self::Arxiv => "arxiv",
             Self::Bluesky => "bluesky",
+            Self::Threads => "threads",
             Self::Local => "local",
             Self::Web => "web",
         }
@@ -82,6 +85,7 @@ impl Platform {
             b"hackernews" | b"hn" | b"ycombinator" => Self::Hackernews,
             b"arxiv" => Self::Arxiv,
             b"bluesky" | b"bsky" => Self::Bluesky,
+            b"threads" | b"th" => Self::Threads,
             b"local" | b"file" | b"dosya" | b"yerel" => Self::Local,
             b"web" | b"custom" | b"link" => Self::Web,
             _ => return None,
@@ -115,6 +119,8 @@ impl Platform {
             Self::Arxiv
         } else if is("bsky.app") {
             Self::Bluesky
+        } else if is("threads.net") || is("threads.com") {
+            Self::Threads
         } else {
             Self::Web
         }
@@ -255,6 +261,9 @@ pub struct Item {
     /// pictures are also in `media`, so they download and show like the rest.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub thread: Vec<Item>,
+    /// Context and replies around a saved X post (captured from TweetDetail).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub replies: Vec<Item>,
     /// The readable copy of a web page: cleaned HTML (Readability) with
     /// absolute links. Kept in its own column and read only by `article`;
     /// an empty string means extraction was tried and found nothing.

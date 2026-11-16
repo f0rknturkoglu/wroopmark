@@ -7,10 +7,12 @@
 //! in the background (see `Library::fill_stubs`). Browsing / watch history
 //! is skipped on purpose; it is not something you saved.
 
-use std::path::{Path, PathBuf};
+use std::io::{BufWriter, Read, Seek, SeekFrom};
+use std::path::{Component, Path, PathBuf};
 use std::sync::LazyLock;
 
 use chrono::NaiveDateTime;
+use flate2::read::DeflateDecoder;
 use regex::Regex;
 use serde_json::Value;
 
@@ -125,20 +127,26 @@ fn section_tag(platform: &str, section: &str) -> Option<Option<String>> {
     if s.contains("history") || s.contains("gecmis") || s.contains("geçmiş") {
         return None;
     }
-    let tag = if s.contains("like") || s.contains("begen") || s.contains("beğen") {
+    let tag = if s.contains("like") || s.contains("begen") || s.contains("beğen") || s.contains("vote") {
         Some(match platform {
             "tiktok" => "tiktok/begenilenler",
             "x" => "x/begenilenler",
+            "threads" => "threads/begenilenler",
+            "reddit" => "reddit/begenilenler",
             _ => "instagram/begenilenler",
         })
     } else if s.contains("favorite") || s.contains("favori") || s.contains("saved") || s.contains("kaydedil") || s.contains("bookmark") {
         Some(match platform {
             "tiktok" => "tiktok/favoriler",
             "x" => "x/yer-imleri",
+            "threads" => "threads/kaydedilenler",
+            "reddit" => "reddit/kaydedilenler",
             _ => "instagram/kaydedilenler",
         })
     } else if platform == "tiktok" && (s.contains("post") || s.contains("video")) {
         Some("tiktok/videolarim")
+    } else if platform == "threads" && s.contains("threads") && !s.contains("follow") && !s.contains("block") {
+        Some("threads/gonderilerim")
     } else {
         None
     };
@@ -242,6 +250,41 @@ pub fn parse_instagram_json(v: &Value, section: &str) -> Vec<Stub> {
     out
 }
 
+fn is_threads_post(url: &str) -> bool {
+    (url.contains("threads.net/") || url.contains("threads.com/")) && (url.contains("/post/") || url.contains("/t/"))
+}
+
+/// Threads' Meta data download (`liked_threads.json`, `saved_threads.json`, `threads_and_replies.json`).
+pub fn parse_threads_json(v: &Value, section: &str) -> Vec<Stub> {
+    let Some(tag) = section_tag("threads", section) else { return vec![] };
+    let mut out: Vec<Stub> = vec![];
+    fn find(v: &Value, author: Option<&str>, tag: &Option<String>, out: &mut Vec<Stub>) {
+        match v {
+            Value::Object(map) => {
+                let author = map.get("title").and_then(Value::as_str).filter(|t| !t.is_empty()).or(author);
+                let url =
+                    map.get("href").or_else(|| map.get("uri")).or_else(|| map.get("value")).and_then(Value::as_str).filter(|h| is_threads_post(h));
+                if let Some(href) = url {
+                    out.push(Stub {
+                        url: href.to_string(),
+                        author: author.map(str::to_string),
+                        at: map.get("timestamp").or_else(|| map.get("creation_timestamp")).and_then(Value::as_i64),
+                        tags: tag.clone().into_iter().collect(),
+                        ..Default::default()
+                    });
+                }
+                for child in map.values() {
+                    find(child, author, tag, out);
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|c| find(c, author, tag, out)),
+            _ => {}
+        }
+    }
+    find(v, None, &tag, &mut out);
+    out
+}
+
 /// X's archive (`data/like.js`, `data/bookmark.js`): JavaScript that assigns
 /// a JSON array.
 pub fn parse_x_js(text: &str, section: &str) -> Vec<Stub> {
@@ -302,6 +345,37 @@ fn parse_time(s: &str) -> Option<i64> {
 
 /// A CSV with a URL column (Pocket, Raindrop, Reddit's `saved_posts.csv`…).
 pub fn parse_csv(text: &str) -> Vec<Stub> {
+    parse_csv_named(text, "")
+}
+
+pub fn parse_csv_named(text: &str, stem: &str) -> Vec<Stub> {
+    const REDDIT_SKIP: [&str; 17] = [
+        "comments",
+        "posts",
+        "comment_headers",
+        "post_headers",
+        "chat_history",
+        "messages",
+        "ip_logs",
+        "statistics",
+        "subreddits",
+        "subscribed_subreddits",
+        "moderated_subreddits",
+        "friends",
+        "drafts",
+        "gilded_content",
+        "poll_votes",
+        "persona",
+        "hidden_posts",
+    ];
+    if REDDIT_SKIP.contains(&stem) {
+        return vec![];
+    }
+    let auto_tag = match stem {
+        "saved_posts" | "saved_comments" => Some("reddit/kaydedilenler".to_string()),
+        "post_votes" | "comment_votes" => Some("reddit/begenilenler".to_string()),
+        _ => None,
+    };
     let rows = csv_records(text);
     let Some((head, body)) = rows.split_first() else { return vec![] };
     let col = |names: &[&str]| head.iter().position(|h| names.contains(&h.trim().to_lowercase().as_str()));
@@ -311,9 +385,15 @@ pub fn parse_csv(text: &str) -> Vec<Stub> {
     let time_col = col(&["time_added", "created", "created_at", "date", "added", "saved_at"]);
     let folder_col = col(&["folder", "collection", "klasör"]);
     let note_col = col(&["note", "excerpt", "not"]);
+    let dir_col = col(&["direction"]);
     body.iter()
         .filter_map(|r| {
             let get = |c: Option<usize>| c.and_then(|c| r.get(c)).map(|s| s.trim()).filter(|s| !s.is_empty());
+            if let Some(dir) = get(dir_col)
+                && !dir.eq_ignore_ascii_case("up")
+            {
+                return None;
+            }
             let mut url = get(Some(url_col))?.to_string();
             if url.starts_with("/r/") {
                 url = format!("https://www.reddit.com{url}");
@@ -321,14 +401,19 @@ pub fn parse_csv(text: &str) -> Vec<Stub> {
             if !is_web(&url) {
                 return None;
             }
+            let mut tags: Vec<String> =
+                get(tags_col).map(|t| t.split(['|', ',']).map(str::trim).filter(|t| !t.is_empty()).map(str::to_string).collect()).unwrap_or_default();
+            if let Some(ref t) = auto_tag
+                && !tags.contains(t)
+            {
+                tags.push(t.clone());
+            }
             Some(Stub {
                 url,
                 title: get(title_col).map(str::to_string),
                 text: get(note_col).map(str::to_string),
                 at: get(time_col).and_then(parse_time),
-                tags: get(tags_col)
-                    .map(|t| t.split(['|', ',']).map(str::trim).filter(|t| !t.is_empty()).map(str::to_string).collect())
-                    .unwrap_or_default(),
+                tags,
                 folder: get(folder_col).map(|f| f.replace(" / ", "/")),
                 ..Default::default()
             })
@@ -356,6 +441,8 @@ pub fn parse_file(path: &Path) -> Vec<Stub> {
             let Ok(v) = serde_json::from_str::<Value>(&text) else { return vec![] };
             if text.contains("tiktok") {
                 parse_tiktok_json(&v)
+            } else if text.contains("threads.net") || text.contains("threads.com") {
+                parse_threads_json(&v, &stem)
             } else if text.contains("instagram.com") {
                 parse_instagram_json(&v, &stem)
             } else {
@@ -364,7 +451,7 @@ pub fn parse_file(path: &Path) -> Vec<Stub> {
         }
         "js" if text.contains("window.YTD") => parse_x_js(&text, &stem),
         "txt" if text.contains("tiktok") => parse_tiktok_txt(&text, &format!("{parent} {name}")),
-        "csv" => parse_csv(&text),
+        "csv" => parse_csv_named(&text, &stem),
         _ => vec![],
     }
 }
@@ -389,18 +476,149 @@ fn walk_files(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Reads a `.zip`, a folder or a single file. Zips are unpacked with the
-/// system's `ditto` into a temporary folder that is removed afterwards.
+fn u16_le(b: &[u8], off: usize) -> Option<u16> {
+    Some(u16::from_le_bytes(b.get(off..off + 2)?.try_into().ok()?))
+}
+
+fn u32_le(b: &[u8], off: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(b.get(off..off + 4)?.try_into().ok()?))
+}
+
+/// Safe relative path inside `dest` for a ZIP entry we know how to parse.
+fn safe_zip_target(dest: &Path, raw_name: &str) -> Option<PathBuf> {
+    if raw_name.ends_with('/') {
+        return None;
+    }
+    let mut out = dest.to_path_buf();
+    let mut depth = 0usize;
+    for c in Path::new(raw_name).components() {
+        match c {
+            Component::Normal(seg) => {
+                let s = seg.to_str()?;
+                if s.is_empty() || s.starts_with('.') || s == "__MACOSX" {
+                    return None;
+                }
+                out.push(seg);
+                depth += 1;
+            }
+            _ => return None,
+        }
+    }
+    if depth == 0 {
+        return None;
+    }
+    let ext = out.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    matches!(ext.as_str(), "html" | "htm" | "json" | "js" | "txt" | "csv").then_some(out)
+}
+
+/// Unpacks an archive `.zip` in pure Rust (Central Directory + store/deflate)
+/// so `.zip` data exports work on iPhone/iPad as well as Mac.
+fn extract_zip(path: &Path, dest: &Path) -> std::io::Result<()> {
+    const MAX_ENTRY: u64 = 200 * 1024 * 1024;
+    let err = |msg: &str| std::io::Error::other(msg);
+    let mut f = std::fs::File::open(path)?;
+    let file_len = f.metadata()?.len();
+    if file_len < 22 {
+        return Err(err("geçersiz zip"));
+    }
+    let tail_len = usize::try_from(file_len.min(65_557)).unwrap_or(65_557);
+    f.seek(SeekFrom::Start(file_len - tail_len as u64))?;
+    let mut tail = vec![0u8; tail_len];
+    f.read_exact(&mut tail)?;
+
+    let eocd = (0..=tail.len().saturating_sub(22))
+        .rev()
+        .find(|&i| {
+            tail.get(i..i + 4) == Some(&[0x50, 0x4b, 0x05, 0x06]) && u16_le(&tail, i + 20).is_some_and(|cl| i + 22 + usize::from(cl) == tail.len())
+        })
+        .ok_or_else(|| err("zip dizini bulunamadı"))?;
+
+    let entries = u16_le(&tail, eocd + 10).ok_or_else(|| err("bozuk zip"))?;
+    let cd_size = u32_le(&tail, eocd + 12).ok_or_else(|| err("bozuk zip"))?;
+    let cd_offset = u32_le(&tail, eocd + 16).ok_or_else(|| err("bozuk zip"))?;
+    if entries == u16::MAX || cd_size == u32::MAX || cd_offset == u32::MAX {
+        return Err(err("Zip64 desteklenmiyor"));
+    }
+    if u64::from(cd_offset).saturating_add(u64::from(cd_size)) > file_len || cd_size > 64 * 1024 * 1024 {
+        return Err(err("geçersiz zip boyutu"));
+    }
+    f.seek(SeekFrom::Start(u64::from(cd_offset)))?;
+    let mut cd = vec![0u8; usize::try_from(cd_size).map_err(|_| err("zip çok büyük"))?];
+    f.read_exact(&mut cd)?;
+
+    let mut pos = 0usize;
+    for _ in 0..entries {
+        if pos + 46 > cd.len() || cd.get(pos..pos + 4) != Some(&[0x50, 0x4b, 0x01, 0x02]) {
+            break;
+        }
+        let method = u16_le(&cd, pos + 10).ok_or_else(|| err("bozuk zip kaydı"))?;
+        let comp_size = u32_le(&cd, pos + 20).ok_or_else(|| err("bozuk zip kaydı"))?;
+        let uncomp_size = u32_le(&cd, pos + 24).ok_or_else(|| err("bozuk zip kaydı"))?;
+        let name_len = usize::from(u16_le(&cd, pos + 28).ok_or_else(|| err("bozuk zip kaydı"))?);
+        let extra_len = usize::from(u16_le(&cd, pos + 30).ok_or_else(|| err("bozuk zip kaydı"))?);
+        let comment_len = usize::from(u16_le(&cd, pos + 32).ok_or_else(|| err("bozuk zip kaydı"))?);
+        let local_off = u32_le(&cd, pos + 42).ok_or_else(|| err("bozuk zip kaydı"))?;
+        let name_end = pos + 46 + name_len;
+        let next = name_end + extra_len + comment_len;
+        if next > cd.len() {
+            break;
+        }
+        let raw_name = String::from_utf8_lossy(cd.get(pos + 46..name_end).unwrap_or(&[]));
+        if let Some(target) = safe_zip_target(dest, &raw_name)
+            && u64::from(comp_size) <= MAX_ENTRY
+            && u64::from(uncomp_size) <= MAX_ENTRY
+            && matches!(method, 0 | 8)
+        {
+            f.seek(SeekFrom::Start(u64::from(local_off)))?;
+            let mut lh = [0u8; 30];
+            f.read_exact(&mut lh)?;
+            if lh.get(0..4) != Some(&[0x50, 0x4b, 0x03, 0x04]) {
+                return Err(err("bozuk zip dosya başlığı"));
+            }
+            let lh_name = u64::from(u16_le(&lh, 26).unwrap_or(0));
+            let lh_extra = u64::from(u16_le(&lh, 28).unwrap_or(0));
+            f.seek(SeekFrom::Start(u64::from(local_off) + 30 + lh_name + lh_extra))?;
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let out_file = std::fs::File::create(&target)?;
+            let mut writer = BufWriter::new(out_file);
+            let mut compressed = (&mut f).take(u64::from(comp_size));
+            if method == 0 {
+                std::io::copy(&mut compressed, &mut writer)?;
+            } else {
+                let mut dec = DeflateDecoder::new(compressed).take(MAX_ENTRY);
+                std::io::copy(&mut dec, &mut writer)?;
+            }
+        }
+        pos = next;
+    }
+    Ok(())
+}
+
+/// Reads a `.zip`, a folder or a single file. Zips are unpacked in Rust
+/// (falling back to macOS `ditto` if needed) into a temporary folder that
+/// is removed afterwards.
 pub fn scan(path: &Path) -> std::io::Result<Found> {
     let is_zip = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("zip"));
     let mut tmp = None;
     let root = if is_zip {
         let dir = std::env::temp_dir().join(format!("wroopmark-import-{}-{}", std::process::id(), crate::text::now()));
         std::fs::create_dir_all(&dir)?;
-        let status = std::process::Command::new("/usr/bin/ditto").arg("-x").arg("-k").arg(path).arg(&dir).status()?;
-        if !status.success() {
-            let _ = std::fs::remove_dir_all(&dir);
-            return Err(std::io::Error::other("zip açılamadı"));
+        if let Err(e) = extract_zip(path, &dir) {
+            #[cfg(target_os = "macos")]
+            {
+                let status = std::process::Command::new("/usr/bin/ditto").arg("-x").arg("-k").arg(path).arg(&dir).status()?;
+                if !status.success() {
+                    let _ = std::fs::remove_dir_all(&dir);
+                    return Err(e);
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = std::fs::remove_dir_all(&dir);
+                return Err(e);
+            }
         }
         tmp = Some(dir.clone());
         dir
@@ -523,5 +741,97 @@ mod tests {
         let s = parse_csv(csv);
         assert_eq!(s.len(), 1);
         assert_eq!(s.first().map(|x| (x.title.as_deref(), x.tags.len())), Some((Some("A, b"), 2)));
+
+        let reddit_saved = "id,permalink\nabc,/r/rust/comments/abc/title/\n";
+        let rs = parse_csv_named(reddit_saved, "saved_posts");
+        assert_eq!(
+            rs.first().map(|x| (x.url.as_str(), x.tags.clone())),
+            Some(("https://www.reddit.com/r/rust/comments/abc/title/", vec!["reddit/kaydedilenler".to_string()]))
+        );
+
+        let reddit_votes = "id,permalink,direction\np1,/r/rust/comments/p1/a/,up\np2,/r/rust/comments/p2/b/,down\n";
+        let rv = parse_csv_named(reddit_votes, "post_votes");
+        assert_eq!(rv.len(), 1);
+        assert_eq!(rv.first().map(|x| x.tags.clone()), Some(vec!["reddit/begenilenler".to_string()]));
+        assert!(parse_csv_named("id,permalink\n1,/r/rust/comments/1/a/", "comments").is_empty());
+
+        let threads: Value = serde_json::from_str(
+            r#"{"text_post_app_liked":[{"title":"zuck","string_map_data":{"URL":{"href":"https://www.threads.net/@zuck/post/C99ab","timestamp":1700000100}}}]}"#,
+        )
+        .unwrap_or_default();
+        let th = parse_threads_json(&threads, "liked_threads");
+        assert_eq!(
+            th.first().map(|x| (x.url.as_str(), x.tags.clone())),
+            Some(("https://www.threads.net/@zuck/post/C99ab", vec!["threads/begenilenler".to_string()]))
+        );
+        assert_eq!(to_item(th.first().unwrap_or(&Stub::default())).id, "threads:C99ab");
+    }
+
+    #[test]
+    fn scans_deflated_zip_without_external_tools() {
+        use flate2::Compression;
+        use flate2::write::DeflateEncoder;
+        use std::io::Write;
+
+        let name = b"saved_posts.csv";
+        let plain = b"id,permalink\nxyz,/r/rust/comments/xyz/post/\n";
+        let mut enc = DeflateEncoder::new(Vec::new(), Compression::default());
+        enc.write_all(plain).unwrap_or_default();
+        let comp = enc.finish().unwrap_or_default();
+
+        let mut zip = Vec::new();
+        // Local file header (30 bytes)
+        zip.extend_from_slice(&0x04034b50u32.to_le_bytes());
+        zip.extend_from_slice(&20u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&8u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u32.to_le_bytes());
+        zip.extend_from_slice(&(comp.len() as u32).to_le_bytes());
+        zip.extend_from_slice(&(plain.len() as u32).to_le_bytes());
+        zip.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(name);
+        zip.extend_from_slice(&comp);
+
+        let cd_off = zip.len() as u32;
+        // Central directory header (46 bytes)
+        zip.extend_from_slice(&0x02014b50u32.to_le_bytes());
+        zip.extend_from_slice(&20u16.to_le_bytes());
+        zip.extend_from_slice(&20u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&8u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u32.to_le_bytes());
+        zip.extend_from_slice(&(comp.len() as u32).to_le_bytes());
+        zip.extend_from_slice(&(plain.len() as u32).to_le_bytes());
+        zip.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u32.to_le_bytes());
+        zip.extend_from_slice(&0u32.to_le_bytes());
+        zip.extend_from_slice(name);
+
+        let cd_size = (zip.len() as u32) - cd_off;
+        // End of central directory (22 bytes)
+        zip.extend_from_slice(&0x06054b50u32.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+        zip.extend_from_slice(&1u16.to_le_bytes());
+        zip.extend_from_slice(&1u16.to_le_bytes());
+        zip.extend_from_slice(&cd_size.to_le_bytes());
+        zip.extend_from_slice(&cd_off.to_le_bytes());
+        zip.extend_from_slice(&0u16.to_le_bytes());
+
+        let path = std::env::temp_dir().join(format!("wm-zip-test-{}.zip", std::process::id()));
+        std::fs::write(&path, &zip).unwrap_or_default();
+        let found = scan(&path).unwrap_or_default();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(found.stubs.len(), 1);
+        assert_eq!(found.stubs.first().map(|s| s.tags.clone()), Some(vec!["reddit/kaydedilenler".to_string()]));
     }
 }
