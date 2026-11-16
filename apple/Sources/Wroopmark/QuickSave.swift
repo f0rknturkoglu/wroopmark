@@ -91,6 +91,40 @@ final class QuickSave {
         }
     }
 
+    /// Saves a linkless note card via the core (used by Menu Bar and macOS Services).
+    @discardableResult
+    func saveNote(title: String? = nil, text: String, tags: [String] = [], folderID: Int64? = nil) async -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let client: any CoreClient = model?.core ?? Core.shared
+        do {
+            var args: [String: CoreArg] = [
+                "text": .string(trimmed),
+                "tags": .strings(tags),
+            ]
+            if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                args["title"] = .string(title.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            if let folderID {
+                args["folder_id"] = .int(folderID)
+            }
+            let item: Item = try await client.call(.call("add_note", args))
+            let preview = item.title ?? String(trimmed.prefix(90))
+            show(symbol: "checkmark.circle.fill", title: String(localized: "Not kaydedildi"), detail: preview)
+            if let model {
+                await model.refreshLoaded()
+                await model.loadRecent()
+            }
+            if model?.enableSystemIntegrations ?? true {
+                Spotlight.indexRecent(core: client)
+            }
+            return true
+        } catch {
+            show(symbol: "exclamationmark.triangle.fill", title: String(localized: "Kaydedilemedi"), detail: error.localizedDescription)
+            return false
+        }
+    }
+
     // MARK: Banner
 
     private func show(symbol: String, title: String, detail: String, stay: Bool = false) {
@@ -154,22 +188,49 @@ private struct Banner: View {
     }
 }
 
-/// The menu bar icon's panel: save a link, see the newest saves.
+/// The menu bar icon's panel: save a link or quick note, see the newest saves.
 struct QuickAddMenu: View {
+    enum Mode: String, CaseIterable { case link, note }
+
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @AppStorage("quickAddFolder") private var folderID = 0
+    @State private var mode: Mode = .link
     @State private var link = ""
+    @State private var noteText = ""
     @State private var tags = ""
     @State private var saving = false
 
+    private var canSave: Bool {
+        guard !saving else { return false }
+        return mode == .link
+            ? QuickSave.firstURL(in: link) != nil
+            : !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            Text("Hızlı kaydet").font(.headline)
-            TextField("https://…", text: $link)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(save)
+            HStack {
+                Text("Hızlı kaydet").font(.headline)
+                Spacer()
+                Picker("Tür", selection: $mode) {
+                    Text("Bağlantı").tag(Mode.link)
+                    Text("Not").tag(Mode.note)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+            if mode == .link {
+                TextField("https://…", text: $link)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(save)
+            } else {
+                TextField("Hızlı not metni…", text: $noteText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...4)
+            }
             TextField("etiketler (virgülle)", text: $tags)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(save)
@@ -190,7 +251,7 @@ struct QuickAddMenu: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
                 .keyboardShortcut(.defaultAction)
-                .disabled(QuickSave.firstURL(in: link) == nil || saving)
+                .disabled(!canSave)
             }
 
             if !model.recentItems.isEmpty {
@@ -237,10 +298,24 @@ struct QuickAddMenu: View {
     }
 
     private func save() {
-        guard let url = QuickSave.firstURL(in: link), !saving else { return }
-        saving = true
+        guard !saving else { return }
         let picked = parseTags(tags)
         let folder = folderID == 0 ? nil : Int64(folderID)
+        if mode == .note {
+            let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            saving = true
+            Task {
+                if await QuickSave.shared.saveNote(text: trimmed, tags: picked, folderID: folder) {
+                    noteText = ""
+                    tags = ""
+                }
+                saving = false
+            }
+            return
+        }
+        guard let url = QuickSave.firstURL(in: link) else { return }
+        saving = true
         Task {
             if await QuickSave.shared.save(url, tags: picked, folderID: folder) {
                 link = ""
@@ -273,12 +348,19 @@ private struct RecentSaveRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Theme.Spacing.sm) {
-                Image(nsImage: FolderIcons.image(forPlatform: Platform(rawValue: item.platform) ?? .web))
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(.secondary)
+                if let file = item.cover?.file {
+                    LocalImage(file: file, maxPixel: 72)
+                        .frame(width: 24, height: 24)
+                        .clipShape(.rect(cornerRadius: 5))
+                } else {
+                    Image(nsImage: FolderIcons.image(forPlatform: Platform(rawValue: item.platform) ?? .web))
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                }
                 Text(item.title ?? (item.text.isEmpty ? item.url : item.text))
                     .font(.callout)
                     .lineLimit(1)

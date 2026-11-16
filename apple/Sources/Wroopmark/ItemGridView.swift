@@ -131,9 +131,15 @@ struct ItemGridView: View {
         } label: {
             Label("Bağlantıyı kopyala", systemImage: "doc.on.doc")
         }
-        if item.needsDownload {
-            Button { Task { await model.downloadMedia(item.id) } } label: {
-                Label("Medyayı indir", systemImage: "arrow.down.circle")
+        let missingIDs = model.items.filter { ids.contains($0.id) && $0.needsDownload }.map(\.id)
+        if !missingIDs.isEmpty {
+            Button {
+                Task { await model.downloadMediaBatch(missingIDs) }
+            } label: {
+                Label(
+                    missingIDs.count > 1 ? "\(missingIDs.count) kaydın medyasını indir" : "Medyayı indir",
+                    systemImage: "arrow.down.circle"
+                )
             }
         }
         Divider()
@@ -191,10 +197,12 @@ private struct Selectable: ViewModifier {
     let owner: ItemGridView
 
     func body(content: Content) -> some View {
+        let dragURL = URL(string: item.url) ?? URL(string: "https://wroopmark.local/item/\(item.id)")!
         content
             .onTapGesture { ClickInfo.current.handle(single: owner.select(item), double: owner.open(item),
                                                      command: owner.toggle(item), shift: owner.extend(to: item)) }
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+            .draggable(dragURL)
             .contextMenu { owner.menu(for: item) }
             .onAppear {
                 if item.id == model.items.last?.id { Task { await model.loadMore() } }

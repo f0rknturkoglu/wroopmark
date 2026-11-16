@@ -111,6 +111,16 @@ struct GalleryView: View {
                 CountPill(value: model.reachedEnd ? count.formatted() : "\(count.formatted())+")
             }
             Spacer()
+            if videos && count > 0 {
+                Button {
+                    model.showVideoFeed = true
+                } label: {
+                    Label("Video Akışı", systemImage: "play.rectangle.on.rectangle")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .help("Videoları tam ekran arka arkaya izle (⇧⌘P)")
+            }
             let others = model.filters.activeCount - (model.filters.folder == .any ? 0 : 1)
             if others > 0 {
                 Button { model.showFilters = true } label: {

@@ -8632,6 +8632,292 @@
           }
         }
       }
+    },
+    "Paylaş ya da Fotoğraflar'a kaydet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share or save to Photos"
+          }
+        }
+      }
+    },
+    "Çevrimiçi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Online"
+          }
+        }
+      }
+    },
+    "Oynatma hızı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback speed"
+          }
+        }
+      }
+    },
+    "Oynatma hızı %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback speed %@"
+          }
+        }
+      }
+    },
+    "Panoya kopyalandı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied to clipboard"
+          }
+        }
+      }
+    },
+    "Panoya kopyala (⌘C)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy to clipboard (⌘C)"
+          }
+        }
+      }
+    },
+    "Önceki gönderi (↑)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous post (↑)"
+          }
+        }
+      }
+    },
+    "Sonraki gönderi (↓)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next post (↓)"
+          }
+        }
+      }
+    },
+    "Video Akışı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video Feed"
+          }
+        }
+      }
+    },
+    "Videoları tam ekran arka arkaya izle (⇧⌘P)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch videos back-to-back full screen (⇧⌘P)"
+          }
+        }
+      }
+    },
+    "Önceki (↑ / K)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous (↑ / K)"
+          }
+        }
+      }
+    },
+    "Sonraki (↓ / J)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next (↓ / J)"
+          }
+        }
+      }
+    },
+    "Çevrimiçi akış": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Online stream"
+          }
+        }
+      }
+    },
+    "Sesi aç (M)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unmute (M)"
+          }
+        }
+      }
+    },
+    "Sessiz (M)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute (M)"
+          }
+        }
+      }
+    },
+    "Hız: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed: %@"
+          }
+        }
+      }
+    },
+    "Okuyucu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reader"
+          }
+        }
+      }
+    },
+    "İndirilmiş ya da doğrudan akışı olan videolar burada arka arkaya oynar.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloaded videos or direct streams play here one after another."
+          }
+        }
+      }
+    },
+    "Not kartı ekle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add note card"
+          }
+        }
+      }
+    },
+    "Hızlı not metni…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick note text…"
+          }
+        }
+      }
+    },
+    "Not kaydedildi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note saved"
+          }
+        }
+      }
+    },
+    "Kaydedilecek bağlantı ya da metin bulunamadı.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No link or text found to save."
+          }
+        }
+      }
+    },
+    "%lld kaydın medyasını indir": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download media for %lld items"
+          }
+        }
+      }
+    },
+    "Eksik medyaları indir (%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download missing media (%lld)"
+          }
+        }
+      }
+    },
+    "Seçilenlere etiket ekle, klasöre taşı, medyayı indir ya da sil.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add tags, move to folder, download media, or delete selected items."
+          }
+        }
+      }
+    },
+    "Telefonda ya da çevrimiçi akışı olan videolar burada akar. Mac'ten gelen videolar iCloud indirdikçe eklenir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videos on this phone or with direct streams play here. Videos from your Mac arrive as iCloud downloads them."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

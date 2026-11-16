@@ -15,6 +15,8 @@
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>

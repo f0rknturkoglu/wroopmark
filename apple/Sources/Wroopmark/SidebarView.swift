@@ -10,6 +10,7 @@ struct SidebarView: View {
     @AppStorage("linkPoolExpanded") private var linkPoolExpanded = true
     @State private var searchRenaming: SavedSearch?
     @State private var hoveringDownloads = false
+    @State private var targetedFolderID: Int64?
 
     var body: some View {
         @Bindable var model = model
@@ -38,6 +39,16 @@ struct SidebarView: View {
                         let fid = node.folder?.id ?? 0
                         row(node.name, image: FolderIcons.image(forFolder: node.name), node.count > 0 ? node.count : nil)
                             .tag(Scope.folder(id: fid, name: node.id))
+                            .listRowBackground(
+                                targetedFolderID == fid && fid != 0
+                                    ? RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.accent.opacity(0.22))
+                                    : nil
+                            )
+                            .dropDestination(for: URL.self) { urls, _ in
+                                handleDrop(urls, toFolderID: fid)
+                            } isTargeted: { targeted in
+                                targetedFolderID = targeted ? fid : (targetedFolderID == fid ? nil : targetedFolderID)
+                            }
                             .contextMenu {
                                 if let f = node.folder {
                                     Button {
@@ -364,5 +375,48 @@ struct SidebarView: View {
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
             .lineLimit(1)
+    }
+
+    private func handleDrop(_ urls: [URL], toFolderID fid: Int64) -> Bool {
+        guard fid != 0, !urls.isEmpty else { return false }
+        var moveIDs: Set<String> = []
+        var externalWeb: [String] = []
+        var files: [URL] = []
+
+        for u in urls {
+            let s = u.absoluteString
+            if s.hasPrefix("https://wroopmark.local/item/") {
+                let id = String(s.dropFirst("https://wroopmark.local/item/".count))
+                if model.selection.contains(id) {
+                    moveIDs.formUnion(model.selection)
+                } else {
+                    moveIDs.insert(id)
+                }
+            } else if let match = model.items.first(where: { $0.url == s }) {
+                if model.selection.contains(match.id) {
+                    moveIDs.formUnion(model.selection)
+                } else {
+                    moveIDs.insert(match.id)
+                }
+            } else if ["http", "https"].contains(u.scheme?.lowercased() ?? "") {
+                externalWeb.append(s)
+            } else if u.isFileURL {
+                files.append(u)
+            }
+        }
+
+        guard !moveIDs.isEmpty || !externalWeb.isEmpty || !files.isEmpty else { return false }
+        Task {
+            if !moveIDs.isEmpty {
+                await model.moveItemsToFolder(ids: Array(moveIDs), folderID: fid)
+            }
+            if !externalWeb.isEmpty {
+                await model.addURLs(externalWeb, folderID: fid)
+            }
+            if !files.isEmpty {
+                await model.importURLs(files)
+            }
+        }
+        return true
     }
 }

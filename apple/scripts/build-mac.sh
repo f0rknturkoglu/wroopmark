@@ -79,6 +79,22 @@ cat > "$APP/Contents/Info.plist" <<PLIST
       <key>CFBundleURLSchemes</key><array><string>wroopmark</string></array>
     </dict>
   </array>
+  <key>NSServices</key>
+  <array>
+    <dict>
+      <key>NSMenuItem</key>
+      <dict>
+        <key>default</key><string>wroopmark'a Kaydet</string>
+      </dict>
+      <key>NSMessage</key><string>saveFromService</string>
+      <key>NSPortName</key><string>wroopmark</string>
+      <key>NSSendTypes</key>
+      <array>
+        <string>public.url</string>
+        <string>public.utf8-plain-text</string>
+      </array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST

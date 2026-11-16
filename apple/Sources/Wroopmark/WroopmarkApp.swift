@@ -6,6 +6,32 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.servicesProvider = self
+        NSUpdateDynamicServices()
+    }
+
+    /// macOS Services ("Servisler → wroopmark'a Kaydet"): saves a selected URL
+    /// or turns selected text from any app into a linkless Note Card.
+    @objc func saveFromService(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        let urlString = pboard.string(forType: .URL)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let plainText = pboard.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let urlString, let direct = QuickSave.firstURL(in: urlString) {
+            Task { @MainActor in _ = await QuickSave.shared.save(direct) }
+            return
+        }
+        if let plainText, !plainText.isEmpty {
+            if !plainText.contains(where: \.isWhitespace), let link = QuickSave.firstURL(in: plainText) {
+                Task { @MainActor in _ = await QuickSave.shared.save(link) }
+            } else {
+                Task { @MainActor in _ = await QuickSave.shared.saveNote(text: plainText) }
+            }
+            return
+        }
+        error.pointee = String(localized: "Kaydedilecek bağlantı ya da metin bulunamadı.") as NSString
+    }
+
     /// Deletions still undoable in the clean-up view are committed, and the database is cleanly checkpointed.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task { @MainActor in
@@ -136,6 +162,10 @@ struct WroopmarkApp: App {
                     Label("Ayıkla", systemImage: "arrow.left.arrow.right.square")
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
+                Button { model.showVideoFeed.toggle() } label: {
+                    Label("Video Akışı", systemImage: "play.rectangle.on.rectangle")
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
                 Toggle(isOn: Binding(get: { model.semanticSearch }, set: { model.semanticSearch = $0 })) {
                     Label("Anlamına göre ara", systemImage: "sparkle.magnifyingglass")
                 }

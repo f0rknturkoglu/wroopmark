@@ -30,22 +30,24 @@ Okumak, izlemek, sonra bulmak istediğin her şey tek yerde. Paylaş → wroopma
 wroopmark, internette karşına çıkıp "sonra bakarım" dediğin her şeyi tek yerde, telefonunda saklar.
 
 KAYDET
-• Her uygulamadan Paylaş → wroopmark: bağlantı anında kaydedilir, istersen etiket ve not eklersin.
-• Kaydettiğin sayfanın başlığı, metni, yazarı ve görselleri telefona iner.
-• İnternet yokken de kaydedebilirsin; ayrıntılar bağlantı gelince tamamlanır.
+• Her uygulamadan Paylaş → wroopmark: bağlantı anında kaydedilir; istersen klasör, etiket, seçili alıntı ya da not eklersin.
+• Bağlantı gerekmeden hızlı Not Kartları oluştur, Denetim Merkezi düğmesiyle panodaki bağlantıyı tek dokunuşta kaydet.
+• Kaydettiğin sayfanın başlığı, metni, yazarı, tam sayfa kopyası (webarchive) ve görselleri telefona iner; Safari eklentisiyle yer imlerin otomatik aktarılır.
+• Fotoğraflar'dan kendi video ya da görselini bir gönderiye ekleyebilir, internet yokken bile kaydedebilirsin; ayrıntılar bağlantı gelince tamamlanır.
 
 OKU VE BUL
 • Arşivin internetsiz okunur; sayfa sonradan silinse ya da değişse de sende kalır.
-• Okuyucu: sade, reklamsız sayfa; tema, yazı boyutu, sesli okuma. Önemli cümleleri vurgula, not ekle; vurgular aramada da çıkar.
-• Cihazdaki zeka (Apple Intelligence olan cihazlarda): kısa özet, etiket önerisi, anlamına göre arama. Hiçbir şey internete gitmez.
-• Metinde, notlarında ve etiketlerinde ara. Etikete, klasöre ya da kaynağa göre süz; aramada tag:, from:@kişi, after:2025 gibi süzgeçler de çalışır.
-• Klasörler (alt klasörlerle) ve iç içe etiketlerle (okuma/teknoloji) düzenle.
+• Okuyucu: sade, reklamsız sayfa; tema, yazı boyutu, Kilit Ekranı kontrollü sesli okuma. Önemli cümleleri vurgula ve alıntı kartı (QuoteShot) olarak paylaş.
+• Görsellerde Canlı Metin (Live Text) seçimi, cihazda OCR + benzer görsel arama ve videolar için cihazda konuşma dökümü.
+• Cihazdaki zeka (Apple Intelligence olan cihazlarda): kısa özet, etiket önerisi, toplu sınıflandırma, anlamına göre arama. Hiçbir şey internete gitmez.
+• Metinde, notlarında, görsel yazılarında ve vurgularında ara; kayıtlı aramalar, kurallar ve gelişmiş filtrelerle süz.
+• Hiyerarşik klasörler (alt klasörlerle) ve iç içe etiketlerle (okuma/teknoloji) düzenle; kaydırma hareketleri ve çoklu seçimle toplu yönet.
 
 KAYDIR VE AYIKLA
-• Videolarını ve gönderilerini tam ekran, art arda kaydırarak izle; klasör seç, karıştır, kaldığın yerden devam et.
+• Videolarını (yerel dosyalar veya doğrudan akış) ve gönderilerini tam ekran, art arda kaydırarak izle; oynatma hızı seç, klasöre taşı, PiP / AirPlay / Kilit Ekranı kontrolü kullan, karıştır, kaldığın yerden devam et.
 • Ayıkla: kayıtlar tek tek gelir, sola at sil, sağa at sakla ya da önerilen klasöre taşı.
-• Ana ekran widget'ı arşivinden bir kaydı gösterir; ne gösterileceğini, klasörü ve sıklığı sen seçersin.
-• Bir klasörü tek bir HTML sayfası olarak paylaş: görseller içinde, her yerde internetsiz açılır.
+• Ana ekran ve Denetim Merkezi widget'ları, Spotlight araması ve Handoff (Mac ↔ iPhone devam et).
+• Bir klasörü tek bir HTML sayfası veya Markdown olarak paylaş: görseller içinde, her yerde internetsiz açılır.
 • iPad'de üç sütun: kapsamlar, liste, kayıt.
 
 MAC İLE BİRLİKTE (İSTEĞE BAĞLI)
@@ -125,22 +127,24 @@ Everything you want to read, watch and find later, in one place. Save with Share
 wroopmark keeps everything you meet online and mean to come back to in one place, on your phone.
 
 SAVE
-• Share → wroopmark from any app: the link is saved at once; add tags and a note if you like.
-• The title, text, author and pictures of what you save come to your phone.
-• Save without a connection too; the details fill in when you are back online.
+• Share → wroopmark from any app: the link is saved at once; optionally pick a folder, tags, a selected quote or a note.
+• Create standalone Note Cards without a link, or save your clipboard link in one tap from Control Center.
+• The title, text, author, full offline webarchive copy and pictures of what you save come to your phone; capture bookmarks directly via the Safari extension.
+• Attach your own photos or videos from Photos, or save offline and let details fill in when you are back online.
 
 READ AND FIND
 • Your archive reads offline; it stays with you even if the page is later deleted or changed.
-• Reader: a clean page without ads; theme, text size, read aloud. Highlight what matters and add notes; highlights show up in search.
-• On-device intelligence (on devices with Apple Intelligence): short summaries, tag suggestions, search by meaning. Nothing goes to the internet.
-• Search your text, notes and tags. Filter by tag, folder or source; filters such as tag:, from:@someone and after:2025 work in search.
-• Organize with folders (and subfolders) and nested tags (reading/tech).
+• Reader: a clean page without ads; theme, text size, read aloud with Lock Screen controls. Highlight what matters and share QuoteShot image cards.
+• Live Text selection on saved images, on-device OCR + similar visual search, and on-device speech transcription for videos.
+• On-device intelligence (on devices with Apple Intelligence): short summaries, tag suggestions, batch organization, search by meaning. Nothing goes to the internet.
+• Search your text, notes, OCR and highlights; refine with saved searches, rules and advanced filters.
+• Organize with hierarchical folders and nested tags (reading/tech), swipe gestures and multi-select batch actions.
 
 SCROLL AND TRIAGE
-• Watch your videos and posts full screen, one after another; pick a folder, shuffle, pick up where you left off.
+• Watch your videos (local files or direct streams) and posts full screen, one after another; adjust speed, move to folders, use PiP / AirPlay / Lock Screen controls, shuffle and pick up where you left off.
 • Triage: items come one by one; swipe left to delete, right to keep, or move to a suggested folder.
-• The home screen widget shows one of your saves; you choose what it shows, the folder and how often it changes.
-• Share a folder as a single HTML page: pictures inside, opens offline anywhere.
+• Home Screen and Control Center widgets, Spotlight search, and Handoff between Mac and iPhone.
+• Share a folder as a single offline HTML page or Markdown export with images, highlights and replies.
 • Three columns on iPad: scopes, list, item.
 
 WITH YOUR MAC (OPTIONAL)
@@ -148,7 +152,7 @@ WITH YOUR MAC (OPTIONAL)
 • The phone works on its own; a Mac is not required.
 
 SHORTCUTS
-• “Save to wroopmark”, “Search wroopmark” and “Find in wroopmark” in Shortcuts and Siri.
+• “Save to wroopmark” (with folder & note), “Add Note to wroopmark”, “Open Random Item”, “Search wroopmark” and “Find in wroopmark” in Shortcuts and Siri.
 
 PRIVACY
 • No account, no server, no ads, no tracking. No data is collected; your archive lives only on your device (and, if you choose, in your own iCloud Drive).

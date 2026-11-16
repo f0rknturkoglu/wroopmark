@@ -202,7 +202,7 @@ struct PhoneTriageView: View {
         }
         .task(id: queue?.current?.id) {
             guard let queue else { return }
-            if let v = queue.current.flatMap(Self.video)?.videoFile { player.play(v) } else { player.stop() }
+            if let item = queue.current, let v = Self.video(item) { player.play(v, item: item) } else { player.stop() }
             async let sug: Void = queue.loadSuggestions(hasFolders: !model.folders.isEmpty)
             async let sum: Void = queue.prefetchSummaries(llmReady: model.aiStatus?.llmReady == true)
             _ = await (sug, sum)
@@ -227,7 +227,7 @@ struct PhoneTriageView: View {
     }
 
     private static func video(_ item: Item) -> Media? {
-        item.allMedia.first { $0.isVideo && $0.videoFile != nil }
+        item.allMedia.first { $0.isVideo && ($0.videoFile != nil || $0.streamURL != nil) }
     }
 
     // MARK: Card

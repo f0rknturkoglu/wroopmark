@@ -99,34 +99,108 @@ struct NameSheet: View {
 }
 
 struct AddURLSheet: View {
+    enum Mode: String, CaseIterable, Identifiable {
+        case link, note
+        var id: String { rawValue }
+    }
+
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var mode: Mode = .link
     @State private var url = ""
+    @State private var noteTitle = ""
     @State private var tags = ""
     @State private var note = ""
+    @State private var folderID: Int64? = nil
 
     private var trimmedURL: String {
         url.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var trimmedNote: String {
+        note.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedTitle: String {
+        noteTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var isValid: Bool {
-        URL(string: trimmedURL)?.scheme?.hasPrefix("http") == true
+        switch mode {
+        case .link: URL(string: trimmedURL)?.scheme?.hasPrefix("http") == true
+        case .note: !trimmedNote.isEmpty || !trimmedTitle.isEmpty
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-            Label("Bağlantı kaydet", systemImage: "bookmark.badge.plus")
-                .font(.headline)
+            HStack {
+                Label(mode == .link ? "Bağlantı kaydet" : "Not kartı ekle", systemImage: mode == .link ? "bookmark.badge.plus" : "note.text.badge.plus")
+                    .font(.headline)
+                Spacer()
+                Picker("Tür", selection: $mode) {
+                    Text("Bağlantı").tag(Mode.link)
+                    Text("Not Kartı").tag(Mode.note)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
 
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                SheetField(
-                    title: String(localized: "Bağlantı"),
-                    text: $url,
-                    prompt: "https://…",
-                    hint: String(localized: "X, TikTok, Pinterest ya da herhangi bir sayfa")
-                )
+                if mode == .link {
+                    SheetField(
+                        title: String(localized: "Bağlantı"),
+                        text: $url,
+                        prompt: "https://…",
+                        hint: String(localized: "X, TikTok, Pinterest ya da herhangi bir sayfa")
+                    )
+                    SheetField(title: String(localized: "Not"), text: $note, prompt: String(localized: "isteğe bağlı"))
+                } else {
+                    SheetField(title: String(localized: "Başlık"), text: $noteTitle, prompt: String(localized: "isteğe bağlı"))
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Not")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        TextEditor(text: $note)
+                            .font(.body)
+                            .frame(minHeight: 88, maxHeight: 140)
+                            .padding(Theme.Spacing.xs)
+                            .background(.background, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                                    .strokeBorder(Theme.Stroke.surfaceBorder, lineWidth: Theme.Stroke.hairlineWidth)
+                            }
+                    }
+                }
+
                 SheetField(title: String(localized: "Etiketler"), text: $tags, prompt: String(localized: "dev/rust, okunacak"))
-                SheetField(title: String(localized: "Not"), text: $note, prompt: String(localized: "isteğe bağlı"))
+                if !model.tags.isEmpty {
+                    TagSuggestions(current: parseTags(tags), all: model.tags) { name in
+                        let current = parseTags(tags)
+                        if !current.contains(name) {
+                            tags = (current + [name]).joined(separator: ", ")
+                        }
+                    }
+                }
+
+                if !model.folders.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Klasör")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Picker("Klasör", selection: $folderID) {
+                            Text("Klasörsüz").tag(Int64?.none)
+                            ForEach(FolderNode.flattened(model.folderTree).filter { $0.folder != nil }) { node in
+                                if let f = node.folder {
+                                    Text(node.displayPath).tag(Int64?.some(f.id))
+                                }
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
             .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -145,7 +219,7 @@ struct AddURLSheet: View {
                 if model.isBusy {
                     ProgressView()
                         .controlSize(.small)
-                    Text("İndiriliyor…")
+                    Text(mode == .link ? "İndiriliyor…" : "Kaydediliyor…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -158,9 +232,14 @@ struct AddURLSheet: View {
 
                 Button {
                     Task {
-                        if await model.addURL(trimmedURL, tags: parseTags(tags), note: note) {
-                            dismiss()
+                        let ok: Bool
+                        switch mode {
+                        case .link:
+                            ok = await model.addURL(trimmedURL, tags: parseTags(tags), note: trimmedNote, folderID: folderID)
+                        case .note:
+                            ok = await model.addNote(title: trimmedTitle.isEmpty ? nil : trimmedTitle, text: trimmedNote, tags: parseTags(tags), folderID: folderID)
                         }
+                        if ok { dismiss() }
                     }
                 } label: {
                     Label("Kaydet", systemImage: "checkmark")
@@ -175,8 +254,11 @@ struct AddURLSheet: View {
             .background(.background)
             .overlay(alignment: .top) { Divider() }
         }
-        .frame(minWidth: 440, idealWidth: 500, minHeight: 340)
+        .frame(minWidth: 460, idealWidth: 520, minHeight: 420)
         .onAppear {
+            if case .folder(let fid, _) = model.scope {
+                folderID = fid
+            }
             // Pre-fill from the clipboard when it holds a link.
             if let s = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
                s.hasPrefix("http"), !s.contains(" ") {

@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @State private var saveSearchName = ""
+    @State private var keyMonitor: Any?
 
     var body: some View {
         @Bindable var model = model
@@ -38,15 +39,19 @@ struct ContentView: View {
                     )
             }
         }
-        // The media viewer is a lightbox over the whole window rather than a
-        // sheet: a click on the backdrop closes it, like Esc.
+        // The media viewer and video feed sit as full-window overlays so
+        // Esc / backdrop taps close cleanly.
         .overlay {
-            if let v = model.viewer {
+            if model.showVideoFeed {
+                MacVideoFeedView(initialScope: model.scope)
+                    .transition(.opacity)
+            } else if let v = model.viewer {
                 MediaViewer(viewer: v)
                     .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.16), value: model.viewer?.id)
+        .animation(.easeOut(duration: 0.16), value: model.showVideoFeed)
         .alert("Aramayı kaydet", isPresented: $model.showSaveSearch) {
             TextField("Ad", text: $saveSearchName)
             Button("Kaydet") {
@@ -198,6 +203,60 @@ struct ContentView: View {
         } message: {
             Text("Bu işlem geri alınamaz.")
         }
+        .onAppear {
+            if keyMonitor == nil {
+                keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                    MainActor.assumeIsolated { handleKey(event) } ? nil : event
+                }
+            }
+        }
+        .onDisappear {
+            if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+            keyMonitor = nil
+        }
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard !model.showAdd, !model.showBulkTags, !model.showDownloads, !model.showDuplicates,
+              !model.showFilters, !model.showSaveSearch, !model.showVideoFeed,
+              model.scope != .triage,
+              !(event.window?.firstResponder is NSText),
+              event.window?.isSheet == false,
+              event.window?.attachedSheet == nil else { return false }
+
+        let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        guard mods.isEmpty else { return false }
+
+        if let viewer = model.viewer {
+            switch event.keyCode {
+            case 126: // Up arrow -> previous post's media
+                if model.canStepViewerItem(-1) { model.stepViewerItem(-1); return true }
+                return false
+            case 125: // Down arrow -> next post's media
+                if model.canStepViewerItem(1) { model.stepViewerItem(1); return true }
+                return false
+            case 49: // Space -> close image lightbox (let QuickTime keep Space for video play/pause)
+                let current = viewer.media.indices.contains(viewer.index) ? viewer.media[viewer.index] : viewer.media.first
+                if current?.isVideo == true && current?.videoFile != nil { return false }
+                model.viewer = nil
+                return true
+            default:
+                return false
+            }
+        }
+
+        switch event.keyCode {
+        case 49: // Space -> Quick Look selected media
+            return model.openSelectedViewer()
+        case 126: // Up arrow
+            model.stepSelection(-1)
+            return true
+        case 125: // Down arrow
+            model.stepSelection(1)
+            return true
+        default:
+            return false
+        }
     }
 }
 
@@ -237,49 +296,67 @@ struct MultiSelectionView: View {
     @Environment(AppModel.self) private var model
     let count: Int
 
+    private var missingMediaIDs: [String] {
+        model.items.filter { model.selection.contains($0.id) && $0.needsDownload }.map(\.id)
+    }
+
     var body: some View {
         ContentUnavailableView {
             Label("\(count) kayıt seçili", systemImage: "square.stack.3d.up")
                 .font(.title3.weight(.semibold))
                 .monospacedDigit()
         } description: {
-            Text("Seçilenlere etiket ekle, klasöre taşı ya da sil.")
+            Text("Seçilenlere etiket ekle, klasöre taşı, medyayı indir ya da sil.")
         } actions: {
-            ControlGroup {
-                Button { model.showBulkTags = true } label: {
-                    Label("Etiketle…", systemImage: "tag")
-                }
+            VStack(spacing: Theme.Spacing.sm) {
+                ControlGroup {
+                    Button { model.showBulkTags = true } label: {
+                        Label("Etiketle…", systemImage: "tag")
+                    }
 
-                Menu {
-                    if !model.folders.isEmpty {
-                        ForEach(model.folders) { f in
-                            Button {
-                                Task { await model.moveItemsToFolder(ids: Array(model.selection), folderID: f.id) }
-                            } label: {
-                                Label {
-                                    Text(f.name)
-                                } icon: {
-                                    Image(nsImage: FolderIcons.image(forFolder: f.name))
+                    Menu {
+                        if !model.folders.isEmpty {
+                            ForEach(model.folders) { f in
+                                Button {
+                                    Task { await model.moveItemsToFolder(ids: Array(model.selection), folderID: f.id) }
+                                } label: {
+                                    Label {
+                                        Text(f.name)
+                                    } icon: {
+                                        Image(nsImage: FolderIcons.image(forFolder: f.name))
+                                    }
                                 }
                             }
+                            Divider()
                         }
-                        Divider()
-                    }
-                    Button {
-                        Task { await model.moveItemsToFolder(ids: Array(model.selection), folderID: nil) }
+                        Button {
+                            Task { await model.moveItemsToFolder(ids: Array(model.selection), folderID: nil) }
+                        } label: {
+                            Label("Klasörden çıkar", systemImage: "tray")
+                        }
                     } label: {
-                        Label("Klasörden çıkar", systemImage: "tray")
+                        Label("Klasöre taşı…", systemImage: "folder")
                     }
-                } label: {
-                    Label("Klasöre taşı…", systemImage: "folder")
-                }
 
-                Button(role: .destructive) { model.requestDelete(Array(model.selection)) } label: {
-                    Label("Sil", systemImage: "trash")
+                    Button(role: .destructive) { model.requestDelete(Array(model.selection)) } label: {
+                        Label("Sil", systemImage: "trash")
+                    }
+                }
+                .buttonStyle(.glass)
+                .controlSize(.regular)
+
+                if !missingMediaIDs.isEmpty {
+                    Button {
+                        let ids = missingMediaIDs
+                        Task { await model.downloadMediaBatch(ids) }
+                    } label: {
+                        Label("Eksik medyaları indir (\(missingMediaIDs.count))", systemImage: "arrow.down.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(model.isBusy)
                 }
             }
-            .buttonStyle(.glass)
-            .controlSize(.regular)
         }
         .padding(Theme.Spacing.lg)
     }

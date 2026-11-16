@@ -436,6 +436,7 @@ struct MediaViewerView: View {
     let media: Media
     @State private var player: AVPlayer?
     @State private var failed = false
+    @State private var shareURL: URL?
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -454,9 +455,11 @@ struct MediaViewerView: View {
                     }
                     .task {
                         if let v = media.videoFile, let url = await PhoneMedia.playable(v) {
+                            shareURL = url
                             player = AVPlayer(url: url)
                             player?.play()
                         } else if let stream = media.streamURL {
+                            shareURL = stream
                             player = AVPlayer(url: stream)
                             player?.play()
                         } else {
@@ -467,14 +470,31 @@ struct MediaViewerView: View {
             } else if let f = media.file {
                 ZoomableLiveImage(file: f)
                     .ignoresSafeArea()
+                    .task(id: f) {
+                        if let local = PhoneMedia.local(f) {
+                            shareURL = local
+                        } else {
+                            shareURL = await PhoneMedia.playable(f)
+                        }
+                    }
             } else {
                 Text("Bu video telefonda yok. Kaynağında izlemek için ⋯ → Kaynağında aç.")
                     .foregroundStyle(.white).padding()
             }
-            Button { dismiss() } label: {
-                Image(systemName: "xmark.circle.fill").font(.title).foregroundStyle(.white, .black.opacity(0.4))
+            HStack(spacing: 12) {
+                if let shareURL {
+                    ShareLink(item: shareURL) {
+                        Image(systemName: "square.and.arrow.up.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(.white, .black.opacity(0.4))
+                    }
+                    .accessibilityLabel("Paylaş ya da Fotoğraflar'a kaydet")
+                }
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.title).foregroundStyle(.white, .black.opacity(0.4))
+                }
+                .accessibilityLabel("Kapat")
             }
-            .accessibilityLabel("Kapat")
             .padding()
         }
     }

@@ -71,6 +71,7 @@ struct Viewer: Identifiable, Sendable {
     var media: [Media]
     var index: Int
     let postURL: String
+    var title: String = ""
 }
 
 /// UI state. Holds a few pages of items; media is read from disk lazily by
@@ -174,6 +175,7 @@ final class AppModel {
     var showAdd = false
     var showBulkTags = false
     var showDownloads = false
+    var showVideoFeed = false
     var downloads: DownloadsReport?
     var isDownloading: Bool { !(downloads?.active.isEmpty ?? true) || isFetchingVideos }
     var activeOrQueuedDownloadsCount: Int { (downloads?.active.count ?? 0) + (downloads?.queued.count ?? 0) }
@@ -984,12 +986,40 @@ final class AppModel {
         await reload()
     }
 
-    func addURL(_ url: String, tags: [String], note: String) async -> Bool {
+    func addURL(_ url: String, tags: [String], note: String, folderID: Int64? = nil) async -> Bool {
         isBusy = true
         defer { isBusy = false }
         do {
-            let item: Item = try await core.call(.addURL(url: url, tags: tags, note: note.isEmpty ? nil : note, folderID: nil), network: true)
+            let item: Item = try await core.call(.addURL(url: url, tags: tags, note: note.isEmpty ? nil : note, folderID: folderID), network: true)
             await reload()
+            await refreshMeta()
+            selection = [item.id]
+            return true
+        } catch is CancellationError {
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func addNote(title: String?, text: String, tags: [String], folderID: Int64? = nil) async -> Bool {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            var args: [String: CoreArg] = [
+                "text": .string(text),
+                "tags": .strings(tags),
+            ]
+            if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                args["title"] = .string(title.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            if let folderID {
+                args["folder_id"] = .int(folderID)
+            }
+            let item: Item = try await core.call(.call("add_note", args))
+            await reload()
+            await refreshMeta()
             selection = [item.id]
             return true
         } catch is CancellationError {
@@ -1001,7 +1031,7 @@ final class AppModel {
     }
 
     /// Saves multiple dropped/shared URLs in one batch before reloading once.
-    func addURLs(_ urls: [String]) async {
+    func addURLs(_ urls: [String], folderID: Int64? = nil) async {
         let clean = urls.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         guard !clean.isEmpty else { return }
         isBusy = true
@@ -1012,7 +1042,7 @@ final class AppModel {
         for url in clean {
             guard !Task.isCancelled else { break }
             do {
-                let item: Item = try await core.call(.addURL(url: url, tags: [], note: nil, folderID: nil), network: true)
+                let item: Item = try await core.call(.addURL(url: url, tags: [], note: nil, folderID: folderID), network: true)
                 lastAddedID = item.id
             } catch is CancellationError {
                 break
@@ -1021,6 +1051,7 @@ final class AppModel {
             }
         }
         await reload()
+        await refreshMeta()
         if let lastAddedID, items.contains(where: { $0.id == lastAddedID }) {
             selection = [lastAddedID]
         }
@@ -1309,11 +1340,96 @@ final class AppModel {
         viewer = v
     }
 
+    func downloadMediaBatch(_ ids: [String]) async {
+        guard !ids.isEmpty else { return }
+        isBusy = true
+        defer { isBusy = false }
+        for id in ids {
+            guard !Task.isCancelled else { break }
+            _ = await downloadMedia(id)
+        }
+    }
+
     func openViewer(owner: Item, fromQuote: Bool, index: Int) {
-        let media = fromQuote ? (owner.quote?.item.media ?? []) : owner.media
+        let target = fromQuote ? owner.quote?.item : owner
+        let media = target?.media ?? []
         guard media.indices.contains(index) else { return }
-        let url = fromQuote ? (owner.quote?.item.url ?? owner.url) : owner.url
-        viewer = Viewer(ownerID: owner.id, fromQuote: fromQuote, media: media, index: index, postURL: url)
+        let url = target?.url ?? owner.url
+        let headline = owner.title?.isEmpty == false ? owner.title! : owner.headline
+        let author = owner.author ?? URL(string: owner.url)?.host()
+        let title = [author, headline.isEmpty ? nil : String(headline.prefix(70))].compactMap { $0 }.joined(separator: " · ")
+        viewer = Viewer(ownerID: owner.id, fromQuote: fromQuote, media: media, index: index, postURL: url, title: title)
+    }
+
+    @discardableResult
+    func openSelectedViewer() -> Bool {
+        guard let item = selectedItem else { return false }
+        if !item.media.isEmpty {
+            openViewer(owner: item, fromQuote: false, index: 0)
+            return true
+        }
+        if let q = item.quote?.item, !q.media.isEmpty {
+            openViewer(owner: item, fromQuote: true, index: 0)
+            return true
+        }
+        return false
+    }
+
+    func stepSelection(_ delta: Int) {
+        guard !items.isEmpty else { return }
+        guard let cur = selectedItem, let idx = items.firstIndex(where: { $0.id == cur.id }) else {
+            if let first = delta >= 0 ? items.first : items.last {
+                selection = [first.id]
+            }
+            return
+        }
+        let next = idx + delta
+        guard items.indices.contains(next) else { return }
+        selection = [items[next].id]
+        if next >= items.count - 5 {
+            Task { await loadMore() }
+        }
+    }
+
+    func canStepViewerItem(_ delta: Int) -> Bool {
+        nextViewerTarget(delta) != nil
+    }
+
+    func stepViewerItem(_ delta: Int) {
+        guard let target = nextViewerTarget(delta) else { return }
+        selection = [target.item.id]
+        openViewer(owner: target.item, fromQuote: target.fromQuote, index: target.index)
+        if let idx = items.firstIndex(where: { $0.id == target.item.id }), idx >= items.count - 5 {
+            Task { await loadMore() }
+        }
+    }
+
+    private func nextViewerTarget(_ delta: Int) -> (item: Item, fromQuote: Bool, index: Int)? {
+        guard let v = viewer, delta != 0,
+              let curIdx = items.firstIndex(where: { $0.id == v.ownerID }) else { return nil }
+        let wantVideoOnly = scope == .videos
+        let wantPhotoOnly = scope == .photos
+        var i = curIdx + (delta > 0 ? 1 : -1)
+        while items.indices.contains(i) {
+            let candidate = items[i]
+            if let match = candidate.media.firstIndex(where: { m in
+                if wantVideoOnly { return m.isVideo }
+                if wantPhotoOnly { return !m.isVideo }
+                return true
+            }) {
+                return (candidate, false, match)
+            }
+            if let qMedia = candidate.quote?.item.media,
+               let match = qMedia.firstIndex(where: { m in
+                   if wantVideoOnly { return m.isVideo }
+                   if wantPhotoOnly { return !m.isVideo }
+                   return true
+               }) {
+                return (candidate, true, match)
+            }
+            i += (delta > 0 ? 1 : -1)
+        }
+        return nil
     }
 
     /// Fetches titles for links that have none; network-bound, in batches.

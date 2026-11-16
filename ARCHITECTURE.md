@@ -352,5 +352,10 @@ hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
 - Zengin Paylaşım Eklentisi (`ShareExtension`): klasör seçici, etiket çipleri, seçili metni vurgu olarak ekleme ve saf metinden not kartı oluşturma.
 - Medya görüntüleyicide yakınlaştırma (`UIScrollView`) ve iOS Canlı Metin (`VisionKit` `ImageAnalysisInteraction`); sesli okumada Kilit Ekranı / Dinamik Ada kontrolleri (`MPNowPlayingInfoCenter`), vurgudan görsel alıntı kartı paylaşımı (`QuoteShot`), Handoff, Spotlight'a konuşma dökümü + özet indeksleme, Ana Ekran Quick Actions ve gelişmiş Kısayollar (`FolderAppEntity`, `SaveNoteIntent`, `OpenRandomItemIntent`).
 
+**v1.6: Medya Kontrollü Yer İmi (iOS + macOS)** ✅
+- iOS `VideoFeed`: yerel dosya yoksa `streamURL` üzerinden çevrimiçi akış oynatma, oynatma hızı (`1×–2×`), hızlı klasöre taşıma menüsü, `MPNowPlayingInfoCenter` + Sonraki/Önceki parça komutları; `MediaViewerView`'da dosya paylaşımı ve Fotoğraflar'a kaydetme; `ITSAppUsesNonExemptEncryption = NO` ve `AppStore.md` güncellemesi.
+- macOS `MediaViewer` ve `MacVideoFeedView`: görsel yakınlaştırma + Canlı Metin (`ImageAnalysisOverlayView`), `⌘C` ile panoya görsel/video kopyalama, `NSSharingServicePicker` paylaşımı, video oynatma hızı (`1×–2×`) ve izleme konumu hafızası (`MacFeedMemory`), `↑ / ↓` ile gönderiler arası kesintisiz geçiş ve tam ekran seri video akışı (`⇧⌘P`).
+- macOS ergonomi ve iOS v1.5 paritesi: `Space` ile hızlı medya ön izleme / ok tuşlarıyla gezinme, `AddURLSheet` (`⌘N`) ve `QuickAddMenu` içinde klasör seçimi ile bağlantısız Not Kartı (`add_note`), kenar çubuğu klasörlerine kart/bağlantı sürükle-bırak, çoklu seçimde toplu medya indirme, gelişmiş Mac `AppIntents` (`FolderAppEntity`, `SaveNoteIntent`, `OpenRandomItemIntent`) ve sistem geneli `NSServices` ("wroopmark'a Kaydet").
+
 **Şimdilik yok**: RSS ve bültenler, EPUB, hesap ve sunucu, Raycast eklentisi (MCP çoğunu karşılar), harici API
 anahtarıyla AI (cihazdaki model yetmezse).

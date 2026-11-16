@@ -438,4 +438,77 @@ struct AppModelConcurrencyTests {
             .moveToFolder(id: "t1", folderID: nil),
         ])
     }
+
+    @Test func stepSelectionAndViewerStepSkipNonMediaAndRespectGalleryScope() async throws {
+        let (defaults, suite) = TestFixtures.makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let mock = MockCoreClient { _ in .voidOK }
+        let model = AppModel(core: mock, defaults: defaults, enableSystemIntegrations: false)
+        defer { model.stopBackgroundWork() }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let photoJSON = #"{"id":"p1","platform":"web","url":"https://example.com/1","text":"photo","saved_at":1,"media":[{"kind":"image","url":"https://example.com/1.jpg","file":"a.jpg"}]}"#
+        let textJSON = #"{"id":"t1","platform":"local","url":"https://wroopmark.local/note/1","text":"plain note","saved_at":2,"media":[]}"#
+        let videoJSON = #"{"id":"v1","platform":"x","url":"https://x.com/u/status/2","text":"video","saved_at":3,"media":[{"kind":"video","url":"https://example.com/2.mp4","file":"b.jpg","video_file":"b.mp4"}]}"#
+
+        let p1 = try decoder.decode(Item.self, from: Data(photoJSON.utf8))
+        let t1 = try decoder.decode(Item.self, from: Data(textJSON.utf8))
+        let v1 = try decoder.decode(Item.self, from: Data(videoJSON.utf8))
+        model.items = [p1, t1, v1]
+
+        model.stepSelection(1)
+        #expect(model.selection == ["p1"])
+        #expect(model.openSelectedViewer() == true)
+        #expect(model.viewer?.ownerID == "p1")
+        #expect(model.canStepViewerItem(1) == true)
+
+        model.stepViewerItem(1)
+        #expect(model.viewer?.ownerID == "v1")
+        #expect(model.selection == ["v1"])
+
+        model.scope = .videos
+        #expect(model.canStepViewerItem(-1) == false)
+    }
+
+    @Test func addNoteSerializesFolderTagsAndTitle() async throws {
+        let (defaults, suite) = TestFixtures.makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let noteItemJSON = #"{"id":"local:abc123","platform":"local","url":"https://wroopmark.local/note/abc123","title":"Fikir","text":"İçerik","saved_at":1,"media":[],"tags":["not"],"folder_id":42}"#
+        let mock = MockCoreClient { command in
+            switch command {
+            case .call("add_note", _):
+                return .jsonData(Data(noteItemJSON.utf8))
+            case .search:
+                return .jsonData(TestFixtures.searchResultJSON(itemIDs: ["local:abc123"]))
+            case .stats:
+                return .jsonData(TestFixtures.statsJSON())
+            case .tags, .folders:
+                return .jsonData(TestFixtures.emptyArrayJSON())
+            case .linkCounts:
+                return .jsonData(TestFixtures.emptyLinkCountsJSON())
+            default:
+                return .voidOK
+            }
+        }
+
+        let model = AppModel(core: mock, defaults: defaults, enableSystemIntegrations: false)
+        defer { model.stopBackgroundWork() }
+
+        let ok = await model.addNote(title: "Fikir", text: "İçerik", tags: ["not"], folderID: 42)
+        #expect(ok)
+        #expect(model.selection == ["local:abc123"])
+        let recorded = mock.recordedCommands.first {
+            if case .call("add_note", _) = $0 { return true }
+            return false
+        }
+        #expect(recorded == .call("add_note", [
+            "text": .string("İçerik"),
+            "tags": .strings(["not"]),
+            "title": .string("Fikir"),
+            "folder_id": .int(42),
+        ]))
+    }
 }

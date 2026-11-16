@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import MediaPlayer
 import SwiftUI
 import UIKit
 
@@ -12,13 +13,18 @@ import UIKit
 /// One page of the feed: an item, and the video it plays if any.
 struct FeedEntry: Identifiable, Hashable {
     let item: Item
-    /// A video on the phone; nil for pictures and text.
+    /// A playable video (offline file or direct stream); nil for pictures and text.
     let video: Media?
     let index: Int
     var id: String { "\(item.id)#\(index)" }
 
     static func == (a: FeedEntry, b: FeedEntry) -> Bool { a.id == b.id }
     func hash(into h: inout Hasher) { h.combine(id) }
+
+    /// Stable key for remembered watch position and watched badge.
+    var memoryKey: String? { video.map { $0.videoFile ?? $0.url } }
+    /// True when playing from the source stream rather than a stored file.
+    var isStream: Bool { video?.videoFile == nil && video?.streamURL != nil }
 
     /// Pictures to show when there is no video (posters of videos that are
     /// not on the phone included).
@@ -88,7 +94,34 @@ final class FeedPlayer {
     /// The video is coming down from iCloud, or could not be had.
     var loading = false
     var unavailable = false
+    var isStream = false
     @ObservationIgnored var pipController: AVPictureInPictureController?
+    @ObservationIgnored var onNext: (() -> Void)?
+    @ObservationIgnored var onPrevious: (() -> Void)?
+    @ObservationIgnored private var remoteTargets: [(MPRemoteCommand, Any)] = []
+    @ObservationIgnored private var nowTitle = "wroopmark"
+    @ObservationIgnored private var nowArtist: String?
+    @ObservationIgnored private var lastReportedDuration: Double = -1
+
+    private static let rateOptions: [Float] = [1.0, 1.25, 1.5, 2.0]
+
+    var rate: Float = {
+        let saved = UserDefaults.standard.float(forKey: "feedRate")
+        return saved > 0 ? saved : 1.0
+    }() {
+        didSet {
+            UserDefaults.standard.set(rate, forKey: "feedRate")
+            player.defaultRate = rate
+            if !paused, current != nil { player.rate = rate }
+            updateNowPlaying()
+        }
+    }
+
+    var rateLabel: String {
+        let rounded = rate == floor(rate) ? "\(Int(rate))" : String(format: "%.2g", rate)
+        return "\(rounded)×"
+    }
+
     var muted = UserDefaults.standard.bool(forKey: "feedMuted") {
         didSet {
             player.isMuted = muted
@@ -98,6 +131,7 @@ final class FeedPlayer {
 
     init() {
         player.isMuted = muted
+        player.defaultRate = rate
         player.preventsDisplaySleepDuringVideoPlayback = true
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 10), queue: .main) { [weak self] t in
             MainActor.assumeIsolated {
@@ -106,14 +140,22 @@ final class FeedPlayer {
                 self.duration = d.isFinite ? d : 0
                 self.progress = self.duration > 0 ? t.seconds / self.duration : 0
                 if self.progress >= 0.9, let f = self.current { FeedMemory.markWatched(f) }
+                if self.duration > 0 && abs(self.duration - self.lastReportedDuration) > 0.5 {
+                    self.updateNowPlaying()
+                }
             }
         }
     }
 
-    func play(_ file: String) {
-        guard file != current else { return }
+    func play(_ media: Media, item: Item) {
+        let key = media.videoFile ?? media.url
+        guard key != current else { return }
         rememberPosition()
-        current = file
+        current = key
+        let headline = item.title?.isEmpty == false ? item.title! : item.headline
+        nowTitle = headline.isEmpty ? "wroopmark" : String(headline.prefix(80))
+        nowArtist = item.author ?? URL(string: item.url)?.host()
+        lastReportedDuration = -1
         looper?.disableLooping()
         looper = nil
         player.removeAllItems()
@@ -121,30 +163,56 @@ final class FeedPlayer {
         duration = 0
         paused = false
         unavailable = false
-        if let url = PhoneMedia.local(file) {
-            start(url)
+        isStream = false
+        registerRemoteIfNeeded()
+
+        if let file = media.videoFile {
+            if let url = PhoneMedia.local(file) {
+                start(url, isStream: false)
+                return
+            }
+            // A video kept on demand: iCloud brings it first; fall back to direct stream if present.
+            loading = true
+            Task {
+                let url = await PhoneMedia.playable(file)
+                guard current == key else { return }
+                loading = false
+                if let url {
+                    start(url, isStream: false)
+                } else if let stream = media.streamURL {
+                    start(stream, isStream: true)
+                } else {
+                    unavailable = true
+                }
+            }
             return
         }
-        // A video kept on demand: iCloud brings it first.
-        loading = true
-        Task {
-            let url = await PhoneMedia.playable(file)
-            guard current == file else { return }
-            loading = false
-            if let url { start(url) } else { unavailable = true }
+
+        if let stream = media.streamURL {
+            start(stream, isStream: true)
+        } else {
+            unavailable = true
         }
     }
 
-    private func start(_ url: URL) {
+    private func start(_ url: URL, isStream: Bool) {
+        self.isStream = isStream
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
+        player.defaultRate = rate
         looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
         // Back where it was left.
         if let f = current, let at = FeedMemory.position(f) {
             player.seek(to: CMTime(seconds: at, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         }
-        player.rate = 1
         player.play()
+        player.rate = rate
+        updateNowPlaying()
+    }
+
+    func cycleRate() {
+        let i = Self.rateOptions.firstIndex(where: { abs($0 - rate) < 0.05 }) ?? 0
+        rate = Self.rateOptions[(i + 1) % Self.rateOptions.count]
     }
 
     func togglePiP() {
@@ -175,13 +243,19 @@ final class FeedPlayer {
 
     func togglePause() {
         paused.toggle()
-        if paused { player.pause() } else { player.play() }
+        if paused {
+            player.pause()
+        } else {
+            player.play()
+            player.rate = rate
+        }
+        updateNowPlaying()
     }
 
     /// Hold to watch at double speed.
     func fast(_ on: Bool) {
         guard !paused else { return }
-        player.rate = on ? 2 : 1
+        player.rate = on ? max(2.0, rate) : rate
     }
 
     func seek(to fraction: Double) {
@@ -189,6 +263,7 @@ final class FeedPlayer {
         let t = CMTime(seconds: max(0, min(1, fraction)) * duration, preferredTimescale: 600)
         player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
         progress = fraction
+        updateNowPlaying(elapsed: t.seconds)
     }
 
     func stop() {
@@ -201,6 +276,80 @@ final class FeedPlayer {
         current = nil
         loading = false
         unavailable = false
+        isStream = false
+        clearRemoteTargets()
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
+    private func registerRemoteIfNeeded() {
+        guard remoteTargets.isEmpty else { return }
+        let cc = MPRemoteCommandCenter.shared()
+        cc.playCommand.isEnabled = true
+        cc.pauseCommand.isEnabled = true
+        cc.togglePlayPauseCommand.isEnabled = true
+        cc.nextTrackCommand.isEnabled = true
+        cc.previousTrackCommand.isEnabled = true
+        cc.changePlaybackPositionCommand.isEnabled = true
+
+        remoteTargets.append((cc.playCommand, cc.playCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.paused else { return }
+                self.togglePause()
+            }
+            return .success
+        }))
+        remoteTargets.append((cc.pauseCommand, cc.pauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self, !self.paused else { return }
+                self.togglePause()
+            }
+            return .success
+        }))
+        remoteTargets.append((cc.togglePlayPauseCommand, cc.togglePlayPauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.togglePause() }
+            return .success
+        }))
+        remoteTargets.append((cc.nextTrackCommand, cc.nextTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.onNext?() }
+            return .success
+        }))
+        remoteTargets.append((cc.previousTrackCommand, cc.previousTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.onPrevious?() }
+            return .success
+        }))
+        remoteTargets.append((cc.changePlaybackPositionCommand, cc.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let e = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            Task { @MainActor in
+                guard let self, self.duration > 0 else { return }
+                self.seek(to: e.positionTime / self.duration)
+            }
+            return .success
+        }))
+    }
+
+    private func clearRemoteTargets() {
+        for (cmd, token) in remoteTargets {
+            cmd.removeTarget(token)
+        }
+        remoteTargets.removeAll()
+    }
+
+    private func updateNowPlaying(elapsed: Double? = nil) {
+        guard current != nil else { return }
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: nowTitle,
+            MPMediaItemPropertyMediaType: MPMediaType.anyVideo.rawValue,
+            MPNowPlayingInfoPropertyPlaybackRate: paused ? 0.0 : Double(rate),
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed ?? max(0, player.currentTime().seconds),
+        ]
+        if let nowArtist, !nowArtist.isEmpty {
+            info[MPMediaItemPropertyArtist] = nowArtist
+        }
+        if duration > 0 {
+            info[MPMediaItemPropertyPlaybackDuration] = duration
+            lastReportedDuration = duration
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 }
 
@@ -227,7 +376,7 @@ final class FeedSource {
     }
 
     /// Reads results until at least `want` more pages came or the library
-    /// ran out (in the video mode, videos not on the phone are skipped).
+    /// ran out (in the video mode, videos with a local file or direct stream are included).
     func load(want: Int = 10) async {
         guard !loading, !reachedEnd else { return }
         loading = true
@@ -242,7 +391,7 @@ final class FeedSource {
             offset += r.items.count
             reachedEnd = r.items.count < pageSize
             for item in r.items {
-                let videos = item.allMedia.enumerated().filter { $0.element.isVideo && $0.element.videoFile != nil }
+                let videos = item.allMedia.enumerated().filter { $0.element.isVideo && ($0.element.videoFile != nil || $0.element.streamURL != nil) }
                 switch mode {
                 case .videos:
                     got += videos.map { FeedEntry(item: item, video: $0.element, index: $0.offset) }
@@ -254,7 +403,7 @@ final class FeedSource {
         }
         if hideWatched {
             let watched = FeedMemory.watched
-            got.removeAll { e in e.video?.videoFile.map(watched.contains) ?? false }
+            got.removeAll { e in e.memoryKey.map(watched.contains) ?? false }
         }
         if shuffled { got.shuffle() }
         let known = Set(entries.map(\.id))
@@ -284,6 +433,7 @@ struct VideoFeedView: View {
     @State private var player = FeedPlayer()
     @State private var details: Item?
     @State private var deleting: Item?
+    @State private var folderOverrides: [String: Int64?] = [:]
 
     private var filter: String {
         [scope.filter, query.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: " ")
@@ -335,7 +485,7 @@ struct VideoFeedView: View {
         .task(id: "\(filter)|\(mode.rawValue)|\(shuffled)|\(hideWatched)") { await open() }
         .onChange(of: current) { _, id in
             guard let source, let id, let entry = source.entries.first(where: { $0.id == id }) else { return }
-            if let v = entry.video?.videoFile { player.play(v) } else { player.stop() }
+            if let v = entry.video { player.play(v, item: entry.item) } else { player.stop() }
             if !shuffled { UserDefaults.standard.set(id, forKey: resumeKey) }
             if let i = source.entries.firstIndex(of: entry) {
                 FeedPlayer.prepare(source.entries.dropFirst(i + 1).prefix(2).compactMap { $0.video?.videoFile })
@@ -347,6 +497,8 @@ struct VideoFeedView: View {
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            player.onNext = { step(1) }
+            player.onPrevious = { step(-1) }
         }
         .onDisappear {
             player.stop()
@@ -360,7 +512,21 @@ struct VideoFeedView: View {
                     }
             }
             .onAppear { player.player.pause() }
-            .onDisappear { if !player.paused { player.player.play() } }
+            .onDisappear {
+                if !player.paused {
+                    player.player.play()
+                    player.player.rate = player.rate
+                }
+            }
+        }
+    }
+
+    private func step(_ delta: Int) {
+        guard let source, let current, let i = source.entries.firstIndex(where: { $0.id == current }) else { return }
+        let target = i + delta
+        guard source.entries.indices.contains(target) else { return }
+        withAnimation(.snappy(duration: 0.2)) {
+            self.current = source.entries[target].id
         }
     }
 
@@ -369,7 +535,9 @@ struct VideoFeedView: View {
         player.stop()
         let next = source.remove(item: item.id, after: current)
         current = next
-        if let id = next, let e = source.entries.first(where: { $0.id == id }), let v = e.video?.videoFile { player.play(v) }
+        if let id = next, let e = source.entries.first(where: { $0.id == id }), let v = e.video {
+            player.play(v, item: e.item)
+        }
         await model.delete(item.id)
     }
 
@@ -395,7 +563,19 @@ struct VideoFeedView: View {
         ScrollView(.vertical) {
             LazyVStack(spacing: 0) {
                 ForEach(source.entries) { entry in
-                    FeedPage(entry: entry, active: entry.id == current, player: player, details: { details = entry.item }, delete: { deleting = entry.item })
+                    FeedPage(
+                        entry: entry,
+                        active: entry.id == current,
+                        player: player,
+                        folders: model.folders,
+                        currentFolderID: folderOverrides[entry.item.id] ?? entry.item.folderId,
+                        moveToFolder: { fid in
+                            folderOverrides[entry.item.id] = fid
+                            Task { await model.moveItems([entry.item.id], to: fid) }
+                        },
+                        details: { details = entry.item },
+                        delete: { deleting = entry.item }
+                    )
                         .containerRelativeFrame([.horizontal, .vertical])
                         .id(entry.id)
                 }
@@ -413,7 +593,7 @@ struct VideoFeedView: View {
             Label(mode == .videos ? "Burada video yok" : "Burada gönderi yok", systemImage: "play.slash")
         } description: {
             Text(mode == .videos
-                 ? "Telefonda olan videolar burada akar. Mac'ten gelen videolar iCloud indirdikçe eklenir."
+                 ? "Telefonda ya da çevrimiçi akışı olan videolar burada akar. Mac'ten gelen videolar iCloud indirdikçe eklenir."
                  : "Bu klasörde ya da süzgeçte kayıt yok.")
         }
         .foregroundStyle(.white)
@@ -475,6 +655,9 @@ private struct FeedPage: View {
     let entry: FeedEntry
     let active: Bool
     let player: FeedPlayer
+    let folders: [Folder]
+    let currentFolderID: Int64?
+    let moveToFolder: (Int64?) -> Void
     let details: () -> Void
     let delete: () -> Void
     @State private var showPause = false
@@ -518,8 +701,11 @@ private struct FeedPage: View {
                             Text(a).font(.headline).lineLimit(1)
                         }
                         Text(item.saved.formatted(.relative(presentation: .named))).font(.caption).opacity(0.7)
-                        if let v = entry.video?.videoFile, FeedMemory.watched.contains(v) {
+                        if let key = entry.memoryKey, FeedMemory.watched.contains(key) {
                             Label("İzlendi", systemImage: "checkmark.circle.fill").font(.caption2).labelStyle(.titleAndIcon).opacity(0.75)
+                        }
+                        if entry.isStream {
+                            Label("Çevrimiçi", systemImage: "globe").font(.caption2).labelStyle(.titleAndIcon).opacity(0.75)
                         }
                     }
                     if !textOnly {
@@ -553,11 +739,17 @@ private struct FeedPage: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     if entry.video != nil {
                         sideButton(player.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: player.muted ? String(localized: "Sesi aç") : String(localized: "Sesi kapat")) {
                             player.muted.toggle()
                         }
+                        Button { player.cycleRate() } label: {
+                            Text(player.rateLabel)
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .frame(width: 44, height: 36)
+                        }
+                        .accessibilityLabel("Oynatma hızı \(player.rateLabel)")
                         if AVPictureInPictureController.isPictureInPictureSupported() {
                             sideButton("pip.enter", label: String(localized: "Resim İçinde Resim")) {
                                 player.togglePiP()
@@ -566,6 +758,31 @@ private struct FeedPage: View {
                         AirPlayButton()
                             .frame(width: 44, height: 44)
                             .accessibilityLabel("AirPlay")
+                    }
+                    if !folders.isEmpty {
+                        Menu {
+                            ForEach(folders) { f in
+                                Button {
+                                    moveToFolder(f.id)
+                                } label: {
+                                    Label(
+                                        f.name.replacingOccurrences(of: "/", with: " › "),
+                                        systemImage: currentFolderID == f.id ? "checkmark" : "folder"
+                                    )
+                                }
+                            }
+                            if currentFolderID != nil {
+                                Divider()
+                                Button { moveToFolder(nil) } label: {
+                                    Label("Klasörden çıkar", systemImage: "tray")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: currentFolderID != nil ? "folder.fill" : "folder")
+                                .font(.title2)
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel("Klasöre taşı")
                     }
                     if !item.replies.isEmpty {
                         sideButton("bubble.left.and.bubble.right", label: String(localized: "Yanıtlar")) { showReplies = true }
