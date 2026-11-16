@@ -1,5 +1,7 @@
 import AVKit
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ItemView: View {
     @Environment(PhoneModel.self) private var model
@@ -15,6 +17,9 @@ struct ItemView: View {
     @State private var folderName = ""
     @State private var summarizing = false
     @State private var related: [Item] = []
+    @State private var pickingFromPhotos = false
+    @State private var picked: [PhotosPickerItem] = []
+    @State private var attaching = false
 
     var body: some View {
         ScrollView {
@@ -105,12 +110,29 @@ struct ItemView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Link(destination: url) { Label("Kaynağında aç", systemImage: "safari") }
+                        // The user's own copy (saved from the app, a screen
+                        // recording): the post plays and shows offline.
+                        Button { pickingFromPhotos = true } label: {
+                            Label(item.needsVideoFile ? "Videoyu Fotoğraflar'dan ekle" : "Fotoğraflar'dan ekle", systemImage: "photo.badge.plus")
+                        }
                         Button(role: .destructive) { confirmDelete = true } label: { Label("Sil", systemImage: "trash") }
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
         }
         .fullScreenCover(isPresented: $reading) { ReaderView(id: id) }
+        .photosPicker(isPresented: $pickingFromPhotos, selection: $picked, maxSelectionCount: 5,
+                      matching: item?.needsVideoFile == true ? .videos : .any(of: [.videos, .images]))
+        .onChange(of: picked) { _, chosen in
+            guard !chosen.isEmpty else { return }
+            picked = []
+            Task { await attach(chosen) }
+        }
+        .overlay {
+            if attaching {
+                ProgressView().padding(20).background(.regularMaterial, in: .rect(cornerRadius: 14))
+            }
+        }
         .confirmationDialog("Bu kayıt silinsin mi?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Sil", role: .destructive) {
                 Task {
@@ -237,6 +259,19 @@ struct ItemView: View {
 
     /// Makes the folder (or finds it, any case) and files the item in it.
     /// `Ders/Matematik` makes a subfolder.
+    /// Copies the chosen videos and pictures out of Photos and puts them on this post.
+    private func attach(_ chosen: [PhotosPickerItem]) async {
+        attaching = true
+        defer { attaching = false }
+        for p in chosen {
+            guard let file = try? await p.loadTransferable(type: PickedFile.self) else { continue }
+            _ = try? await model.core.call(.call("attach_file", ["id": .string(id), "path": .string(file.url.path)])) as Bool
+            try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent())
+        }
+        item = await model.refresh(id)
+        model.startOCR()
+    }
+
     private func createFolder() async {
         let name = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
@@ -395,4 +430,28 @@ private extension String {
         for c in ["\\", "*", "_", "`", "[", "]", "#", "~", ">"] { s = s.replacingOccurrences(of: c, with: "\\" + c) }
         return s
     }
+}
+
+
+/// A video or picture from Photos, copied to a temporary folder with its
+/// own extension (the media store names files by content and type).
+struct PickedFile: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .movie) { received in try Self(copying: received.file) }
+        FileRepresentation(importedContentType: .image) { received in try Self(copying: received.file) }
+    }
+
+    init(copying src: URL) throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pick-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        url = dir.appendingPathComponent(src.lastPathComponent)
+        try FileManager.default.copyItem(at: src, to: url)
+    }
+}
+
+extension Item {
+    /// Has a video whose file is not on this device.
+    var needsVideoFile: Bool { media.contains { $0.isVideo && $0.videoFile == nil } }
 }

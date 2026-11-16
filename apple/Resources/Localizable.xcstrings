@@ -1823,6 +1823,16 @@
         }
       }
     },
+    "Bu görsel hangi gönderinin?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which post is this picture from?"
+          }
+        }
+      }
+    },
     "Bu hafta kontrol edilmemiş linklerin hâlâ açılıp açılmadığına bak": {
       "localizations": {
         "en": {
@@ -1939,6 +1949,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nothing matches this choice"
+          }
+        }
+      }
+    },
+    "Bu video hangi gönderinin?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which post is this video from?"
           }
         }
       }
@@ -2321,6 +2341,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "File"
+          }
+        }
+      }
+    },
+    "Dosya gönderisine eklendi; internetsiz de açılır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file is on its post now; it opens offline too."
           }
         }
       }
@@ -2771,6 +2801,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Photos"
+          }
+        }
+      }
+    },
+    "Fotoğraflar'dan ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add from Photos"
           }
         }
       }
@@ -5275,6 +5315,16 @@
         }
       }
     },
+    "Son kaydedilenler.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recently saved."
+          }
+        }
+      }
+    },
     "Son kontrolde sayfa açılmadı. Gönderinin kendisi arşivde duruyor.": {
       "localizations": {
         "en": {
@@ -5965,6 +6015,26 @@
         }
       }
     },
+    "Videosu telefonda olmayan son kayıtlar. Gönderiyi önce bağlantısıyla kaydettiysen burada çıkar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent posts whose video is not on the phone. If you saved the post by its link first, it shows up here."
+          }
+        }
+      }
+    },
+    "Videoyu Fotoğraflar'dan ekle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add the Video from Photos"
+          }
+        }
+      }
+    },
     "Videoyu lokale indir": {
       "localizations": {
         "en": {
@@ -6231,6 +6301,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Everything newly saved goes through the rules: an item that matches the search gets the tag, and goes into the folder if it has none. Any search term works (site:, from:, platform:, has:video, words…)."
+          }
+        }
+      }
+    },
+    "Yeni kayıt olarak kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save as a New Item"
           }
         }
       }
