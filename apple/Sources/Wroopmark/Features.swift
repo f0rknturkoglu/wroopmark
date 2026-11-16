@@ -180,8 +180,8 @@ extension AppModel {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Seç"
-        panel.message = "Yedeğin konacağı klasörü seç. İçinde bir \"wroopmark-yedek\" klasörü oluşur."
+        panel.prompt = String(localized: "Seç")
+        panel.message = String(localized: "Yedeğin konacağı klasörü seç. İçinde bir \"wroopmark-yedek\" klasörü oluşur.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         backupFolder = url.path
         backupError = nil
@@ -196,7 +196,7 @@ extension AppModel {
         guard !isBackingUp, let folder = backupFolder, let target = backupTarget else { return }
         // Check off the main thread so slow/unmounted disks don't hang UI.
         guard await HostInstaller.fileExists(atPath: folder) else {
-            backupError = "Yedek klasörü şu an yok (disk takılı mı?): \(folder)"
+            backupError = String(localized: "Yedek klasörü şu an yok (disk takılı mı?): \(folder)")
             return
         }
         isBackingUp = true

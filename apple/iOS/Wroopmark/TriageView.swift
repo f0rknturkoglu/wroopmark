@@ -210,8 +210,8 @@ struct PhoneTriageView: View {
     private var subtitle: String {
         guard let q = queue else { return "" }
         var parts: [String] = []
-        if q.remaining > 0 { parts.append("\(q.remaining) kaldı") }
-        if q.deleted + q.kept > 0 { parts.append("\(q.deleted) silindi, \(q.kept) saklandı") }
+        if q.remaining > 0 { parts.append(String(localized: "\(q.remaining) kaldı")) }
+        if q.deleted + q.kept > 0 { parts.append(String(localized: "\(q.deleted) silindi, \(q.kept) saklandı")) }
         return parts.joined(separator: " · ")
     }
 
@@ -228,7 +228,7 @@ struct PhoneTriageView: View {
                 HStack {
                     stamp("SAKLA", color: .green).opacity(Double(max(0, progress)))
                     Spacer()
-                    stamp("SİL", color: .red).opacity(Double(max(0, -progress)))
+                    stamp(String(localized: "SİL"), color: .red).opacity(Double(max(0, -progress)))
                 }
                 .padding(20)
                 .allowsHitTesting(false)
@@ -257,7 +257,7 @@ struct PhoneTriageView: View {
             .foregroundStyle(color)
             .padding(.horizontal, 12).padding(.vertical, 4)
             .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(color, lineWidth: 3) }
-            .rotationEffect(.degrees(text == "SİL" ? 12 : -12))
+            .rotationEffect(.degrees(text == String(localized: "SİL") ? 12 : -12))
     }
 
     // MARK: Controls
@@ -303,9 +303,9 @@ struct PhoneTriageView: View {
                 .padding(.horizontal)
             }
             HStack(spacing: 40) {
-                roundButton("xmark", color: .red, label: "Sil") { Task { await decide(delete: true) } }
-                roundButton("info", color: .secondary, label: "Ayrıntılar", small: true) { details = queue.current }
-                roundButton("checkmark", color: .green, label: "Sakla") { Task { await decide(delete: false) } }
+                roundButton("xmark", color: .red, label: String(localized: "Sil")) { Task { await decide(delete: true) } }
+                roundButton("info", color: .secondary, label: String(localized: "Ayrıntılar"), small: true) { details = queue.current }
+                roundButton("checkmark", color: .green, label: String(localized: "Sakla")) { Task { await decide(delete: false) } }
             }
             .padding(.bottom, 8)
         }

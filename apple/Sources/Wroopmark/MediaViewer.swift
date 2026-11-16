@@ -150,14 +150,14 @@ struct MediaViewer: View {
             GlassEffectContainer(spacing: Theme.Spacing.sm) {
                 HStack(spacing: Theme.Spacing.sm) {
                     if let file = media?.videoFile ?? media?.file {
-                        chromeButton("folder", label: "Finder'da göster") {
+                        chromeButton("folder", label: String(localized: "Finder'da göster")) {
                             NSWorkspace.shared.activateFileViewerSelecting([Core.shared.mediaURL(file)])
                         }
                     }
                     if let url = URL(string: viewer.postURL) {
-                        chromeButton("arrow.up.right.square", label: "Kaynağında aç") { NSWorkspace.shared.open(url) }
+                        chromeButton("arrow.up.right.square", label: String(localized: "Kaynağında aç")) { NSWorkspace.shared.open(url) }
                     }
-                    chromeButton("xmark", label: "Kapat (Esc)", action: close)
+                    chromeButton("xmark", label: String(localized: "Kapat (Esc)"), action: close)
                         .keyboardShortcut(.cancelAction)
                 }
             }
@@ -169,10 +169,10 @@ struct MediaViewer: View {
 
     private var arrows: some View {
         HStack {
-            arrow("chevron.left", label: "Önceki medya", enabled: viewer.index > 0) { move(-1) }
+            arrow("chevron.left", label: String(localized: "Önceki medya"), enabled: viewer.index > 0) { move(-1) }
                 .keyboardShortcut(.leftArrow, modifiers: [])
             Spacer()
-            arrow("chevron.right", label: "Sonraki medya", enabled: viewer.index < viewer.media.count - 1) { move(1) }
+            arrow("chevron.right", label: String(localized: "Sonraki medya"), enabled: viewer.index < viewer.media.count - 1) { move(1) }
                 .keyboardShortcut(.rightArrow, modifiers: [])
         }
         .padding(.horizontal, Theme.Spacing.lg)

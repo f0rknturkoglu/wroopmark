@@ -17,10 +17,10 @@ enum ReaderTheme: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .auto: "Otomatik"
-        case .light: "Açık"
-        case .sepia: "Sepya"
-        case .dark: "Koyu"
+        case .auto: String(localized: "Otomatik")
+        case .light: String(localized: "Açık")
+        case .sepia: String(localized: "Sepya")
+        case .dark: String(localized: "Koyu")
         }
     }
 }
@@ -30,9 +30,9 @@ enum ReaderWidth: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .narrow: "Dar"
+        case .narrow: String(localized: "Dar")
         case .normal: "Normal"
-        case .wide: "Geniş"
+        case .wide: String(localized: "Geniş")
         }
     }
     var css: String {
@@ -65,7 +65,7 @@ enum ReaderDocument {
     private static func header(_ item: Item, words: String) -> String {
         let site = item.author ?? URL(string: item.url)?.host() ?? ""
         let when = Date(timeIntervalSince1970: TimeInterval(item.createdAt ?? item.savedAt)).formatted(date: .abbreviated, time: .omitted)
-        var h = "<div class=\"meta\">\(esc(site)) · \(esc(when)) · \(minutes(words)) dk okuma</div>"
+        var h = "<div class=\"meta\">\(esc(site)) · \(esc(when)) · \(String(localized: "\(minutes(words)) dk okuma"))</div>"
         if let t = item.title, !t.isEmpty { h += "<h1>\(esc(t))</h1>" }
         return h
     }
@@ -90,27 +90,27 @@ enum ReaderDocument {
             out += "<div class=\"part\">\(paragraphs(part.text))\(media(item.media.filter { files.contains($0.url) }))</div>"
         }
         if !item.replies.isEmpty {
-            out += "<h2>Yanıtlar</h2>"
+            out += "<h2>\(String(localized: "Yanıtlar"))</h2>"
             for r in item.replies {
                 out += "<div class=\"part\"><div class=\"meta\">\(esc(r.author ?? ""))</div>\(paragraphs(r.text))</div>"
             }
         }
         if let s = item.summary, !s.isEmpty {
-            out += "<div class=\"summary\"><div class=\"meta\">Özet</div>\(paragraphs(s))</div>"
+            out += "<div class=\"summary\"><div class=\"meta\">\(String(localized: "Özet"))</div>\(paragraphs(s))</div>"
         }
         return out + source(item)
     }
 
     private static func source(_ item: Item) -> String {
         guard let u = URL(string: item.url), u.scheme?.hasPrefix("http") == true else { return "" }
-        return "<p class=\"source\"><a href=\"\(esc(item.url))\">Kaynağında aç ↗</a></p>"
+        return "<p class=\"source\"><a href=\"\(esc(item.url))\">\(String(localized: "Kaynağında aç")) ↗</a></p>"
     }
 
     private static func media(_ media: [Media]) -> String {
         media.compactMap { m in
             guard let f = m.file else { return nil }
             let img = "<img src=\"wroopmark-media:///\(esc(f))\" alt=\"\(esc(m.alt ?? ""))\">"
-            return m.isVideo ? "<figure>\(img)<figcaption>▶︎ Video: uygulamada oynatılır</figcaption></figure>" : "<figure>\(img)</figure>"
+            return m.isVideo ? "<figure>\(img)<figcaption>▶︎ \(String(localized: "Video: uygulamada oynatılır"))</figcaption></figure>" : "<figure>\(img)</figure>"
         }
         .joined()
     }

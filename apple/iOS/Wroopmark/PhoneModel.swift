@@ -25,8 +25,8 @@ enum PhoneScope: Hashable, Sendable {
     var title: String {
         switch self {
         case .all: "wroopmark"
-        case .today: "Bugün"
-        case .untagged: "Etiketsiz"
+        case .today: String(localized: "Bugün")
+        case .untagged: String(localized: "Etiketsiz")
         case .platform(let p): Platform(rawValue: p)?.label ?? p
         case .tag(let t): "#\(t)"
         case .folder(_, let name): name.split(separator: "/").last.map(String.init) ?? name
@@ -124,7 +124,7 @@ final class PhoneModel {
         PhoneAI.register()
         ReaderView.onEdit = { [weak self] in self?.syncSoon() }
         guard await core.ensureOpen() else {
-            errorMessage = "Kütüphane açılamadı"
+            errorMessage = String(localized: "Kütüphane açılamadı")
             return
         }
         // The phone never downloads videos from the sites themselves; a
@@ -399,7 +399,7 @@ final class PhoneModel {
             // No network (or the site would not answer): keep the link now,
             // fetch the rest later, like the share sheet does.
             if (try? await Self.saveLinkOnly(url, tags: tags)) != nil {
-                notice = "Sayfaya ulaşılamadı; bağlantı kaydedildi, ayrıntılar sonra gelecek."
+                notice = String(localized: "Sayfaya ulaşılamadı; bağlantı kaydedildi, ayrıntılar sonra gelecek.")
                 await reload()
                 syncSoon()
                 return true
@@ -484,7 +484,7 @@ final class PhoneModel {
         }.value
 
         guard !staged.isEmpty else {
-            importMessage = "Seçilen dosya okunamadı."
+            importMessage = String(localized: "Seçilen dosya okunamadı.")
             return
         }
 
@@ -506,9 +506,9 @@ final class PhoneModel {
             let displayName = url.lastPathComponent.replacingOccurrences(of: #"^\d+-"#, with: "", options: .regularExpression)
             do {
                 let r: ArchiveReport = try await core.call(.call("import_archive", ["path": .string(url.path)]))
-                var line = "\(displayName): \(r.found) kayıt bulundu, \(r.new) yeni"
-                if r.existing > 0 { line += ", \(r.existing) zaten vardı" }
-                if r.new > 0 { line += ". Ayrıntılar arka planda gelecek." }
+                var line = String(localized: "\(displayName): \(r.found) kayıt bulundu, \(r.new) yeni")
+                if r.existing > 0 { line += String(localized: ", \(r.existing) zaten vardı") }
+                if r.new > 0 { line += String(localized: ". Ayrıntılar arka planda gelecek.") }
                 lines.append(line)
             } catch {
                 lines.append("\(displayName): \(error.localizedDescription)")
@@ -517,10 +517,10 @@ final class PhoneModel {
         if !media.isEmpty {
             do {
                 let r: FilesReport = try await core.call(.call("import_files", ["paths": .strings(media.map(\.path))]))
-                var line = "\(r.files) dosya: \(r.new) yeni kayıt"
-                if r.attached > 0 { line += ", \(r.attached) tanesi arşivdeki gönderisine bağlandı" }
-                if r.existing > 0 { line += ", \(r.existing) zaten vardı" }
-                if r.failed > 0 { line += ", \(r.failed) okunamadı" }
+                var line = String(localized: "\(r.files) dosya: \(r.new) yeni kayıt")
+                if r.attached > 0 { line += String(localized: ", \(r.attached) tanesi arşivdeki gönderisine bağlandı") }
+                if r.existing > 0 { line += String(localized: ", \(r.existing) zaten vardı") }
+                if r.failed > 0 { line += String(localized: ", \(r.failed) okunamadı") }
                 lines.append(line)
             } catch {
                 lines.append(error.localizedDescription)

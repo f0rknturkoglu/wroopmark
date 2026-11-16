@@ -30,9 +30,9 @@ extension AppModel {
 
     func chooseImport() {
         let panel = NSOpenPanel()
-        panel.title = "İçe aktar"
-        panel.message = "Veri paketi (.zip ya da klasör), bookmarks.html, Pocket/Raindrop CSV, ya da video ve görseller"
-        panel.prompt = "İçe aktar"
+        panel.title = String(localized: "İçe aktar")
+        panel.message = String(localized: "Veri paketi (.zip ya da klasör), bookmarks.html, Pocket/Raindrop CSV, ya da video ve görseller")
+        panel.prompt = String(localized: "İçe aktar")
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
@@ -61,25 +61,25 @@ extension AppModel {
         defer { isTransferring = false }
         var lines: [String] = []
         for url in archives {
-            transferStatus = "\(url.lastPathComponent) okunuyor…"
+            transferStatus = String(localized: "\(url.lastPathComponent) okunuyor…")
             do {
                 let r: ArchiveReport = try await core.call(.call("import_archive", ["path": .string(url.path)]))
-                var line = "\(url.lastPathComponent): \(r.found) kayıt bulundu, \(r.new) yeni"
-                if r.existing > 0 { line += ", \(r.existing) zaten vardı" }
-                if r.new > 0 { line += ". Metin, yazar ve medya arka planda gelecek." }
+                var line = String(localized: "\(url.lastPathComponent): \(r.found) kayıt bulundu, \(r.new) yeni")
+                if r.existing > 0 { line += String(localized: ", \(r.existing) zaten vardı") }
+                if r.new > 0 { line += String(localized: ". Metin, yazar ve medya arka planda gelecek.") }
                 lines.append(line)
             } catch {
                 lines.append("\(url.lastPathComponent): \(error.localizedDescription)")
             }
         }
         if !media.isEmpty {
-            transferStatus = "Dosyalar kopyalanıyor…"
+            transferStatus = String(localized: "Dosyalar kopyalanıyor…")
             do {
                 let r: FilesReport = try await core.call(.call("import_files", ["paths": .strings(media.map(\.path))]))
-                var line = "\(r.files) dosya: \(r.new) yeni kayıt"
-                if r.attached > 0 { line += ", \(r.attached) tanesi arşivdeki gönderisine bağlandı" }
-                if r.existing > 0 { line += ", \(r.existing) zaten vardı" }
-                if r.failed > 0 { line += ", \(r.failed) okunamadı" }
+                var line = String(localized: "\(r.files) dosya: \(r.new) yeni kayıt")
+                if r.attached > 0 { line += String(localized: ", \(r.attached) tanesi arşivdeki gönderisine bağlandı") }
+                if r.existing > 0 { line += String(localized: ", \(r.existing) zaten vardı") }
+                if r.failed > 0 { line += String(localized: ", \(r.failed) okunamadı") }
                 lines.append(line)
             } catch {
                 lines.append(error.localizedDescription)
@@ -102,9 +102,9 @@ extension AppModel {
         var label: String {
             switch self {
             case .markdown: "Markdown (Obsidian)"
-            case .csv: "CSV (tablo)"
-            case .json: "JSON satırları"
-            case .html: "Tek sayfa (HTML)"
+            case .csv: String(localized: "CSV (tablo)")
+            case .json: String(localized: "JSON satırları")
+            case .html: String(localized: "Tek sayfa (HTML)")
             }
         }
     }
@@ -124,7 +124,7 @@ extension AppModel {
     /// where the user says: something to send to someone, opens anywhere.
     func exportPage(query: String, title: String) {
         let panel = NSSavePanel()
-        panel.title = "Tek sayfa olarak dışa aktar"
+        panel.title = String(localized: "Tek sayfa olarak dışa aktar")
         panel.nameFieldStringValue = "\(title).html"
         panel.allowedContentTypes = [.html]
         guard panel.runModal() == .OK, let target = panel.url else { return }
@@ -132,7 +132,7 @@ extension AppModel {
         Task {
             isTransferring = true
             defer { isTransferring = false }
-            transferStatus = "Sayfa hazırlanıyor…"
+            transferStatus = String(localized: "Sayfa hazırlanıyor…")
             let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("wm-page-\(UUID().uuidString)", isDirectory: true)
             defer { try? FileManager.default.removeItem(at: tmp) }
             do {
@@ -142,7 +142,7 @@ extension AppModel {
                 ]))
                 try? FileManager.default.removeItem(at: target)
                 try FileManager.default.moveItem(at: URL(fileURLWithPath: r.path), to: target)
-                transferStatus = "\(r.count) kayıt tek sayfada" + (r.media > 0 ? ", \(r.media) görsel" : "")
+                transferStatus = String(localized: "\(r.count) kayıt tek sayfada") + (r.media > 0 ? String(localized: ", \(r.media) görsel") : "")
                 NSWorkspace.shared.activateFileViewerSelecting([target])
             } catch {
                 transferStatus = error.localizedDescription
@@ -157,9 +157,9 @@ extension AppModel {
             return
         }
         let panel = NSOpenPanel()
-        panel.title = "Dışa aktar"
-        panel.message = "\(total) kayıt (şu anki görünüm ve arama) \(format.label) olarak bu klasöre yazılacak"
-        panel.prompt = "Buraya aktar"
+        panel.title = String(localized: "Dışa aktar")
+        panel.message = String(localized: "\(total) kayıt (şu anki görünüm ve arama) \(format.label) olarak bu klasöre yazılacak")
+        panel.prompt = String(localized: "Buraya aktar")
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
@@ -173,12 +173,12 @@ extension AppModel {
         Task {
             isTransferring = true
             defer { isTransferring = false }
-            transferStatus = "Dışa aktarılıyor…"
+            transferStatus = String(localized: "Dışa aktarılıyor…")
             do {
                 let r: ExportReport = try await core.call(.call("export", [
                     "q": .string(q), "format": .string(format.rawValue), "dest": .string(dest.path), "media": .bool(true),
                 ]))
-                transferStatus = "\(r.count) kayıt aktarıldı" + (r.media > 0 ? ", \(r.media) medya dosyası" : "")
+                transferStatus = String(localized: "\(r.count) kayıt aktarıldı") + (r.media > 0 ? String(localized: ", \(r.media) medya dosyası") : "")
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.path)])
             } catch {
                 transferStatus = error.localizedDescription

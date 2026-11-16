@@ -76,7 +76,7 @@ private struct ShareView: View {
 
     private func save() async {
         guard let (url, title) = await sharedLink() else {
-            phase = .failed("Paylaşılan şeyde bağlantı yok")
+            phase = .failed(String(localized: "Paylaşılan şeyde bağlantı yok"))
             return
         }
         link = url.absoluteString

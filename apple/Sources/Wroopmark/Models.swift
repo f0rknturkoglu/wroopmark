@@ -281,9 +281,9 @@ struct FolderSuggestion: Decodable, Identifiable, Hashable, Sendable {
 
     var reasonLabel: String {
         switch reason {
-        case "author": "aynı kişi"
-        case "tag": "benzer etiket"
-        default: "aynı site"
+        case "author": String(localized: "aynı kişi")
+        case "tag": String(localized: "benzer etiket")
+        default: String(localized: "aynı site")
         }
     }
 }
@@ -355,7 +355,7 @@ enum Platform: String, CaseIterable, Identifiable, Sendable {
         case .arxiv: "arXiv"
         case .bluesky: "Bluesky"
         case .threads: "Threads"
-        case .local: "Dosya"
+        case .local: String(localized: "Dosya")
         case .web: "Web"
         }
     }
@@ -576,9 +576,9 @@ struct DuplicateGroup: Decodable, Identifiable, Hashable, Sendable {
 
     var reasonLabel: String {
         switch reason {
-        case "media": "Aynı görsel ya da video"
-        case "text": "Aynı metin"
-        default: "Çok benzer içerik"
+        case "media": String(localized: "Aynı görsel ya da video")
+        case "text": String(localized: "Aynı metin")
+        default: String(localized: "Çok benzer içerik")
         }
     }
 }
@@ -690,7 +690,7 @@ enum LinkCategory: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .youtube: "YouTube"
         case .arxiv: "arXiv"
         case .twitter: "Twitter / X"
-        case .other: "Diğer"
+        case .other: String(localized: "Diğer")
         }
     }
 

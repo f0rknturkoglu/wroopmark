@@ -22,7 +22,7 @@ extension AppModel {
             let r: SyncReport = try await core.call(.call("sync_enable", [
                 "dir": .string(folder.path), "name": .string(Host.current().localizedName ?? "Mac"),
             ]))
-            syncMessage = "Senkron açıldı: \(r.pushed) kayıt gönderildi, \(r.applied) değişiklik alındı."
+            syncMessage = String(localized: "Senkron açıldı: \(r.pushed) kayıt gönderildi, \(r.applied) değişiklik alındı.")
             await afterSync(r)
             startSyncLoop()
         } catch {
@@ -33,9 +33,9 @@ extension AppModel {
 
     func chooseSyncFolder() {
         let panel = NSOpenPanel()
-        panel.title = "Senkron klasörü"
-        panel.message = "Diğer cihazların da gördüğü bir klasör seç (iCloud Drive, Syncthing, Dropbox…)."
-        panel.prompt = "Bu klasörü kullan"
+        panel.title = String(localized: "Senkron klasörü")
+        panel.message = String(localized: "Diğer cihazların da gördüğü bir klasör seç (iCloud Drive, Syncthing, Dropbox…).")
+        panel.prompt = String(localized: "Bu klasörü kullan")
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
@@ -65,7 +65,7 @@ extension AppModel {
             let r: SyncReport = try await core.call(.call("sync_now", [:]))
             lastSyncAt = .now
             if !quiet || r.applied > 0 {
-                syncMessage = r.applied > 0 ? "Diğer cihazlardan \(r.applied) değişiklik geldi." : "Her şey güncel."
+                syncMessage = r.applied > 0 ? String(localized: "Diğer cihazlardan \(r.applied) değişiklik geldi.") : String(localized: "Her şey güncel.")
             }
             await afterSync(r)
         } catch {

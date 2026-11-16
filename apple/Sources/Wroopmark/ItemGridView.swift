@@ -228,16 +228,16 @@ struct TagStrip: View {
 
     private var scopeTitle: String {
         switch model.scope {
-        case .all: "Tümü"
-        case .today: "Bugün"
-        case .untagged: "Etiketsiz"
+        case .all: String(localized: "Tümü")
+        case .today: String(localized: "Bugün")
+        case .untagged: String(localized: "Etiketsiz")
         case .platform(let p): p.label
         case .tag(let key): "#\(key)"
         case .folder(_, let name): name
-        case .links(let cat): cat.map { "\($0.label) linkleri" } ?? "Link havuzu"
-        case .photos: "Fotoğraflar"
-        case .videos: "Videolar"
-        case .triage: "Ayıkla"
+        case .links(let cat): cat.map { String(localized: "\($0.label) linkleri") } ?? String(localized: "Link havuzu")
+        case .photos: String(localized: "Fotoğraflar")
+        case .videos: String(localized: "Videolar")
+        case .triage: String(localized: "Ayıkla")
         case .saved(let saved): saved.name
         }
     }
@@ -259,7 +259,7 @@ struct TagStrip: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     if !model.filters.isEmpty {
                         TagStripActionCapsule(
-                            title: "\(model.filters.activeCount) filtre",
+                            title: String(localized: "\(model.filters.activeCount) filtre"),
                             symbol: "line.3.horizontal.decrease",
                             prominent: true
                         ) {
@@ -278,7 +278,7 @@ struct TagStrip: View {
                     }
                     if !model.searchToSave.isEmpty {
                         TagStripActionCapsule(
-                            title: "Aramayı kaydet",
+                            title: String(localized: "Aramayı kaydet"),
                             symbol: "bookmark",
                             prominent: false
                         ) {

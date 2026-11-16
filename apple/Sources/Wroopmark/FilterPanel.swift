@@ -44,11 +44,11 @@ struct FilterPanel: View {
                     Picker("Medya", selection: $model.filters.media) {
                         ForEach(AdvancedFilters.MediaFilter.allCases) { Text($0.label).tag($0) }
                     }
-                    tri("Etiket", $model.filters.tagged, yes: "Etiketli", no: "Etiketsiz")
-                    tri("Link", $model.filters.link)
-                    tri("Not", $model.filters.note)
-                    tri("Görselde yazı (OCR)", $model.filters.ocr)
-                    tri("Alıntı", $model.filters.quote)
+                    tri(String(localized: "Etiket"), $model.filters.tagged, yes: String(localized: "Etiketli"), no: String(localized: "Etiketsiz"))
+                    tri(String(localized: "Link"), $model.filters.link)
+                    tri(String(localized: "Not"), $model.filters.note)
+                    tri(String(localized: "Görselde yazı (OCR)"), $model.filters.ocr)
+                    tri(String(localized: "Alıntı"), $model.filters.quote)
                 } header: {
                     Label("İçerik", systemImage: "doc.text")
                 }
@@ -66,8 +66,8 @@ struct FilterPanel: View {
                 .disabled(model.scope.isFolder)
 
                 Section {
-                    TagPick(title: "İçersin", picked: $model.filters.includeTags, all: model.tags)
-                    TagPick(title: "İçermesin", picked: $model.filters.excludeTags, all: model.tags)
+                    TagPick(title: String(localized: "İçersin"), picked: $model.filters.includeTags, all: model.tags)
+                    TagPick(title: String(localized: "İçermesin"), picked: $model.filters.excludeTags, all: model.tags)
                 } header: {
                     Label("Etiketler", systemImage: "tag")
                 }
@@ -83,8 +83,8 @@ struct FilterPanel: View {
                     Picker("Alan", selection: $model.filters.dateField) {
                         ForEach(AdvancedFilters.DateField.allCases) { Text($0.label).tag($0) }
                     }
-                    DateBound(title: "Başlangıç", date: $model.filters.from)
-                    DateBound(title: "Bitiş", date: $model.filters.to)
+                    DateBound(title: String(localized: "Başlangıç"), date: $model.filters.from)
+                    DateBound(title: String(localized: "Bitiş"), date: $model.filters.to)
                 } header: {
                     Label("Tarih", systemImage: "calendar")
                 }
@@ -114,7 +114,7 @@ struct FilterPanel: View {
         .frame(minWidth: 440, idealWidth: 480, minHeight: 500, idealHeight: 640)
     }
 
-    private func tri(_ title: String, _ value: Binding<AdvancedFilters.Tri>, yes: String = "Var", no: String = "Yok") -> some View {
+    private func tri(_ title: String, _ value: Binding<AdvancedFilters.Tri>, yes: String = String(localized: "Var"), no: String = String(localized: "Yok")) -> some View {
         Picker(title, selection: value) {
             Text("Fark etmez").tag(AdvancedFilters.Tri.any)
             Text(yes).tag(AdvancedFilters.Tri.yes)
@@ -173,7 +173,7 @@ private struct PlatformFilterChip: View {
 /// includes its subfolders.
 struct FolderFilterPicker: View {
     @Environment(AppModel.self) private var model
-    var title = "Klasör"
+    var title = String(localized: "Klasör")
 
     var body: some View {
         @Bindable var model = model

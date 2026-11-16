@@ -114,7 +114,7 @@ struct PostEntry: TimelineEntry {
 
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> PostEntry {
-        PostEntry(date: .now, post: WidgetPost(id: "", author: "wroopmark", text: "Kaydettiklerinden biri burada.", platform: "web", image: nil, video: false))
+        PostEntry(date: .now, post: WidgetPost(id: "", author: "wroopmark", text: String(localized: "Kaydettiklerinden biri burada."), platform: "web", image: nil, video: false))
     }
 
     func snapshot(for configuration: WidgetSettings, in context: Context) async -> PostEntry {
@@ -124,7 +124,7 @@ struct Provider: AppIntentTimelineProvider {
     func timeline(for configuration: WidgetSettings, in context: Context) async -> Timeline<PostEntry> {
         let posts = Self.posts(for: configuration)
         guard !posts.isEmpty else {
-            let note = Shared.posts().isEmpty ? "wroopmark'ı bir kez aç" : "Bu seçimde kayıt yok"
+            let note = Shared.posts().isEmpty ? String(localized: "wroopmark'ı bir kez aç") : String(localized: "Bu seçimde kayıt yok")
             return Timeline(entries: [PostEntry(date: .now, post: nil, note: note)], policy: .after(.now.addingTimeInterval(3600)))
         }
         // From now on, one post per step; the arrow moves the start along.
@@ -196,7 +196,7 @@ struct PostView: View {
         } else {
             VStack(spacing: 6) {
                 Image(systemName: "bookmark").font(.title2)
-                Text(entry.note ?? "wroopmark'ı bir kez aç").font(.caption).multilineTextAlignment(.center)
+                Text(entry.note ?? String(localized: "wroopmark'ı bir kez aç")).font(.caption).multilineTextAlignment(.center)
             }
             .containerBackground(.fill.tertiary, for: .widget)
         }

@@ -364,10 +364,10 @@ struct WelcomeView: View {
                 Text("Okumak, izlemek, sonra bulmak istediğin her şey tek yerde, telefonunda.")
                     .foregroundStyle(.secondary)
             }
-            point("square.and.arrow.up", "Her uygulamadan kaydet", "Safari, X, Reddit… Paylaş → wroopmark. Listede yoksa paylaşım satırının sonundaki “Diğer”den ekle.")
-            point("arrow.down.doc", "İnternetsiz oku", "Metin ve görseller telefona iner; sayfa silinse de arşivde kalır.")
-            point("magnifyingglass", "Her şeyi bul", "Metinde, notlarında, etiketlerinde ara: tag:okunacak, from:@kişi.")
-            point("laptopcomputer.and.iphone", "Mac'le birlikte (isteğe bağlı)", "Mac'te wroopmark kullanıyorsan iCloud Drive üzerinden iki yönlü eşitlenir.")
+            point("square.and.arrow.up", String(localized: "Her uygulamadan kaydet"), String(localized: "Safari, X, Reddit… Paylaş → wroopmark. Listede yoksa paylaşım satırının sonundaki “Diğer”den ekle."))
+            point("arrow.down.doc", String(localized: "İnternetsiz oku"), String(localized: "Metin ve görseller telefona iner; sayfa silinse de arşivde kalır."))
+            point("magnifyingglass", String(localized: "Her şeyi bul"), String(localized: "Metinde, notlarında, etiketlerinde ara: tag:okunacak, from:@kişi."))
+            point("laptopcomputer.and.iphone", String(localized: "Mac'le birlikte (isteğe bağlı)"), String(localized: "Mac'te wroopmark kullanıyorsan iCloud Drive üzerinden iki yönlü eşitlenir."))
             HStack {
                 Button(action: add) { Label("Bağlantı ekle", systemImage: "plus") }
                     .buttonStyle(.borderedProminent)

@@ -379,7 +379,7 @@ final class AppModel {
 
     func start() async {
         guard await core.ensureOpen() else {
-            errorMessage = "Kütüphane açılamadı: \(core.libraryURL.path)"
+            errorMessage = String(localized: "Kütüphane açılamadı: \(core.libraryURL.path)")
             return
         }
         if enableSystemIntegrations {

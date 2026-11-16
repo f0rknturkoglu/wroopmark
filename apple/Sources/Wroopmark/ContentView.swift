@@ -58,7 +58,7 @@ struct ContentView: View {
             Text("Kenar çubuğunda durur, her açılışta güncel sonuçları gösterir.\n\(model.searchToSave)")
         }
         .onChange(of: model.showSaveSearch) { _, shown in
-            if shown { saveSearchName = model.query.trimmingCharacters(in: .whitespaces).isEmpty ? "Yeni arama" : model.query }
+            if shown { saveSearchName = model.query.trimmingCharacters(in: .whitespaces).isEmpty ? String(localized: "Yeni arama") : model.query }
         }
         .onChange(of: model.query) { _, _ in model.queryChanged() }
         .onChange(of: model.filters) { _, _ in model.queryChanged() }

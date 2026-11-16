@@ -15,10 +15,10 @@ struct SidebarView: View {
         @Bindable var model = model
         List(selection: $model.selectedScope) {
             Section("Kütüphane") {
-                row("Tümü", "tray.full", model.stats?.items).tag(Scope.all)
-                row("Bugün", "calendar.day.timeline.left", nil).tag(Scope.today)
+                row(String(localized: "Tümü"), "tray.full", model.stats?.items).tag(Scope.all)
+                row(String(localized: "Bugün"), "calendar.day.timeline.left", nil).tag(Scope.today)
                     .help("Geçmiş yıllarda bugün kaydettiklerin ve arşivden 5 kayıt")
-                row("Etiketsiz", "tag.slash", nil).tag(Scope.untagged)
+                row(String(localized: "Etiketsiz"), "tag.slash", nil).tag(Scope.untagged)
                 linkPoolRow
                     .tag(Scope.links(nil))
                     .help("Bütün linkler, kategorilere ayrılmış")
@@ -29,7 +29,7 @@ struct SidebarView: View {
                             .padding(.leading, Theme.Spacing.lg)
                     }
                 }
-                row("Ayıkla", "arrow.left.arrow.right.square", nil).tag(Scope.triage)
+                row(String(localized: "Ayıkla"), "arrow.left.arrow.right.square", nil).tag(Scope.triage)
                     .help("Kayıtları tek tek gözden geçir: ← sil, → sakla")
             }
             Section {
@@ -100,8 +100,8 @@ struct SidebarView: View {
                 }
             }
             Section("Galeri") {
-                row("Fotoğraflar", "photo.on.rectangle", nil).tag(Scope.photos)
-                row("Videolar", "play.rectangle", nil).tag(Scope.videos)
+                row(String(localized: "Fotoğraflar"), "photo.on.rectangle", nil).tag(Scope.photos)
+                row(String(localized: "Videolar"), "play.rectangle", nil).tag(Scope.videos)
             }
             Section("Platformlar") {
                 ForEach(Platform.allCases) { p in
@@ -136,10 +136,10 @@ struct SidebarView: View {
         .navigationTitle("wroopmark")
         .sheet(isPresented: $showNewFolderSheet) {
             NameSheet(
-                title: "Yeni klasör",
-                message: "Kayıtları bu klasörde toplayabilirsin.",
-                placeholder: "Klasör adı",
-                actionTitle: "Oluştur",
+                title: String(localized: "Yeni klasör"),
+                message: String(localized: "Kayıtları bu klasörde toplayabilirsin."),
+                placeholder: String(localized: "Klasör adı"),
+                actionTitle: String(localized: "Oluştur"),
                 symbol: "folder.badge.plus"
             ) { name in
                 Task { _ = await model.addFolder(name: name) }
@@ -147,10 +147,10 @@ struct SidebarView: View {
         }
         .sheet(item: $folderRenaming) { folder in
             NameSheet(
-                title: "Klasörü yeniden adlandır",
-                message: "Yeni ad, alt klasörlerin yolunu da günceller.",
-                placeholder: "Yeni ad",
-                actionTitle: "Adlandır",
+                title: String(localized: "Klasörü yeniden adlandır"),
+                message: String(localized: "Yeni ad, alt klasörlerin yolunu da günceller."),
+                placeholder: String(localized: "Yeni ad"),
+                actionTitle: String(localized: "Adlandır"),
                 symbol: "pencil",
                 initialName: folder.name
             ) { name in
@@ -159,10 +159,10 @@ struct SidebarView: View {
         }
         .sheet(item: $parentForSubfolder) { parent in
             NameSheet(
-                title: "Yeni Alt Klasör",
-                message: "\"\(parent.name)\" klasörünün altına yeni alt klasör ekle.",
-                placeholder: "Alt klasör adı",
-                actionTitle: "Ekle",
+                title: String(localized: "Yeni Alt Klasör"),
+                message: String(localized: "\"\(parent.name)\" klasörünün altına yeni alt klasör ekle."),
+                placeholder: String(localized: "Alt klasör adı"),
+                actionTitle: String(localized: "Ekle"),
                 symbol: "folder.badge.plus"
             ) { name in
                 Task { _ = await model.addSubfolder(parent: parent, name: name) }
@@ -185,10 +185,10 @@ struct SidebarView: View {
         }
         .sheet(item: $renaming) { node in
             NameSheet(
-                title: "Etiketi yeniden adlandır",
-                message: "Alt etiketler de taşınır: \(node.id)/… → yeni/…",
-                placeholder: "yeni ad",
-                actionTitle: "Adlandır",
+                title: String(localized: "Etiketi yeniden adlandır"),
+                message: String(localized: "Alt etiketler de taşınır: \(node.id)/… → yeni/…"),
+                placeholder: String(localized: "yeni ad"),
+                actionTitle: String(localized: "Adlandır"),
                 symbol: "tag",
                 initialName: node.id
             ) { name in
@@ -197,10 +197,10 @@ struct SidebarView: View {
         }
         .sheet(item: $searchRenaming) { saved in
             NameSheet(
-                title: "Aramayı yeniden adlandır",
+                title: String(localized: "Aramayı yeniden adlandır"),
                 message: saved.query,
                 placeholder: "Ad",
-                actionTitle: "Adlandır",
+                actionTitle: String(localized: "Adlandır"),
                 symbol: "magnifyingglass",
                 initialName: saved.name
             ) { name in
@@ -298,13 +298,13 @@ struct SidebarView: View {
             .help("İndirme paneli (⌘J)")
 
             if let s = model.stats, s.mediaPending > 0 {
-                statusLine("\(s.mediaPending) kaydın medyası iniyor", symbol: "arrow.down.circle")
+                statusLine(String(localized: "\(s.mediaPending) kaydın medyası iniyor"), symbol: "arrow.down.circle")
             }
             if model.isFetchingVideos, let n = model.stats?.videosMissing, n > 0 {
-                statusLine("\(n) video iniyor", symbol: "film")
+                statusLine(String(localized: "\(n) video iniyor"), symbol: "film")
             }
             if model.isReadingText, let n = model.stats?.ocrPending, n > 0 {
-                statusLine("\(n) kayıtta yazı okunuyor", symbol: "text.viewfinder")
+                statusLine(String(localized: "\(n) kayıtta yazı okunuyor"), symbol: "text.viewfinder")
             }
         }
         .font(.caption)

@@ -14,19 +14,19 @@ enum SortOrder: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .relevance: "Önerilen"
-        case .savedNewest: "Kaydedilme: yeniden eskiye"
-        case .savedOldest: "Kaydedilme: eskiden yeniye"
-        case .postedNewest: "Paylaşılma: yeniden eskiye"
-        case .postedOldest: "Paylaşılma: eskiden yeniye"
-        case .author: "Kişiye göre (A–Z)"
-        case .random: "Karışık"
+        case .relevance: String(localized: "Önerilen")
+        case .savedNewest: String(localized: "Kaydedilme: yeniden eskiye")
+        case .savedOldest: String(localized: "Kaydedilme: eskiden yeniye")
+        case .postedNewest: String(localized: "Paylaşılma: yeniden eskiye")
+        case .postedOldest: String(localized: "Paylaşılma: eskiden yeniye")
+        case .author: String(localized: "Kişiye göre (A–Z)")
+        case .random: String(localized: "Karışık")
         }
     }
 
     var help: String {
         switch self {
-        case .relevance: "Arama varsa en uygun sonuç önce, yoksa son kaydedilen önce"
+        case .relevance: String(localized: "Arama varsa en uygun sonuç önce, yoksa son kaydedilen önce")
         default: label
         }
     }
@@ -45,11 +45,11 @@ struct AdvancedFilters: Equatable {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .any: "Fark etmez"
-            case .image: "Fotoğraflı"
-            case .video: "Videolu"
-            case .media: "Herhangi bir medya"
-            case .none: "Medyasız"
+            case .any: String(localized: "Fark etmez")
+            case .image: String(localized: "Fotoğraflı")
+            case .video: String(localized: "Videolu")
+            case .media: String(localized: "Herhangi bir medya")
+            case .none: String(localized: "Medyasız")
             }
         }
     }
@@ -72,7 +72,7 @@ struct AdvancedFilters: Equatable {
     enum DateField: String, CaseIterable, Identifiable {
         case posted, saved
         var id: String { rawValue }
-        var label: String { self == .posted ? "Paylaşılma tarihi" : "Kaydedilme tarihi" }
+        var label: String { self == .posted ? String(localized: "Paylaşılma tarihi") : String(localized: "Kaydedilme tarihi") }
     }
 
     var platforms: Set<Platform> = []

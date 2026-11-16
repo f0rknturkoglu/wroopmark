@@ -38,7 +38,7 @@ enum PhoneAI {
             loadError = nil
             failedAt = nil
             guard let m = NLContextualEmbedding(script: .latin) else {
-                fail("Bu iPhone'da gömme modeli yok")
+                fail(String(localized: "Bu iPhone'da gömme modeli yok"))
                 return nil
             }
             if !m.hasAvailableAssets {
@@ -49,14 +49,14 @@ enum PhoneAI {
                     done.signal()
                 }
                 if done.wait(timeout: .now() + 120) == .timedOut || (box.get()["ok"] as? Bool) != true {
-                    fail("gömme modeli indirilemedi")
+                    fail(String(localized: "gömme modeli indirilemedi"))
                     return nil
                 }
             }
             do {
                 try m.load()
             } catch {
-                fail("gömme modeli yüklenemedi: \(error.localizedDescription)")
+                fail(String(localized: "gömme modeli yüklenemedi: \(error.localizedDescription)"))
                 return nil
             }
             model = m
@@ -120,15 +120,33 @@ enum PhoneAI {
             case .available: "available"
             case .unavailable(let reason):
                 switch reason {
-                case .deviceNotEligible: "Bu cihaz Apple Intelligence desteklemiyor"
-                case .appleIntelligenceNotEnabled: "Apple Intelligence kapalı (Ayarlar → Apple Intelligence ve Siri)"
-                case .modelNotReady: "Model henüz hazır değil (indiriliyor olabilir)"
-                @unknown default: "Model kullanılamıyor"
+                case .deviceNotEligible: String(localized: "Bu cihaz Apple Intelligence desteklemiyor")
+                case .appleIntelligenceNotEnabled: String(localized: "Apple Intelligence kapalı (Ayarlar → Apple Intelligence ve Siri)")
+                case .modelNotReady: String(localized: "Model henüz hazır değil (indiriliyor olabilir)")
+                @unknown default: String(localized: "Model kullanılamıyor")
                 }
             }
         }
 
-        static let instructions = """
+        static let englishInstructions = """
+    You help with an archive of saved posts. You will get one saved post or page.
+    Write only these two lines and nothing else:
+    SUMMARY: <the content in English, in at most two short sentences>
+    TAGS: <1-4 short lowercase tags, separated by commas>
+    Tags name the topic (e.g. ai, rust, recipe). Prefer the existing tags given, when they fit.
+    """
+
+    static let englishExpandInstructions = """
+    Someone searches a personal archive. Write keywords that related items may contain:
+    synonyms, close terms, English and Turkish equivalents, abbreviations. 6 to 12 of them, 1-2 words each.
+    Write only the comma-separated list, no explanation.
+    """
+
+    /// Summaries and search words in the user's language: Turkish for
+    /// Turkish, English for everyone else.
+    static var english: Bool { !(Locale.preferredLanguages.first ?? "tr").hasPrefix("tr") }
+
+    static let instructions = """
         Sen bir kayıt arşivinin yardımcısısın. Sana kaydedilmiş bir gönderi ya da sayfa verilecek.
         Yalnızca şu iki satırı yaz, başka hiçbir şey yazma:
         ÖZET: <içeriği Türkçe, en fazla iki kısa cümleyle anlatan özet>
@@ -137,10 +155,10 @@ enum PhoneAI {
         """
 
         static func run(text: String, tags: [String]) async throws -> (String, [String]) {
-            let session = LanguageModelSession(instructions: instructions)
-            var prompt = "İçerik:\n\(text)\n"
+            let session = LanguageModelSession(instructions: english ? englishInstructions : instructions)
+            var prompt = (english ? "Content:" : "İçerik:") + "\n\(text)\n"
             if !tags.isEmpty {
-                prompt += "\nMevcut etiketler: \(tags.prefix(80).joined(separator: ", "))\n"
+                prompt += (english ? "\nExisting tags: " : "\nMevcut etiketler: ") + tags.prefix(80).joined(separator: ", ") + "\n"
             }
             let response = try await session.respond(to: prompt, options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 220))
             return parse(response.content)
@@ -160,8 +178,8 @@ enum PhoneAI {
         """
 
         static func expand(_ query: String) async throws -> [String] {
-            let session = LanguageModelSession(instructions: expandInstructions)
-            let response = try await session.respond(to: "Arama: \(query)", options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 120))
+            let session = LanguageModelSession(instructions: english ? englishExpandInstructions : expandInstructions)
+            let response = try await session.respond(to: (english ? "Search: " : "Arama: ") + query, options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 120))
             let text = response.content.replacingOccurrences(of: "\n", with: ",")
             return text.split(separator: ",")
                 .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " -•*#.\"'0123456789)")).lowercased(with: Locale(identifier: "tr")) }
@@ -175,13 +193,13 @@ enum PhoneAI {
                 let line = raw.replacingOccurrences(of: "**", with: "").trimmingCharacters(in: .whitespaces)
                 let k = key(line)
                 let value = String(line.drop { $0 != ":" }.dropFirst()).trimmingCharacters(in: .whitespaces)
-                if k.hasPrefix("ozet:") {
+                if k.hasPrefix("ozet:") || k.hasPrefix("summary:") {
                     summary = value
-                } else if k.hasPrefix("etiketler:") || k.hasPrefix("etiket:") {
+                } else if k.hasPrefix("etiketler:") || k.hasPrefix("etiket:") || k.hasPrefix("tags:") || k.hasPrefix("tag:") {
                     tags = value.split(separator: ",")
                         .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " #.\"'")).lowercased(with: Locale(identifier: "tr")) }
                         .filter { !$0.isEmpty }
-                } else if summary.isEmpty && !line.isEmpty && !k.hasPrefix("etiket") {
+                } else if summary.isEmpty && !line.isEmpty && !k.hasPrefix("etiket") && !k.hasPrefix("tag") {
                     summary = line
                 }
             }
@@ -203,7 +221,7 @@ enum PhoneAI {
                   let data = String(cString: reqPtr).data(using: .utf8),
                   let req = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             else {
-                PhoneAI.reply(["error": "geçersiz istek"], ctx: ctx, out: out)
+                PhoneAI.reply(["error": String(localized: "geçersiz istek")], ctx: ctx, out: out)
                 return
             }
             PhoneAI.reply(PhoneAI.handle(req), ctx: ctx, out: out)
@@ -248,12 +266,12 @@ enum PhoneAI {
                     let (s, t) = try await Summarizer.run(text: text, tags: tags)
                     box.set(["summary": s, "tags": t])
                 } catch {
-                    box.set(["error": "özetlenemedi: \(error.localizedDescription)"])
+                    box.set(["error": String(localized: "özetlenemedi: \(error.localizedDescription)")])
                 }
                 done.signal()
             }
             // A stuck model must not hold the core's AI lock for ever.
-            if done.wait(timeout: .now() + 90) == .timedOut { return ["error": "model yanıt vermedi"] }
+            if done.wait(timeout: .now() + 90) == .timedOut { return ["error": String(localized: "model yanıt vermedi")] }
             return box.get()
         case "expand":
             let query = req["query"] as? String ?? ""
@@ -266,12 +284,12 @@ enum PhoneAI {
                 do {
                     box.set(["terms": try await Summarizer.expand(query)])
                 } catch {
-                    box.set(["error": "genişletilemedi: \(error.localizedDescription)"])
+                    box.set(["error": String(localized: "genişletilemedi: \(error.localizedDescription)")])
                 }
                 done.signal()
             }
             // A stuck model must not hold the core's AI lock for ever.
-            if done.wait(timeout: .now() + 90) == .timedOut { return ["error": "model yanıt vermedi"] }
+            if done.wait(timeout: .now() + 90) == .timedOut { return ["error": String(localized: "model yanıt vermedi")] }
             return box.get()
         case "status":
             let m = Embedder.load()
@@ -280,7 +298,7 @@ enum PhoneAI {
             if let e = Embedder.lastError { status["embed_error"] = e }
             return status
         default:
-            return ["error": "bilinmeyen işlem"]
+            return ["error": String(localized: "bilinmeyen işlem")]
         }
     }
 }

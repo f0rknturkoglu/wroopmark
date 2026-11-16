@@ -415,7 +415,7 @@ struct VideoFeedView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: mode == .videos ? "play.rectangle.fill" : "text.below.photo.fill").font(.caption)
-                        Text(scope == .all ? (mode == .videos ? "Tüm videolar" : "Tüm gönderiler") : scope.title)
+                        Text(scope == .all ? (mode == .videos ? String(localized: "Tüm videolar") : String(localized: "Tüm gönderiler")) : scope.title)
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
                         Image(systemName: "chevron.down").font(.caption2.weight(.bold))
@@ -523,15 +523,15 @@ private struct FeedPage: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(spacing: 18) {
                     if entry.video != nil {
-                        sideButton(player.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: player.muted ? "Sesi aç" : "Sesi kapat") {
+                        sideButton(player.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: player.muted ? String(localized: "Sesi aç") : String(localized: "Sesi kapat")) {
                             player.muted.toggle()
                         }
                     }
                     if !item.replies.isEmpty {
-                        sideButton("bubble.left.and.bubble.right", label: "Yanıtlar") { showReplies = true }
+                        sideButton("bubble.left.and.bubble.right", label: String(localized: "Yanıtlar")) { showReplies = true }
                     }
-                    sideButton("info.circle", label: "Ayrıntılar", action: details)
-                    sideButton("trash", label: "Sil", action: delete)
+                    sideButton("info.circle", label: String(localized: "Ayrıntılar"), action: details)
+                    sideButton("trash", label: String(localized: "Sil"), action: delete)
                     if let url = URL(string: item.url), url.scheme?.hasPrefix("http") == true {
                         ShareLink(item: url) {
                             Image(systemName: "square.and.arrow.up").font(.title2).frame(width: 44, height: 44)

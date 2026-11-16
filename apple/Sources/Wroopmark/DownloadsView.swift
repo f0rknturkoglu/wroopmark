@@ -12,6 +12,16 @@ struct DownloadsView: View {
         case failed = "Başarısız"
 
         var id: String { rawValue }
+
+        /// When the tab has nothing.
+        var emptyTitle: String {
+            switch self {
+            case .all: String(localized: "İndirme yok")
+            case .active: String(localized: "İnen video yok")
+            case .completed: String(localized: "Tamamlanan indirme yok")
+            case .failed: String(localized: "Başarısız indirme yok")
+            }
+        }
     }
 
     @State private var selectedTab: FilterTab = .all
@@ -208,19 +218,19 @@ struct DownloadsView: View {
         let completed = model.downloads?.completed.count ?? 0
         let failed = model.downloads?.failed.count ?? 0
 
-        if active > 0 { parts.append("\(active) video iniyor") }
-        if queued > 0 { parts.append("\(queued) sırada") }
-        if completed > 0 { parts.append("\(completed) tamamlandı") }
-        if failed > 0 { parts.append("\(failed) başarısız") }
+        if active > 0 { parts.append(String(localized: "\(active) video iniyor")) }
+        if queued > 0 { parts.append(String(localized: "\(queued) sırada")) }
+        if completed > 0 { parts.append(String(localized: "\(completed) tamamlandı")) }
+        if failed > 0 { parts.append(String(localized: "\(failed) başarısız")) }
 
-        return parts.isEmpty ? "İndirme kuyruğu boş" : parts.joined(separator: " · ")
+        return parts.isEmpty ? String(localized: "İndirme kuyruğu boş") : parts.joined(separator: " · ")
     }
 
     @ViewBuilder
     private var emptyStateView: some View {
         ContentUnavailableView {
             Label(
-                selectedTab == .all ? "İndirme yok" : "\(selectedTab.rawValue) bulunamadı",
+                selectedTab == .all ? String(localized: "İndirme yok") : selectedTab.emptyTitle,
                 systemImage: "arrow.down.circle"
             )
         } description: {

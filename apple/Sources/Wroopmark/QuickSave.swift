@@ -61,7 +61,7 @@ final class QuickSave {
 
     func saveClipboard() async {
         guard let link = Self.clipboardURL() else {
-            show(symbol: "doc.on.clipboard", title: "Panoda link yok", detail: "Bir bağlantı kopyala, sonra \(Self.hotKeyLabel)")
+            show(symbol: "doc.on.clipboard", title: String(localized: "Panoda link yok"), detail: String(localized: "Bir bağlantı kopyala, sonra \(Self.hotKeyLabel)"))
             return
         }
         let folder = UserDefaults.standard.integer(forKey: "quickAddFolder")
@@ -71,12 +71,12 @@ final class QuickSave {
     /// Saves a link with its media, as "add link" in the app does.
     @discardableResult
     func save(_ link: String, tags: [String] = [], folderID: Int64? = nil) async -> Bool {
-        show(symbol: "arrow.down.circle", title: "Kaydediliyor…", detail: link, stay: true)
+        show(symbol: "arrow.down.circle", title: String(localized: "Kaydediliyor…"), detail: link, stay: true)
         let client: any CoreClient = model?.core ?? Core.shared
         do {
             let item: Item = try await client.call(.addURL(url: link, tags: tags, note: nil, folderID: folderID), network: true)
             let title = item.title ?? item.text.split(separator: "\n").first.map(String.init) ?? item.url
-            show(symbol: "checkmark.circle.fill", title: "Kaydedildi", detail: String(title.prefix(90)))
+            show(symbol: "checkmark.circle.fill", title: String(localized: "Kaydedildi"), detail: String(title.prefix(90)))
             if let model {
                 await model.refreshLoaded()
                 await model.loadRecent()
@@ -86,7 +86,7 @@ final class QuickSave {
             }
             return true
         } catch {
-            show(symbol: "exclamationmark.triangle.fill", title: "Kaydedilemedi", detail: error.localizedDescription)
+            show(symbol: "exclamationmark.triangle.fill", title: String(localized: "Kaydedilemedi"), detail: error.localizedDescription)
             return false
         }
     }

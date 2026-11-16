@@ -111,12 +111,12 @@ struct PhoneSettingsView: View {
                         LabeledContent(
                             "Anlam araması",
                             value: ai.embedReady
-                                ? ai.vectors.map { "\($0.done) / \($0.total) kayıt" } ?? "Hazır"
-                                : (ai.embedError ?? "Hazırlanıyor")
+                                ? ai.vectors.map { String(localized: "\($0.done) / \($0.total) kayıt") } ?? String(localized: "Hazır")
+                                : (ai.embedError ?? String(localized: "Hazırlanıyor"))
                         )
                         LabeledContent(
                             "Özet ve etiket önerisi",
-                            value: ai.llmReady ? "Hazır" : (ai.llm ?? "Kullanılamıyor")
+                            value: ai.llmReady ? String(localized: "Hazır") : (ai.llm ?? String(localized: "Kullanılamıyor"))
                         )
                     } else {
                         LabeledContent("Cihazdaki zeka", value: "Denetleniyor…")

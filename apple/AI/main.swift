@@ -43,7 +43,7 @@ enum Embedder {
         if let model { return model }
         if loadError != nil { return nil }
         guard let m = NLContextualEmbedding(script: .latin) else {
-            loadError = "bu Mac'te gömme modeli yok"
+            loadError = Summarizer.english ? "this Mac has no embedding model" : "bu Mac'te gömme modeli yok"
             return nil
         }
         if !m.hasAvailableAssets {
@@ -55,14 +55,14 @@ enum Embedder {
                 done.signal()
             }
             if done.wait(timeout: .now() + 600) == .timedOut || !ok {
-                loadError = "gömme modeli indirilemedi"
+                loadError = Summarizer.english ? "the embedding model could not be downloaded" : "gömme modeli indirilemedi"
                 return nil
             }
         }
         do {
             try m.load()
         } catch {
-            loadError = "gömme modeli yüklenemedi: \(error.localizedDescription)"
+            loadError = (Summarizer.english ? "the embedding model could not be loaded: " : "gömme modeli yüklenemedi: ") + error.localizedDescription
             return nil
         }
         model = m
@@ -108,13 +108,31 @@ enum Summarizer {
         case .available: "available"
         case .unavailable(let reason):
             switch reason {
-            case .deviceNotEligible: "Bu Mac Apple Intelligence desteklemiyor"
-            case .appleIntelligenceNotEnabled: "Apple Intelligence kapalı (Sistem Ayarları → Apple Intelligence ve Siri)"
-            case .modelNotReady: "Model henüz hazır değil (indiriliyor olabilir)"
-            @unknown default: "Model kullanılamıyor"
+            case .deviceNotEligible: english ? "This Mac does not support Apple Intelligence" : "Bu Mac Apple Intelligence desteklemiyor"
+            case .appleIntelligenceNotEnabled: english ? "Apple Intelligence is off (System Settings → Apple Intelligence & Siri)" : "Apple Intelligence kapalı (Sistem Ayarları → Apple Intelligence ve Siri)"
+            case .modelNotReady: english ? "The model is not ready yet (it may be downloading)" : "Model henüz hazır değil (indiriliyor olabilir)"
+            @unknown default: english ? "The model is unavailable" : "Model kullanılamıyor"
             }
         }
     }
+
+    static let englishInstructions = """
+    You help with an archive of saved posts. You will get one saved post or page.
+    Write only these two lines and nothing else:
+    SUMMARY: <the content in English, in at most two short sentences>
+    TAGS: <1-4 short lowercase tags, separated by commas>
+    Tags name the topic (e.g. ai, rust, recipe). Prefer the existing tags given, when they fit.
+    """
+
+    static let englishExpandInstructions = """
+    Someone searches a personal archive. Write keywords that related items may contain:
+    synonyms, close terms, English and Turkish equivalents, abbreviations. 6 to 12 of them, 1-2 words each.
+    Write only the comma-separated list, no explanation.
+    """
+
+    /// Summaries and search words in the user's language: Turkish for
+    /// Turkish, English for everyone else.
+    static var english: Bool { !(Locale.preferredLanguages.first ?? "tr").hasPrefix("tr") }
 
     static let instructions = """
     Sen bir kayıt arşivinin yardımcısısın. Sana kaydedilmiş bir gönderi ya da sayfa verilecek.
@@ -125,10 +143,10 @@ enum Summarizer {
     """
 
     static func run(text: String, tags: [String]) async throws -> (String, [String]) {
-        let session = LanguageModelSession(instructions: instructions)
-        var prompt = "İçerik:\n\(text)\n"
+        let session = LanguageModelSession(instructions: english ? englishInstructions : instructions)
+        var prompt = (english ? "Content:" : "İçerik:") + "\n\(text)\n"
         if !tags.isEmpty {
-            prompt += "\nMevcut etiketler: \(tags.prefix(80).joined(separator: ", "))\n"
+            prompt += (english ? "\nExisting tags: " : "\nMevcut etiketler: ") + tags.prefix(80).joined(separator: ", ") + "\n"
         }
         let response = try await session.respond(to: prompt, options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 220))
         return parse(response.content)
@@ -149,8 +167,8 @@ enum Summarizer {
     """
 
     static func expand(_ query: String) async throws -> [String] {
-        let session = LanguageModelSession(instructions: expandInstructions)
-        let response = try await session.respond(to: "Arama: \(query)", options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 120))
+        let session = LanguageModelSession(instructions: english ? englishExpandInstructions : expandInstructions)
+        let response = try await session.respond(to: (english ? "Search: " : "Arama: ") + query, options: GenerationOptions(temperature: 0.2, maximumResponseTokens: 120))
         let text = response.content.replacingOccurrences(of: "\n", with: ",")
         return text.split(separator: ",")
             .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " -•*#.\"'0123456789)")).lowercased(with: Locale(identifier: "tr")) }
@@ -164,13 +182,13 @@ enum Summarizer {
             let line = raw.replacingOccurrences(of: "**", with: "").trimmingCharacters(in: .whitespaces)
             let k = key(line)
             let value = String(line.drop { $0 != ":" }.dropFirst()).trimmingCharacters(in: .whitespaces)
-            if k.hasPrefix("ozet:") {
+            if k.hasPrefix("ozet:") || k.hasPrefix("summary:") {
                 summary = value
-            } else if k.hasPrefix("etiketler:") || k.hasPrefix("etiket:") {
+            } else if k.hasPrefix("etiketler:") || k.hasPrefix("etiket:") || k.hasPrefix("tags:") || k.hasPrefix("tag:") {
                 tags = value.split(separator: ",")
                     .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " #.\"'")).lowercased(with: Locale(identifier: "tr")) }
                     .filter { !$0.isEmpty }
-            } else if summary.isEmpty && !line.isEmpty && !k.hasPrefix("etiket") {
+            } else if summary.isEmpty && !line.isEmpty && !k.hasPrefix("etiket") && !k.hasPrefix("tag") {
                 summary = line
             }
         }

@@ -37,11 +37,11 @@ enum CoreError: LocalizedError, Sendable, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .libraryNotOpen: "Kütüphane açık değil"
-        case .invalidHandle: "Geçersiz tutamaç"
-        case .noResponse: "Çekirdek yanıt vermedi"
-        case .invalidEncoding: "Çekirdek yanıtı geçersiz"
-        case .emptyResult: "Çekirdek boş yanıt döndürdü"
+        case .libraryNotOpen: String(localized: "Kütüphane açık değil")
+        case .invalidHandle: String(localized: "Geçersiz tutamaç")
+        case .noResponse: String(localized: "Çekirdek yanıt vermedi")
+        case .invalidEncoding: String(localized: "Çekirdek yanıtı geçersiz")
+        case .emptyResult: String(localized: "Çekirdek boş yanıt döndürdü")
         case .server(let message): message
         }
     }
@@ -494,7 +494,7 @@ final class Core: CoreClient, Sendable {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let envelope = try decoder.decode(Envelope<T>.self, from: raw)
             guard envelope.ok else {
-                throw CoreError.server(envelope.error ?? "Bilinmeyen hata")
+                throw CoreError.server(envelope.error ?? String(localized: "Bilinmeyen hata"))
             }
             guard let data = envelope.data else {
                 throw CoreError.emptyResult
@@ -510,7 +510,7 @@ final class Core: CoreClient, Sendable {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let envelope = try decoder.decode(Envelope<T>.self, from: raw)
             guard envelope.ok else {
-                throw CoreError.server(envelope.error ?? "Bilinmeyen hata")
+                throw CoreError.server(envelope.error ?? String(localized: "Bilinmeyen hata"))
             }
             return envelope.data
         }
@@ -521,7 +521,7 @@ final class Core: CoreClient, Sendable {
             let raw = try Self.invokeFFI(command, handleBits: handleBits)
             let envelope = try JSONDecoder().decode(StatusEnvelope.self, from: raw)
             guard envelope.ok else {
-                throw CoreError.server(envelope.error ?? "Bilinmeyen hata")
+                throw CoreError.server(envelope.error ?? String(localized: "Bilinmeyen hata"))
             }
         }
     }

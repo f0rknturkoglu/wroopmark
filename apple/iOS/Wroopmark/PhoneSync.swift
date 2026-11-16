@@ -41,12 +41,12 @@ extension PhoneModel {
         guard let folder = syncFolder else { return }
         isSyncing = true
         defer { isSyncing = false }
-        syncMessage = "Mac'teki kütüphane indiriliyor…"
+        syncMessage = String(localized: "Mac'teki kütüphane indiriliyor…")
         await Self.fetchLogs(in: folder)
         do {
             let r: SyncReport = try await core.call(.call("sync_enable", ["dir": .string(folder.path), "name": .string(UIDevice.current.name)]))
             lastSyncAt = .now
-            syncMessage = r.applied > 0 ? "\(r.applied) kayıt geldi." : "Senkron açık."
+            syncMessage = r.applied > 0 ? String(localized: "\(r.applied) kayıt geldi.") : String(localized: "Senkron açık.")
             await afterSync(r)
         } catch {
             syncMessage = error.localizedDescription
@@ -93,7 +93,7 @@ extension PhoneModel {
 
     func offloadVideos() async {
         guard let o: Offload = try? await core.call(.call("offload_videos", [:])) else { return }
-        syncMessage = "\(o.files) video telefondan kaldırıldı, \(ByteCountFormatter.string(fromByteCount: o.bytes, countStyle: .file)) boşaldı. İzlediğinde iCloud'dan yeniden iner."
+        syncMessage = String(localized: "\(o.files) video telefondan kaldırıldı, \(ByteCountFormatter.string(fromByteCount: o.bytes, countStyle: .file)) boşaldı. İzlediğinde iCloud'dan yeniden iner.")
         await loadOffloadable()
         await refreshMeta()
         await checkSpace(force: true)
@@ -111,7 +111,7 @@ extension PhoneModel {
             if let device = syncStatus?.device {
                 await Self.announceWrites(in: folder, device: device, media: r.mediaOut > 0)
             }
-            if r.applied > 0 { syncMessage = "\(r.applied) değişiklik geldi." }
+            if r.applied > 0 { syncMessage = String(localized: "\(r.applied) değişiklik geldi.") }
             await afterSync(r)
         } catch {
             syncMessage = error.localizedDescription

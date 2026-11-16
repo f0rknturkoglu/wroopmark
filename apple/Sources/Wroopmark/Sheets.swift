@@ -120,13 +120,13 @@ struct AddURLSheet: View {
 
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 SheetField(
-                    title: "Bağlantı",
+                    title: String(localized: "Bağlantı"),
                     text: $url,
                     prompt: "https://…",
-                    hint: "X, TikTok, Pinterest ya da herhangi bir sayfa"
+                    hint: String(localized: "X, TikTok, Pinterest ya da herhangi bir sayfa")
                 )
-                SheetField(title: "Etiketler", text: $tags, prompt: "dev/rust, okunacak")
-                SheetField(title: "Not", text: $note, prompt: "isteğe bağlı")
+                SheetField(title: String(localized: "Etiketler"), text: $tags, prompt: String(localized: "dev/rust, okunacak"))
+                SheetField(title: String(localized: "Not"), text: $note, prompt: String(localized: "isteğe bağlı"))
             }
             .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -203,8 +203,8 @@ struct BulkTagSheet: View {
             .monospacedDigit()
 
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                SheetField(title: "Ekle", text: $add, prompt: "virgülle ayır")
-                SheetField(title: "Kaldır", text: $remove, prompt: "virgülle ayır")
+                SheetField(title: String(localized: "Ekle"), text: $add, prompt: String(localized: "virgülle ayır"))
+                SheetField(title: String(localized: "Kaldır"), text: $remove, prompt: String(localized: "virgülle ayır"))
                 if !model.tags.isEmpty {
                     TagSuggestions(current: parseTags(add), all: model.tags) { name in
                         add = (parseTags(add) + [name]).joined(separator: ", ")

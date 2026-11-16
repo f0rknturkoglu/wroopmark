@@ -46,10 +46,10 @@ struct TriageView: View {
         }
         .sheet(isPresented: $showNewFolderSheet) {
             NameSheet(
-                title: "Yeni klasör",
-                message: "Kayıtları tek tıkla bu klasöre taşıyabilirsin.",
-                placeholder: "Klasör adı",
-                actionTitle: "Oluştur",
+                title: String(localized: "Yeni klasör"),
+                message: String(localized: "Kayıtları tek tıkla bu klasöre taşıyabilirsin."),
+                placeholder: String(localized: "Klasör adı"),
+                actionTitle: String(localized: "Oluştur"),
                 symbol: "folder.badge.plus"
             ) { name in
                 Task { _ = await model.addFolder(name: name) }
@@ -279,13 +279,13 @@ struct TriageView: View {
     }
 
     private var summary: String {
-        var parts = ["← sil", "→ sakla", "⌘Z geri al"]
-        if !model.triageSuggestions.isEmpty { parts.append("1–\(model.triageSuggestions.count) önerilen klasöre taşı") }
-        else if !model.folders.isEmpty { parts.append("tek tıkla klasöre taşı") }
+        var parts = [String(localized: "← sil"), String(localized: "→ sakla"), String(localized: "⌘Z geri al")]
+        if !model.triageSuggestions.isEmpty { parts.append(String(localized: "1–\(model.triageSuggestions.count) önerilen klasöre taşı")) }
+        else if !model.folders.isEmpty { parts.append(String(localized: "tek tıkla klasöre taşı")) }
         if model.triageDeleted + model.triageKept > 0 {
-            parts.append("bu oturumda \(model.triageDeleted) silindi, \(model.triageKept) saklandı")
+            parts.append(String(localized: "bu oturumda \(model.triageDeleted) silindi, \(model.triageKept) saklandı"))
         }
-        if model.hasPendingTriage { parts.append("son 10 karar geri alınabilir") }
+        if model.hasPendingTriage { parts.append(String(localized: "son 10 karar geri alınabilir")) }
         return parts.joined(separator: " · ")
     }
 

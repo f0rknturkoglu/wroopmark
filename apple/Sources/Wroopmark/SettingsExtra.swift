@@ -144,11 +144,11 @@ struct IntelligenceSettings: View {
             }
 
             Section("Bu Mac'teki modeller") {
-                status("Anlam vektörleri (NaturalLanguage)", ok: s?.embedReady == true, detail: s?.embedReady == true ? "hazır" : (s?.embedError ?? s?.error ?? "denetleniyor…"))
-                status("Dil modeli (Apple Intelligence)", ok: s?.llmReady == true, detail: s?.llmReady == true ? "hazır" : (s?.llm ?? "denetleniyor…"))
+                status(String(localized: "Anlam vektörleri (NaturalLanguage)"), ok: s?.embedReady == true, detail: s?.embedReady == true ? String(localized: "hazır") : (s?.embedError ?? s?.error ?? String(localized: "denetleniyor…")))
+                status(String(localized: "Dil modeli (Apple Intelligence)"), ok: s?.llmReady == true, detail: s?.llmReady == true ? String(localized: "hazır") : (s?.llm ?? String(localized: "denetleniyor…")))
                 if let st = s?.stubs, st.pending + st.failed > 0 {
                     LabeledContent("İçe aktarılan linkler") {
-                        Text("\(st.pending) bekliyor" + (st.failed > 0 ? ", \(st.failed) getirilemedi" : ""))
+                        Text(String(localized: "\(st.pending) bekliyor") + (st.failed > 0 ? String(localized: ", \(st.failed) getirilemedi") : ""))
                     }
                 }
                 HStack {

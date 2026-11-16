@@ -21,19 +21,19 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .general: "Genel"
-        case .appearance: "Görünüm"
-        case .library: "Kütüphane"
-        case .media: "Medya"
-        case .ocr: "Yazı Tanıma"
-        case .backup: "Yedek"
-        case .rules: "Kurallar"
-        case .intelligence: "Zeka"
-        case .transfer: "İçe / Dışa Aktar"
-        case .agents: "Ajanlar (MCP)"
-        case .sync: "Senkron"
-        case .extensionHost: "Eklenti"
-        case .about: "Hakkında"
+        case .general: String(localized: "Genel")
+        case .appearance: String(localized: "Görünüm")
+        case .library: String(localized: "Kütüphane")
+        case .media: String(localized: "Medya")
+        case .ocr: String(localized: "Yazı Tanıma")
+        case .backup: String(localized: "Yedek")
+        case .rules: String(localized: "Kurallar")
+        case .intelligence: String(localized: "Zeka")
+        case .transfer: String(localized: "İçe / Dışa Aktar")
+        case .agents: String(localized: "Ajanlar (MCP)")
+        case .sync: String(localized: "Senkron")
+        case .extensionHost: String(localized: "Eklenti")
+        case .about: String(localized: "Hakkında")
         }
     }
 
@@ -364,7 +364,7 @@ struct SettingsView: View {
         return Form {
             Section {
                 LabeledContent("Hedef") {
-                    Text(model.backupTarget?.path ?? "Klasör seçilmedi")
+                    Text(model.backupTarget?.path ?? String(localized: "Klasör seçilmedi"))
                         .font(.caption.monospaced())
                         .foregroundStyle(model.backupFolder == nil ? .secondary : .primary)
                         .lineLimit(1)
@@ -570,7 +570,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "geliştirme"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? String(localized: "geliştirme")
     }
 }
 

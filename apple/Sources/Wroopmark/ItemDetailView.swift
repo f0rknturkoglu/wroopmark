@@ -155,7 +155,7 @@ struct ItemDetailView: View {
                     }
                 }
 
-                section("Klasör") {
+                section(String(localized: "Klasör")) {
                     HStack {
                         Menu {
                             if model.folders.isEmpty && liveItem.folderId == nil && currentFolder == nil {
@@ -202,7 +202,7 @@ struct ItemDetailView: View {
                                         .frame(width: 16, height: 16)
                                         .foregroundStyle(.secondary)
                                 }
-                                Text(currentFolder?.name ?? "Klasör seçilmedi")
+                                Text(currentFolder?.name ?? String(localized: "Klasör seçilmedi"))
                                     .foregroundStyle(currentFolder != nil ? .primary : .secondary)
                                 Image(systemName: "chevron.up.chevron.down")
                                     .font(.caption)
@@ -222,12 +222,12 @@ struct ItemDetailView: View {
                         Spacer()
                     }
                 }
-                section("Etiketler") {
+                section(String(localized: "Etiketler")) {
                     TagEditor(tags: item.tags, all: model.tags) { tags in
                         Task { await model.setTags(item.id, tags) }
                     }
                 }
-                section("Not") {
+                section(String(localized: "Not")) {
                     ZStack(alignment: .topLeading) {
                         if note.isEmpty {
                             Text("Kayıtla ilgili not ekle…")
@@ -256,7 +256,7 @@ struct ItemDetailView: View {
                     .onChange(of: noteFocused) { _, focused in if !focused { saveNote() } }
                 }
                 if !item.links.isEmpty {
-                    section("Linkler") {
+                    section(String(localized: "Linkler")) {
                         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                             ForEach(item.links, id: \.self) { link in
                                 if let url = URL(string: link) {
@@ -391,7 +391,7 @@ struct ItemDetailView: View {
     }
 
     private var downloadTitle: String {
-        item.platform == "youtube" ? "Videoyu lokale indir" : "Medyayı indir"
+        item.platform == "youtube" ? String(localized: "Videoyu lokale indir") : String(localized: "Medyayı indir")
     }
 
     private var footer: some View {
@@ -599,7 +599,7 @@ struct MediaGallery: View {
         // High priority: inside a feed post or card the post's own click
         // (select / open) would otherwise swallow it.
         .highPriorityGesture(TapGesture().onEnded { open(index) })
-        .help(m.alt ?? (m.isVideo ? (m.videoFile != nil ? "Oynat" : "Video henüz indirilmedi") : "Büyüt"))
+        .help(m.alt ?? (m.isVideo ? (m.videoFile != nil ? String(localized: "Oynat") : String(localized: "Video henüz indirilmedi")) : String(localized: "Büyüt")))
     }
 }
 
