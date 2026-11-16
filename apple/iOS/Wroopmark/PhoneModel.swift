@@ -1,3 +1,4 @@
+import TipKit
 import AVFoundation
 import Observation
 import PhotosUI
@@ -147,6 +148,8 @@ final class PhoneModel {
     }
 
     func start() async {
+        // Tips wait until the setup guide is out of the way.
+        if UserDefaults.standard.bool(forKey: SetupGuide.seenKey) { SetupGuide.startTips() }
         PhoneAI.register()
         ReaderView.onEdit = { [weak self] in self?.syncSoon() }
         guard await core.ensureOpen() else {

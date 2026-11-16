@@ -535,6 +535,17 @@
         }
       }
     },
+    "%lld kaydın medyasını indir": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download media for %lld items"
+          }
+        }
+      }
+    },
     "%lld kayıt": {
       "localizations": {
         "en": {
@@ -1075,6 +1086,16 @@
         }
       }
     },
+    "Akış: videolarını ve gönderilerini tam ekran kaydır. Ayıkla: kayıtları tek tek geç, sola at sil, sağa at sakla. Oku: makaleyi sade okuyucuda aç, önemli yerleri vurgula.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed: scroll your videos and posts full screen. Triage: go through items one by one, swipe left to delete, right to keep. Read: open an article in the clean reader and highlight what matters."
+          }
+        }
+      }
+    },
     "Alan": {
       "localizations": {
         "en": {
@@ -1435,6 +1456,16 @@
         }
       }
     },
+    "Arşivin güvende olsun": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Your Archive Safe"
+          }
+        }
+      }
+    },
     "Arşivinde arar ve sonuçları gösterir.": {
       "localizations": {
         "en": {
@@ -1491,6 +1522,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Settings (⌘,)"
+          }
+        }
+      }
+    },
+    "Ayarlar → Uygulamalar → Safari → Uzantılar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings → Apps → Safari → Extensions"
           }
         }
       }
@@ -1761,6 +1802,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Choose Another Folder…"
+          }
+        }
+      }
+    },
+    "Başla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get Started"
           }
         }
       }
@@ -2135,6 +2186,16 @@
         }
       }
     },
+    "Bu rehber Ayarlar'da durur.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This guide stays in Settings."
+          }
+        }
+      }
+    },
     "Bu seçimde kayıt yok": {
       "localizations": {
         "en": {
@@ -2431,6 +2492,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Detailed List"
+          }
+        }
+      }
+    },
+    "Devam": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
           }
         }
       }
@@ -2753,6 +2824,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Show Extension Folder"
+          }
+        }
+      }
+    },
+    "Eksik medyaları indir (%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download missing media (%lld)"
           }
         }
       }
@@ -3237,6 +3319,16 @@
         }
       }
     },
+    "Geç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip"
+          }
+        }
+      }
+    },
     "Geçersiz tutamaç": {
       "localizations": {
         "en": {
@@ -3323,6 +3415,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Waiting to be sent"
+          }
+        }
+      }
+    },
+    "Gördüğün ve sonra dönmek istediğin her şey (gönderiler, videolar, makaleler) metni ve görselleriyle telefonunda, internetsiz okunur ve aranır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything you come across and want to return to (posts, videos, articles) is on your phone with its text and pictures, to read and search offline."
           }
         }
       }
@@ -3617,6 +3719,16 @@
         }
       }
     },
+    "Hazırsın": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're All Set"
+          }
+        }
+      }
+    },
     "Hedef": {
       "localizations": {
         "en": {
@@ -3737,6 +3849,16 @@
         }
       }
     },
+    "Hesap yok, sunucu yok: arşivin yalnızca senin cihazında ve seçersen senin iCloud Drive'ında.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No account, no server: your archive lives only on your device and, if you choose, in your own iCloud Drive."
+          }
+        }
+      }
+    },
     "Hiçbir kayıtta geçmiyor": {
       "localizations": {
         "en": {
@@ -3747,12 +3869,34 @@
         }
       }
     },
+    "Hız: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed: %@"
+          }
+        }
+      }
+    },
     "Hızlı kaydet": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Quick save"
+          }
+        }
+      }
+    },
+    "Hızlı not metni…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick note text…"
           }
         }
       }
@@ -3943,6 +4087,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "As saved · %@"
+          }
+        }
+      }
+    },
+    "Kaydedilecek bağlantı ya da metin bulunamadı.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No link or text found to save."
           }
         }
       }
@@ -4173,6 +4328,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Items"
+          }
+        }
+      }
+    },
+    "Kayıtlar tek tek gelir: sola at sil, sağa at sakla ya da önerilen klasöre taşı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items come one by one: swipe left to delete, right to keep, or move to a suggested folder."
           }
         }
       }
@@ -4817,6 +4982,16 @@
         }
       }
     },
+    "Kurulum rehberi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setup Guide"
+          }
+        }
+      }
+    },
     "Kütüphane": {
       "localizations": {
         "en": {
@@ -5097,6 +5272,16 @@
         }
       }
     },
+    "Listede yoksa satırın sonundaki “Diğer”e dokun ve wroopmark'ı sık kullanılanlara ekle. Kendi kaydettiğin videoları ve fotoğrafları da böyle gönderisine ekleyebilirsin.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If it's not listed, tap “More” at the end of the row and add wroopmark to your favorites. Videos and photos you saved yourself go onto their posts the same way."
+          }
+        }
+      }
+    },
     "Mac'le birlikte (isteğe bağlı)": {
       "localizations": {
         "en": {
@@ -5113,6 +5298,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sync with Mac"
+          }
+        }
+      }
+    },
+    "Mac'te de wroopmark varsa aynı klasörü seç; iki cihaz kendiliğinden eşitlenir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you use wroopmark on a Mac too, choose the same folder there; the two sync on their own."
           }
         }
       }
@@ -5347,6 +5542,28 @@
         }
       }
     },
+    "Not kartı ekle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add note card"
+          }
+        }
+      }
+    },
+    "Not kaydedildi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note saved"
+          }
+        }
+      }
+    },
     "Not kaydedildi.": {
       "localizations": {
         "en": {
@@ -5377,6 +5594,16 @@
         }
       }
     },
+    "Oku ve vurgula": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read and Highlight"
+          }
+        }
+      }
+    },
     "Okumak, izlemek, sonra bulmak istediğin her şey tek yerde, telefonunda.": {
       "localizations": {
         "en": {
@@ -5393,6 +5620,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Waiting to be read"
+          }
+        }
+      }
+    },
+    "Okuyucu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reader"
           }
         }
       }
@@ -5453,6 +5691,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Play"
+          }
+        }
+      }
+    },
+    "Oynatma hızı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback speed"
+          }
+        }
+      }
+    },
+    "Oynatma hızı %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback speed %@"
           }
         }
       }
@@ -5537,12 +5797,45 @@
         }
       }
     },
+    "Panoya kopyala (⌘C)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy to clipboard (⌘C)"
+          }
+        }
+      }
+    },
+    "Panoya kopyalandı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied to clipboard"
+          }
+        }
+      }
+    },
     "Paylaş": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Share"
+          }
+        }
+      }
+    },
+    "Paylaş ya da Fotoğraflar'a kaydet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share or save to Photos"
           }
         }
       }
@@ -5583,6 +5876,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Posted: newest first"
+          }
+        }
+      }
+    },
+    "Paylaşım menüsünü aç ve dene": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the Share Sheet and Try"
           }
         }
       }
@@ -5637,6 +5940,16 @@
         }
       }
     },
+    "Sade okuyucuda metni seç, Vurgula'ya dokun; vurgular aramada da çıkar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the clean reader, select text and tap Highlight; highlights show up in search too."
+          }
+        }
+      }
+    },
     "Safari": {
       "localizations": {
         "en": {
@@ -5657,12 +5970,42 @@
         }
       }
     },
+    "Safari eklentisini aç; Safari'de x.com yer imlerini, Bluesky, Threads ya da Instagram kaydedilenlerini gezdikçe gönderiler arşive akar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on the Safari extension; as you browse your x.com bookmarks or your Bluesky, Threads or Instagram saved posts in Safari, the posts flow into your archive."
+          }
+        }
+      }
+    },
     "Safari'de aç": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Open in Safari"
+          }
+        }
+      }
+    },
+    "Safari'de x.com yer imlerini aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open x.com Bookmarks in Safari"
+          }
+        }
+      }
+    },
+    "Safari'de, X'te, Instagram'da: Paylaş → wroopmark. Bağlantı hemen kaydedilir; metin ve görseller uygulamayı açınca gelir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In Safari, X, Instagram: Share → wroopmark. The link is saved at once; text and pictures come when you open the app."
           }
         }
       }
@@ -5907,6 +6250,17 @@
         }
       }
     },
+    "Sesi aç (M)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unmute (M)"
+          }
+        }
+      }
+    },
     "Sesi kapat": {
       "localizations": {
         "en": {
@@ -5923,6 +6277,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Read Aloud"
+          }
+        }
+      }
+    },
+    "Sessiz (M)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute (M)"
           }
         }
       }
@@ -5963,6 +6328,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tag, move or delete the selected items."
+          }
+        }
+      }
+    },
+    "Seçilenlere etiket ekle, klasöre taşı, medyayı indir ya da sil.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add tags, move to folder, download media, or delete selected items."
           }
         }
       }
@@ -6133,6 +6509,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Next"
+          }
+        }
+      }
+    },
+    "Sonraki (↓ / J)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next (↓ / J)"
+          }
+        }
+      }
+    },
+    "Sonraki gönderi (↓)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next post (↓)"
           }
         }
       }
@@ -6477,6 +6875,17 @@
         }
       }
     },
+    "Telefonda ya da çevrimiçi akışı olan videolar burada akar. Mac'ten gelen videolar iCloud indirdikçe eklenir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videos on this phone or with direct streams play here. Videos from your Mac arrive as iCloud downloads them."
+          }
+        }
+      }
+    },
     "Telefonda yer az (1 GB'tan az): yeni görseller yer açılana kadar indirilmiyor.": {
       "localizations": {
         "en": {
@@ -6787,6 +7196,17 @@
         }
       }
     },
+    "Video Akışı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video Feed"
+          }
+        }
+      }
+    },
     "Video dosyası henüz cihazda değil.": {
       "localizations": {
         "en": {
@@ -6953,6 +7373,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Download videos automatically"
+          }
+        }
+      }
+    },
+    "Videoları tam ekran arka arkaya izle (⇧⌘P)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch videos back-to-back full screen (⇧⌘P)"
           }
         }
       }
@@ -7437,12 +7868,32 @@
         }
       }
     },
+    "Yer imlerin kendiliğinden gelsin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let Your Bookmarks Come In"
+          }
+        }
+      }
+    },
     "Yok": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "No"
+          }
+        }
+      }
+    },
+    "Yukarı kaydırınca sonraki. Alttaki çubuğu sürükleyerek ileri sar; çıkmak için soldaki kenardan sağa kaydır.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swipe up for the next one. Drag the bar at the bottom to seek; swipe right from the left edge to leave."
           }
         }
       }
@@ -7694,7 +8145,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose iCloud Drive folder…"
+            "value": "Choose an iCloud Drive Folder…"
           }
         }
       }
@@ -7709,12 +8160,32 @@
         }
       }
     },
+    "iCloud Drive'da bir klasör seç: kayıtlar, etiketler, notlar, vurgular, görseller ve eklediğin videolar orada yedeklenir. Telefonun değişirse aynı klasörü seçmen yeter.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a folder in iCloud Drive: items, tags, notes, highlights, pictures and the videos you added are backed up there. On a new phone, just choose the same folder."
+          }
+        }
+      }
+    },
     "iCloud Yedeği ve Senkron": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "iCloud Backup & Sync"
+          }
+        }
+      }
+    },
+    "iCloud yedeği açık": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud backup is on"
           }
         }
       }
@@ -7859,6 +8330,16 @@
         }
       }
     },
+    "wroopmark → aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wroopmark → turn on"
+          }
+        }
+      }
+    },
     "wroopmark'a Kaydet": {
       "localizations": {
         "en": {
@@ -7875,6 +8356,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Add Note to wroopmark"
+          }
+        }
+      }
+    },
+    "wroopmark'a hoş geldin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome to wroopmark"
           }
         }
       }
@@ -8041,6 +8532,28 @@
         }
       }
     },
+    "Çevrimiçi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Online"
+          }
+        }
+      }
+    },
+    "Çevrimiçi akış": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Online stream"
+          }
+        }
+      }
+    },
     "Çok benzer içerik": {
       "localizations": {
         "en": {
@@ -8067,6 +8580,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Quit"
+          }
+        }
+      }
+    },
+    "Önceki (↑ / K)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous (↑ / K)"
+          }
+        }
+      }
+    },
+    "Önceki gönderi (↑)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous post (↑)"
           }
         }
       }
@@ -8241,6 +8776,17 @@
         }
       }
     },
+    "İndirilmiş ya da doğrudan akışı olan videolar burada arka arkaya oynar.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloaded videos or direct streams play here one after another."
+          }
+        }
+      }
+    },
     "İndirme kuyruğu boş": {
       "localizations": {
         "en": {
@@ -8347,6 +8893,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Loading statistics…"
+          }
+        }
+      }
+    },
+    "İzinlerde bu siteler için “İzin Ver”": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Under permissions, “Allow” for these sites"
           }
         }
       }
@@ -8629,292 +9185,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "⌘Z undo"
-          }
-        }
-      }
-    },
-    "Paylaş ya da Fotoğraflar'a kaydet": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Share or save to Photos"
-          }
-        }
-      }
-    },
-    "Çevrimiçi": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Online"
-          }
-        }
-      }
-    },
-    "Oynatma hızı": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playback speed"
-          }
-        }
-      }
-    },
-    "Oynatma hızı %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playback speed %@"
-          }
-        }
-      }
-    },
-    "Panoya kopyalandı": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copied to clipboard"
-          }
-        }
-      }
-    },
-    "Panoya kopyala (⌘C)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copy to clipboard (⌘C)"
-          }
-        }
-      }
-    },
-    "Önceki gönderi (↑)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Previous post (↑)"
-          }
-        }
-      }
-    },
-    "Sonraki gönderi (↓)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Next post (↓)"
-          }
-        }
-      }
-    },
-    "Video Akışı": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Video Feed"
-          }
-        }
-      }
-    },
-    "Videoları tam ekran arka arkaya izle (⇧⌘P)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Watch videos back-to-back full screen (⇧⌘P)"
-          }
-        }
-      }
-    },
-    "Önceki (↑ / K)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Previous (↑ / K)"
-          }
-        }
-      }
-    },
-    "Sonraki (↓ / J)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Next (↓ / J)"
-          }
-        }
-      }
-    },
-    "Çevrimiçi akış": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Online stream"
-          }
-        }
-      }
-    },
-    "Sesi aç (M)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unmute (M)"
-          }
-        }
-      }
-    },
-    "Sessiz (M)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mute (M)"
-          }
-        }
-      }
-    },
-    "Hız: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Speed: %@"
-          }
-        }
-      }
-    },
-    "Okuyucu": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reader"
-          }
-        }
-      }
-    },
-    "İndirilmiş ya da doğrudan akışı olan videolar burada arka arkaya oynar.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Downloaded videos or direct streams play here one after another."
-          }
-        }
-      }
-    },
-    "Not kartı ekle": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add note card"
-          }
-        }
-      }
-    },
-    "Hızlı not metni…": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quick note text…"
-          }
-        }
-      }
-    },
-    "Not kaydedildi": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Note saved"
-          }
-        }
-      }
-    },
-    "Kaydedilecek bağlantı ya da metin bulunamadı.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No link or text found to save."
-          }
-        }
-      }
-    },
-    "%lld kaydın medyasını indir": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download media for %lld items"
-          }
-        }
-      }
-    },
-    "Eksik medyaları indir (%lld)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download missing media (%lld)"
-          }
-        }
-      }
-    },
-    "Seçilenlere etiket ekle, klasöre taşı, medyayı indir ya da sil.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add tags, move to folder, download media, or delete selected items."
-          }
-        }
-      }
-    },
-    "Telefonda ya da çevrimiçi akışı olan videolar burada akar. Mac'ten gelen videolar iCloud indirdikçe eklenir.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Videos on this phone or with direct streams play here. Videos from your Mac arrive as iCloud downloads them."
           }
         }
       }

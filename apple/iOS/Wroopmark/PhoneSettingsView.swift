@@ -159,6 +159,13 @@ struct PhoneSettingsView: View {
                 }
 
                 Section("Hakkında") {
+                    Button {
+                        // LibraryView shows the guide once this is false.
+                        UserDefaults.standard.set(false, forKey: SetupGuide.seenKey)
+                        dismiss()
+                    } label: {
+                        Label("Kurulum rehberi", systemImage: "questionmark.circle")
+                    }
                     Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark/blob/main/PRIVACY.md")!) {
                         Label("Gizlilik politikası", systemImage: "hand.raised")
                     }

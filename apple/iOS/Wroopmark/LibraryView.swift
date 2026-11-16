@@ -1,3 +1,4 @@
+import TipKit
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -7,6 +8,7 @@ import UniformTypeIdentifiers
 struct LibraryView: View {
     @Environment(\.horizontalSizeClass) private var size
     @Environment(PhoneModel.self) private var model
+    @AppStorage(SetupGuide.seenKey) private var guideSeen = false
 
     var body: some View {
         @Bindable var model = model
@@ -14,6 +16,8 @@ struct LibraryView: View {
             if size == .regular { PadLibrary() } else { PhoneLibrary() }
         }
         .sheet(item: $model.sharedPage) { ShareSheet(url: $0.url) }
+        // The first time, and when Settings asks for it again.
+        .fullScreenCover(isPresented: Binding(get: { !guideSeen }, set: { if !$0 { guideSeen = true } })) { SetupGuide() }
         .overlay {
             if model.makingPage {
                 ProgressView("Sayfa hazırlanıyor…")
@@ -202,12 +206,20 @@ struct PhoneLibrary: View {
                     .accessibilityLabel("Ayarlar")
                 }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showTriage = true } label: { Image(systemName: "rectangle.stack.badge.minus") }
+                    Button {
+                        TriageTip().invalidate(reason: .actionPerformed)
+                        showTriage = true
+                    } label: { Image(systemName: "rectangle.stack.badge.minus") }
                         .accessibilityLabel("Ayıkla")
+                        .popoverTip(TriageTip())
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showFeed = true } label: { Image(systemName: "play.rectangle.on.rectangle") }
+                    Button {
+                        FeedTip().invalidate(reason: .actionPerformed)
+                        showFeed = true
+                    } label: { Image(systemName: "play.rectangle.on.rectangle") }
                         .accessibilityLabel("Akış")
+                        .popoverTip(FeedTip())
                 }
                 if model.aiStatus?.embedReady == true {
                     ToolbarItem(placement: .topBarTrailing) {

@@ -1,3 +1,4 @@
+import TipKit
 import AVKit
 import PhotosUI
 import SwiftUI
@@ -149,7 +150,11 @@ struct ItemView: View {
         .toolbar {
             if item != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { reading = true } label: { Image(systemName: "book") }
+                    Button {
+                        ReaderTip().invalidate(reason: .actionPerformed)
+                        reading = true
+                    } label: { Image(systemName: "book") }
+                        .popoverTip(ReaderTip())
                         .accessibilityLabel("Oku")
                 }
             }
