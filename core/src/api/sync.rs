@@ -164,6 +164,10 @@ impl Library {
         Ok(MediaMode::parse(&self.lock_store()?.setting("sync_media")?.unwrap_or_default()))
     }
 
+    fn send_videos(&self, mode: MediaMode) -> bool {
+        mode == MediaMode::All || !self.videos_enabled()
+    }
+
     /// Starts syncing with `dir` (made if missing). The first sync sends the
     /// whole library and takes everything the other devices have.
     pub fn sync_enable(self: &Arc<Self>, dir: &Path, name: Option<&str>, media: Option<&str>) -> Result<SyncReport> {
@@ -211,6 +215,11 @@ impl Library {
         }
         let dev = self.device_id()?;
         let mut report = SyncReport::default();
+        if !self.videos_enabled() && self.lock_store()?.setting("own_videos_backfill")?.as_deref() != Some("1") {
+            let mut store = self.lock_store()?;
+            store.set_setting("sync_media_backfill", "1")?;
+            store.set_setting("own_videos_backfill", "1")?;
+        }
         self.queue_media_out(&base)?;
         self.push(&base, &dev, &mut report)?;
         match self.compact_log(&base, &dev) {
@@ -282,7 +291,8 @@ impl Library {
         let quote = item.quote.iter().flat_map(|q| q.media.iter());
         let mut out = vec![];
         for m in item.media.iter().chain(quote) {
-            let video = if mode == MediaMode::All { m.video_file.as_deref() } else { None };
+            let include_video = self.send_videos(mode) || m.downloadable_video().is_none();
+            let video = if include_video { m.video_file.as_deref() } else { None };
             for name in [m.file.as_deref(), video].into_iter().flatten() {
                 if self.media.contains(name) && matches!(shared_state(&shared_media(base, name)), Shared::Missing) {
                     out.push(name.to_string());
@@ -332,13 +342,13 @@ impl Library {
         let quote = item.quote.iter().flat_map(|q| q.media.iter());
         for m in item.media.iter().chain(quote) {
             let mut files = vec![m.file.as_deref()];
-            if mode == MediaMode::All {
+            if self.send_videos(mode) || m.downloadable_video().is_none() {
                 files.push(m.video_file.as_deref());
             }
             for name in files.into_iter().flatten() {
                 let src = self.media.path(name);
                 let dst = shared_media(base, name);
-                if src.is_file() && !dst.exists() {
+                if src.is_file() && matches!(shared_state(&dst), Shared::Missing) {
                     if let Some(p) = dst.parent() {
                         let _ = fs::create_dir_all(p);
                     }
@@ -1144,6 +1154,36 @@ mod tests {
         for lib in [&a, &b, &c] {
             lib.shutdown();
         }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn own_videos_on_phone_reach_sync_folder() {
+        let root = std::env::temp_dir().join(format!("wm-sync-own-vid-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let shared = root.join("shared");
+        let a = Library::open(&root.join("a")).unwrap_or_else(|_| std::process::abort());
+        let b = Library::open(&root.join("b")).unwrap_or_else(|_| std::process::abort());
+        call(&a, json!({"cmd": "set_settings", "download_videos": false}));
+        call(&a, json!({"cmd": "sync_enable", "dir": shared, "name": "iPhone", "media": "images"}));
+        call(
+            &a,
+            json!({"cmd": "import_items", "items": [
+                {"platform": "tiktok", "url": "https://www.tiktok.com/@a/video/456", "text": "tarif",
+                 "media": [{"kind": "video", "url": "https://v.example/456.mp4"}]}]}),
+        );
+        let vid = root.join("screen.mov");
+        let _ = fs::write(&vid, b"not really a movie");
+        assert_eq!(call(&a, json!({"cmd": "attach_file", "id": "tiktok:456", "path": vid})), json!(true));
+        let r = call(&a, json!({"cmd": "sync_now"}));
+        assert!(r.get("media_out").and_then(Value::as_u64).unwrap_or(0) >= 1, "{r}");
+
+        call(&b, json!({"cmd": "sync_enable", "dir": shared, "name": "New iPhone"}));
+        let got = call(&b, json!({"cmd": "get", "id": "tiktok:456"}));
+        let vf = got.pointer("/media/0/video_file").and_then(Value::as_str);
+        assert!(vf.is_some_and(|f| f.ends_with(".mov") && b.media.contains(f)), "{got}");
+        a.shutdown();
+        b.shutdown();
         let _ = fs::remove_dir_all(&root);
     }
 }

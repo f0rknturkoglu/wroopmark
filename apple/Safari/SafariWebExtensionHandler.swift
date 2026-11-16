@@ -20,15 +20,35 @@ private enum Library {
         return q
     }()
 
-    /// The extension is sandboxed, so `~` would be its container. The real
-    /// home comes from the password database; the entitlements grant access
-    /// to the library folder inside it.
+    private static var libraryPath: String? {
+        #if os(iOS)
+        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.f0rknturkoglu.wroopmark") {
+            return group.appendingPathComponent("wroopmark", isDirectory: true).path
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("wroopmark", isDirectory: true).path
+        #else
+        guard let pw = getpwuid(getuid()) else { return nil }
+        return String(cString: pw.pointee.pw_dir) + "/Library/Application Support/wroopmark"
+        #endif
+    }
+
+    /// The extension is sandboxed, so `~` would be its container. On macOS
+    /// the real home comes from the password database; on iOS both app and
+    /// extension share an App Group container.
     private static func ensureHandle() -> OpaquePointer? {
         let bits = handleBits.withLock { current -> UInt in
             if current != 0 { return current }
-            guard let pw = getpwuid(getuid()) else { return 0 }
-            let path = String(cString: pw.pointee.pw_dir) + "/Library/Application Support/wroopmark"
+            guard let path = libraryPath else { return 0 }
+            #if os(iOS)
+            setenv("WROOPMARK_NO_BG_MEDIA", "1", 1)
+            #endif
             let opened = path.withCString { wm_open($0) }
+            #if os(iOS)
+            if let opened, let out = "{\"cmd\":\"set_settings\",\"download_videos\":false}".withCString({ wm_call(opened, $0) }) {
+                wm_free(out)
+            }
+            #endif
             let openedBits = UInt(bitPattern: opened)
             current = openedBits
             return openedBits
@@ -48,6 +68,13 @@ private enum Library {
         guard let handle = ensureHandle() else {
             return failure("wroopmark kütüphanesi açılamadı")
         }
+        #if os(iOS)
+        defer {
+            if let paused = "{\"cmd\":\"pause\"}".withCString({ wm_call(handle, $0) }) {
+                wm_free(paused)
+            }
+        }
+        #endif
         let text = String(decoding: requestData, as: UTF8.self)
         guard let out = text.withCString({ wm_call(handle, $0) }) else {
             return failure("çekirdek yanıt vermedi")

@@ -20,6 +20,7 @@ struct ItemView: View {
     @State private var pickingFromPhotos = false
     @State private var picked: [PhotosPickerItem] = []
     @State private var attaching = false
+    @State private var showingSnapshot = false
 
     var body: some View {
         ScrollView {
@@ -110,6 +111,11 @@ struct ItemView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Link(destination: url) { Label("Kaynağında aç", systemImage: "safari") }
+                        if item.snapshot != nil {
+                            Button { showingSnapshot = true } label: {
+                                Label("Sayfanın kopyası", systemImage: "doc.richtext")
+                            }
+                        }
                         // The user's own copy (saved from the app, a screen
                         // recording): the post plays and shows offline.
                         Button { pickingFromPhotos = true } label: {
@@ -142,6 +148,9 @@ struct ItemView: View {
             }
         }
         .fullScreenCover(item: $viewer) { m in MediaViewerView(media: m) }
+        .fullScreenCover(isPresented: $showingSnapshot) {
+            if let item { PageCopySheet(item: item) }
+        }
         .alert("Yeni klasör", isPresented: $newFolder) {
             TextField("Ad (alt klasör için: Ders/Matematik)", text: $folderName)
             Button("Oluştur ve taşı") { Task { await createFolder() } }
@@ -268,6 +277,8 @@ struct ItemView: View {
             _ = try? await model.core.call(.call("attach_file", ["id": .string(id), "path": .string(file.url.path)])) as Bool
             try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent())
         }
+        await model.makePosters()
+        model.syncSoon()
         item = await model.refresh(id)
         model.startOCR()
     }
@@ -374,18 +385,24 @@ struct MediaViewerView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
-            if media.isVideo, let v = media.videoFile {
+            if media.isVideo, media.videoFile != nil || media.streamURL != nil {
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
                     .overlay {
                         if player == nil {
-                            Label(failed ? "Video şu an indirilemiyor" : "iCloud'dan iniyor…", systemImage: failed ? "icloud.slash" : "icloud.and.arrow.down")
-                                .foregroundStyle(.white)
+                            Label(
+                                failed ? "Video şu an oynatılamıyor" : (media.videoFile != nil ? "iCloud'dan iniyor…" : "Video yükleniyor…"),
+                                systemImage: failed ? "icloud.slash" : "icloud.and.arrow.down"
+                            )
+                            .foregroundStyle(.white)
                         }
                     }
                     .task {
-                        if let url = await PhoneMedia.playable(v) {
+                        if let v = media.videoFile, let url = await PhoneMedia.playable(v) {
                             player = AVPlayer(url: url)
+                            player?.play()
+                        } else if let stream = media.streamURL {
+                            player = AVPlayer(url: stream)
                             player?.play()
                         } else {
                             failed = true
@@ -433,21 +450,17 @@ private extension String {
 }
 
 
-/// A video or picture from Photos, copied to a temporary folder with its
-/// own extension (the media store names files by content and type).
-struct PickedFile: Transferable {
-    let url: URL
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(importedContentType: .movie) { received in try Self(copying: received.file) }
-        FileRepresentation(importedContentType: .image) { received in try Self(copying: received.file) }
-    }
-
-    init(copying src: URL) throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pick-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        url = dir.appendingPathComponent(src.lastPathComponent)
-        try FileManager.default.copyItem(at: src, to: url)
+extension Media {
+    /// A direct video stream the phone can play online when no local or iCloud copy is stored.
+    var streamURL: URL? {
+        guard isVideo, let u = URL(string: url), u.scheme?.hasPrefix("http") == true else { return nil }
+        let p = u.path.lowercased()
+        if p.hasSuffix(".mp4") || p.hasSuffix(".mov") || p.hasSuffix(".m4v") || p.hasSuffix(".m3u8")
+            || url.contains("video.twimg.com") || url.contains("bsky.app") || url.contains("cdninstagram.com")
+            || url.contains("fbcdn.net") || url.contains("v.redd.it") {
+            return u
+        }
+        return nil
     }
 }
 

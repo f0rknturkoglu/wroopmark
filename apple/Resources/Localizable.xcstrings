@@ -611,6 +611,28 @@
         }
       }
     },
+    "%lld kayıt iCloud Drive'a yedeklendi.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item backed up to iCloud Drive."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items backed up to iCloud Drive."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld kayıt seçili": {
       "localizations": {
         "en": {
@@ -2815,6 +2837,16 @@
         }
       }
     },
+    "Fotoğraflar'dan içe aktar…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import from Photos…"
+          }
+        }
+      }
+    },
     "Fotoğraflı": {
       "localizations": {
         "en": {
@@ -4915,6 +4947,16 @@
         }
       }
     },
+    "Safari eklentisi: Ayarlar → Uygulamalar → Safari → Genişletmeler → wroopmark. Açtığında Safari'de x.com yer imleri, Bluesky, Threads ve Instagram kaydedilenleri kendiliğinden arşive akar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safari extension: Settings → Apps → Safari → Extensions → wroopmark. Once enabled, X bookmarks, Bluesky, Threads and Instagram saved posts flow into your archive automatically as you browse in Safari."
+          }
+        }
+      }
+    },
     "Safari'de aç": {
       "localizations": {
         "en": {
@@ -5021,6 +5063,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Downloading the page…"
+          }
+        }
+      }
+    },
+    "Sayfa kopyaları": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page copies"
           }
         }
       }
@@ -5945,12 +5997,32 @@
         }
       }
     },
+    "Video yükleniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading video…"
+          }
+        }
+      }
+    },
     "Video şu an indirilemiyor": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "The video can't be downloaded right now"
+          }
+        }
+      }
+    },
+    "Video şu an oynatılamıyor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video can't be played right now"
           }
         }
       }
@@ -6623,6 +6695,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "Start with iCloud Drive"
+          }
+        }
+      }
+    },
+    "iCloud Drive ile eşitleniyor…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syncing with iCloud Drive…"
+          }
+        }
+      }
+    },
+    "iCloud Drive klasörü seç…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose iCloud Drive folder…"
+          }
+        }
+      }
+    },
+    "iCloud Drive'da bir klasör seç: arşivin (kayıtlar, etiketler, klasörler, notlar, vurgular, görseller ve eklediğin videolar) orada yedeklenir. Telefonun değişirse aynı klasörü seçmen yeter; Mac'te de wroopmark varsa iki cihaz kendiliğinden eşitlenir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a folder in iCloud Drive: your archive (items, tags, folders, notes, highlights, pictures and videos you added) is backed up there. If you switch phones, just pick the same folder; if you also use wroopmark on a Mac, both devices sync automatically."
+          }
+        }
+      }
+    },
+    "iCloud Yedeği ve Senkron": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Backup & Sync"
+          }
+        }
+      }
+    },
+    "iCloud yedeği ve senkron açık.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud backup and sync are on."
           }
         }
       }

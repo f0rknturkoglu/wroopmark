@@ -1,7 +1,9 @@
 import AVFoundation
 import Observation
+import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 /// What the list shows besides the search box.
 enum PhoneScope: Hashable, Sendable {
@@ -67,6 +69,7 @@ final class PhoneModel {
     var summarizing = Set<String>()
     @ObservationIgnored private var embedTask: Task<Void, Never>?
     @ObservationIgnored var ocrTask: Task<Void, Never>?
+    @ObservationIgnored var pageCopyTask: Task<Void, Never>?
     @ObservationIgnored private var embedPausedUntil: Date?
 
     // A page to share (one HTML file)
@@ -80,6 +83,7 @@ final class PhoneModel {
     // Sync (PhoneSync.swift)
     var syncStatus: SyncStatus?
     var syncFolder: URL? { didSet { PhoneMedia.syncFolder = syncFolder } }
+    @ObservationIgnored var syncAccessFolder: URL?
     /// A link waits on the clipboard (detected without reading it, so iOS
     /// shows no paste prompt; the paste button reads it).
     var clipboardHasLink = false
@@ -134,6 +138,7 @@ final class PhoneModel {
         Self.keepMediaOutOfBackups(core.libraryURL)
         await checkSpace(force: true)
         fetchShared()
+        await makePosters()
         takePendingQuery()
         await reload()
         await refreshMeta()
@@ -141,6 +146,7 @@ final class PhoneModel {
         await loadAIStatus()
         startEmbedding()
         startOCR()
+        startPageCopies()
         Spotlight.reindex()
         // Posts in the widget's new format (folders) after the update.
         WidgetSnapshot.refresh(force: UserDefaults.standard.integer(forKey: "widgetFormat") < 2)
@@ -176,9 +182,11 @@ final class PhoneModel {
         await reload()
         await checkSpace()
         fetchShared()
+        await makePosters()
         await syncNow()
         startEmbedding()
         startOCR()
+        startPageCopies()
     }
 
     /// Going to the background: stop downloads and settle the database, so
@@ -186,6 +194,7 @@ final class PhoneModel {
     func enteredBackground() {
         embedTask?.cancel()
         stopOCR()
+        stopPageCopies()
         embedTask = nil
         PhoneAI.unload()
         let task = BackgroundTask(name: "wroopmark-pause")
@@ -219,6 +228,7 @@ final class PhoneModel {
                 try? await Task.sleep(for: .seconds(5))
                 guard let r: SearchResult = try? await core.call(.search(q: "is:stub", sort: "", limit: 1, offset: 0)) else { return }
                 await reload()
+                startPageCopies()
                 if r.total == 0 { return }
             }
         }
@@ -541,6 +551,42 @@ final class PhoneModel {
         syncSoon()
     }
 
+    func importPhotos(_ chosen: [PhotosPickerItem]) async {
+        guard !chosen.isEmpty, !isImporting else { return }
+        isImporting = true
+        importMessage = nil
+        defer { isImporting = false }
+
+        var dirs: [URL] = []
+        var paths: [String] = []
+        defer { for d in dirs { try? FileManager.default.removeItem(at: d) } }
+        for p in chosen {
+            guard let file = try? await p.loadTransferable(type: PickedFile.self) else { continue }
+            dirs.append(file.url.deletingLastPathComponent())
+            paths.append(file.url.path)
+        }
+        guard !paths.isEmpty else {
+            importMessage = String(localized: "Seçilen dosya okunamadı.")
+            return
+        }
+        do {
+            let r: FilesReport = try await core.call(.call("import_files", ["paths": .strings(paths)]))
+            var line = String(localized: "\(r.files) dosya: \(r.new) yeni kayıt")
+            if r.attached > 0 { line += String(localized: ", \(r.attached) tanesi arşivdeki gönderisine bağlandı") }
+            if r.existing > 0 { line += String(localized: ", \(r.existing) zaten vardı") }
+            if r.failed > 0 { line += String(localized: ", \(r.failed) okunamadı") }
+            importMessage = line
+        } catch {
+            importMessage = error.localizedDescription
+        }
+        await makePosters()
+        await reload()
+        await refreshMeta()
+        startEmbedding()
+        startOCR()
+        syncSoon()
+    }
+
     private static func directoryHoldsData(_ dir: URL) -> Bool {
         guard let e = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else {
             return false
@@ -554,7 +600,7 @@ final class PhoneModel {
         return false
     }
 
-    private func makePosters() async {
+    func makePosters() async {
         struct Row: Decodable, Sendable {
             let id: String
             let videoFile: String
@@ -572,6 +618,24 @@ final class PhoneModel {
             guard (try? data.write(to: jpg)) != nil else { continue }
             _ = try? await core.run(.call("set_poster", ["id": .string(row.id), "video_file": .string(row.videoFile), "path": .string(jpg.path)]))
         }
+    }
+}
+
+/// A video or picture from Photos, copied to a temporary folder with its
+/// own extension (the media store names files by content and type).
+struct PickedFile: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .movie) { received in try Self(copying: received.file) }
+        FileRepresentation(importedContentType: .image) { received in try Self(copying: received.file) }
+    }
+
+    init(copying src: URL) throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pick-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        url = dir.appendingPathComponent(src.lastPathComponent)
+        try FileManager.default.copyItem(at: src, to: url)
     }
 }
 

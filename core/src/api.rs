@@ -709,7 +709,7 @@ impl Library {
 
     /// Starts a background media download pass unless one is running.
     pub fn kick_media(self: &Arc<Self>) {
-        if self.stopping.load(Ordering::Acquire) {
+        if self.stopping.load(Ordering::Acquire) || std::env::var_os("WROOPMARK_NO_BG_MEDIA").is_some() {
             return;
         }
         let Ok(mut slot) = self.worker.lock() else { return };

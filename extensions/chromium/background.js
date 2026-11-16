@@ -7,6 +7,7 @@
 
 const HOST = "com.wroopmark.host";
 const IS_SAFARI = chrome.runtime.getURL("").startsWith("safari-web-extension:");
+const sessionStore = chrome.storage?.session || chrome.storage.local;
 const IDLE_MS = 90_000; // let the host process exit when nothing happens
 
 let port = null;
@@ -93,19 +94,19 @@ async function isAutoSync() {
 async function sendAutoSync(platform, cmd, args) {
   const r = await call(cmd, args);
   if (!r.ok) return null;
-  await chrome.storage.session.set({
+  await sessionStore.set({
     lastAutoSync: { at: Date.now(), platform, newCount: r.data?.new || 0, total: r.data?.ids?.length || 0 },
   });
   return r.data;
 }
 
 async function getCollected() {
-  const { collected } = await chrome.storage.session.get("collected");
+  const { collected } = await sessionStore.get("collected");
   return collected || defaultCollected();
 }
 
 async function setCollected(collected) {
-  await chrome.storage.session.set({ collected });
+  await sessionStore.set({ collected });
   await updateBadge(collected);
 }
 
@@ -129,12 +130,14 @@ function getTotalCollectedCount(c) {
 
 async function updateBadge(collected) {
   const total = getTotalCollectedCount(collected);
-  if (total > 0) {
-    chrome.action.setBadgeBackgroundColor({ color: "#774aed" });
-    chrome.action.setBadgeText({ text: String(total) });
-  } else {
-    chrome.action.setBadgeText({ text: "" });
-  }
+  try {
+    if (total > 0) {
+      chrome.action?.setBadgeBackgroundColor?.({ color: "#774aed" });
+      chrome.action?.setBadgeText?.({ text: String(total) });
+    } else {
+      chrome.action?.setBadgeText?.({ text: "" });
+    }
+  } catch {}
 }
 
 function extractTweetIds(v) {
@@ -433,9 +436,11 @@ async function importCollected() {
   await clearCollected();
 
   // Temporary success badge
-  chrome.action.setBadgeBackgroundColor({ color: "#2e7d32" });
-  chrome.action.setBadgeText({ text: "✓" });
-  setTimeout(() => chrome.action.setBadgeText({ text: "" }), 4000);
+  try {
+    chrome.action?.setBadgeBackgroundColor?.({ color: "#2e7d32" });
+    chrome.action?.setBadgeText?.({ text: "✓" });
+    setTimeout(() => chrome.action?.setBadgeText?.({ text: "" }), 4000);
+  } catch {}
 
   return {
     ok: true,
@@ -929,14 +934,14 @@ const lookups = new Map(); // url -> { at, data }
 function setTabBadge(tabId, saved) {
   try {
     if (saved) {
-      chrome.action.setBadgeBackgroundColor({ tabId, color: "#2e7d32" });
-      chrome.action.setBadgeText({ tabId, text: "✓" });
+      chrome.action?.setBadgeBackgroundColor?.({ tabId, color: "#2e7d32" });
+      chrome.action?.setBadgeText?.({ tabId, text: "✓" });
       const where = saved.folder ? ` · ${saved.folder}` : "";
-      chrome.action.setTitle({ tabId, title: `wroopmark: bu sayfa arşivde${where}` });
+      chrome.action?.setTitle?.({ tabId, title: `wroopmark: bu sayfa arşivde${where}` });
     } else {
       // null falls back to the global badge (the collected count).
-      chrome.action.setBadgeText({ tabId, text: null });
-      chrome.action.setTitle({ tabId, title: "wroopmark" });
+      chrome.action?.setBadgeText?.({ tabId, text: null });
+      chrome.action?.setTitle?.({ tabId, title: "wroopmark" });
     }
   } catch {}
 }
@@ -1027,6 +1032,7 @@ const MENU_CONTEXTS = ["page", "selection", "link", "image"];
 // the browser starts and whenever the popup has read the folders.
 let menuBuild = Promise.resolve();
 function buildMenus() {
+  if (!chrome.contextMenus) return Promise.resolve();
   menuBuild = menuBuild.then(async () => {
     await chrome.contextMenus.removeAll();
     chrome.contextMenus.create({ id: "save", title: t("wroopmark'a kaydet", "Save to wroopmark"), contexts: MENU_CONTEXTS });
@@ -1043,7 +1049,7 @@ function buildMenus() {
 chrome.runtime.onInstalled.addListener(buildMenus);
 chrome.runtime.onStartup.addListener(buildMenus);
 
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+chrome.contextMenus?.onClicked?.addListener(async (info, tab) => {
   const m = String(info.menuItemId).match(/^folder:(\d+)$/);
   const folder_id = m ? Number(m[1]) : null;
   if (info.mediaType === "image" && info.srcUrl) {
@@ -1057,7 +1063,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // ⌥⇧S: save the page in front, into the folder last picked in the popup.
-chrome.commands.onCommand.addListener(async (command) => {
+chrome.commands?.onCommand?.addListener(async (command) => {
   if (command !== "save-page") return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
@@ -1065,8 +1071,10 @@ chrome.commands.onCommand.addListener(async (command) => {
   const r = await saveTab(tab, { folder_id: lastFolder ? Number(lastFolder) : null });
   if (!r.ok) {
     log(`kısayol: kaydedilemedi: ${r.error}`);
-    chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: "#c62828" });
-    chrome.action.setBadgeText({ tabId: tab.id, text: "!" });
+    try {
+      chrome.action?.setBadgeBackgroundColor?.({ tabId: tab.id, color: "#c62828" });
+      chrome.action?.setBadgeText?.({ tabId: tab.id, text: "!" });
+    } catch {}
   }
 });
 
@@ -1112,7 +1120,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return false;
 
     case "autoscroll_stopped":
-      chrome.storage.session.set({ scrollingTabId: null });
+      sessionStore.set({ scrollingTabId: null });
       return false;
 
     case "call":
@@ -1129,7 +1137,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     case "toggle_autoscroll":
       chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
         if (!tab || !tab.id) return reply({ ok: false, error: t("Aktif sekme bulunamadı", "No active tab") });
-        const { scrollingTabId } = await chrome.storage.session.get("scrollingTabId");
+        const { scrollingTabId } = await sessionStore.get("scrollingTabId");
         const isRunning = scrollingTabId === tab.id;
 
         if (isRunning) {
@@ -1138,7 +1146,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
             func: pageScroller,
             args: [false],
           }).catch(() => {});
-          await chrome.storage.session.set({ scrollingTabId: null });
+          await sessionStore.set({ scrollingTabId: null });
           reply({ ok: true, active: false });
         } else {
           if (scrollingTabId) {
@@ -1153,7 +1161,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
             func: pageScroller,
             args: [true],
           }).catch(() => {});
-          await chrome.storage.session.set({ scrollingTabId: tab.id });
+          await sessionStore.set({ scrollingTabId: tab.id });
           reply({ ok: true, active: true });
         }
       });
@@ -1161,7 +1169,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 
     case "get_scroll_status":
       chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-        const { scrollingTabId } = await chrome.storage.session.get("scrollingTabId");
+        const { scrollingTabId } = await sessionStore.get("scrollingTabId");
         reply({ ok: true, active: !!(tab && tab.id === scrollingTabId) });
       });
       return true;

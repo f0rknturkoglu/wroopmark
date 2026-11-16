@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const send = (msg) => chrome.runtime.sendMessage(msg);
 const call = (cmd, args = {}) => send({ type: "call", cmd, args });
+const sessionStore = chrome.storage?.session || chrome.storage.local;
 // Turkish for Turkish browsers, English for everyone else.
 const TR = (navigator.language || "en").toLowerCase().startsWith("tr");
 const t = (tr, en) => (TR ? tr : en);
@@ -211,7 +212,7 @@ async function syncCollected() {
     $("collectedBadge").classList.add("empty");
     $("importCollectedBtn").disabled = true;
     $("clearCollectedBtn").style.display = "none";
-    const { lastAutoSync } = await chrome.storage.session.get("lastAutoSync");
+    const { lastAutoSync } = await sessionStore.get("lastAutoSync");
     if ($("autoSyncToggle").checked && lastAutoSync) {
       $("collectedSummary").textContent = t(`✓ ${lastAutoSync.platform} otomatik eşitlendi (${lastAutoSync.total} gönderi, +${lastAutoSync.newCount} yeni).`, `✓ ${lastAutoSync.platform} synced automatically (${lastAutoSync.total} posts, +${lastAutoSync.newCount} new).`);
     } else {
@@ -358,7 +359,7 @@ $("q").addEventListener("input", () => {
 });
 
 // Sync on storage change (e.g. background scroller found items)
-chrome.storage.session.onChanged.addListener(() => {
+sessionStore.onChanged?.addListener(() => {
   syncCollected();
   syncScrollStatus();
 });

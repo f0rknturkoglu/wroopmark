@@ -24,16 +24,35 @@ extension PhoneModel {
         var stale = false
         guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { return }
         _ = url.startAccessingSecurityScopedResource()
+        syncAccessFolder = url
         if stale, let fresh = try? url.bookmarkData() { UserDefaults.standard.set(fresh, forKey: Self.bookmarkKey) }
-        syncFolder = url
+        syncFolder = Self.resolveSyncFolder(url)
         await syncNow()
+    }
+
+    /// Picks the existing sync folder, or makes a `wroopmark` subfolder inside
+    /// a broader iCloud Drive folder so standalone backups stay tidy.
+    private static func resolveSyncFolder(_ picked: URL) -> URL {
+        let fm = FileManager.default
+        let hasSync = fm.fileExists(atPath: picked.appendingPathComponent("ops").path)
+            || fm.fileExists(atPath: picked.appendingPathComponent("devices").path)
+        if hasSync || picked.lastPathComponent.lowercased() == "wroopmark" {
+            return picked
+        }
+        let sub = picked.appendingPathComponent("wroopmark", isDirectory: true)
+        if (try? fm.createDirectory(at: sub, withIntermediateDirectories: true)) != nil {
+            return sub
+        }
+        return picked
     }
 
     /// From the folder picker.
     func useSyncFolder(_ url: URL) async {
+        syncAccessFolder?.stopAccessingSecurityScopedResource()
         _ = url.startAccessingSecurityScopedResource()
+        syncAccessFolder = url
         if let data = try? url.bookmarkData() { UserDefaults.standard.set(data, forKey: Self.bookmarkKey) }
-        syncFolder = url
+        syncFolder = Self.resolveSyncFolder(url)
         await enableSync()
     }
 
@@ -41,12 +60,18 @@ extension PhoneModel {
         guard let folder = syncFolder else { return }
         isSyncing = true
         defer { isSyncing = false }
-        syncMessage = String(localized: "Mac'teki kütüphane indiriliyor…")
+        syncMessage = String(localized: "iCloud Drive ile eşitleniyor…")
         await Self.fetchLogs(in: folder)
         do {
-            let r: SyncReport = try await core.call(.call("sync_enable", ["dir": .string(folder.path), "name": .string(UIDevice.current.name)]))
+            let r: SyncReport = try await core.call(.call("sync_enable", ["dir": .string(folder.path), "name": .string(UIDevice.current.name), "media": .string("all")]))
             lastSyncAt = .now
-            syncMessage = r.applied > 0 ? String(localized: "\(r.applied) kayıt geldi.") : String(localized: "Senkron açık.")
+            if r.applied > 0 {
+                syncMessage = String(localized: "\(r.applied) kayıt geldi.")
+            } else if r.pushed > 0 {
+                syncMessage = String(localized: "\(r.pushed) kayıt iCloud Drive'a yedeklendi.")
+            } else {
+                syncMessage = String(localized: "iCloud yedeği ve senkron açık.")
+            }
             await afterSync(r)
         } catch {
             syncMessage = error.localizedDescription
@@ -56,7 +81,8 @@ extension PhoneModel {
 
     func disableSync() async {
         _ = await perform(.call("sync_disable", [:]))
-        syncFolder?.stopAccessingSecurityScopedResource()
+        syncAccessFolder?.stopAccessingSecurityScopedResource()
+        syncAccessFolder = nil
         syncFolder = nil
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
         syncMessage = nil

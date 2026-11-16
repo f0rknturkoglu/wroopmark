@@ -15,6 +15,8 @@
 		A10000000000000000000103 /* Spotlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* Spotlight.swift */; };
 		A10000000000000000000104 /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000204 /* ReaderView.swift */; };
 		A30000000000000000000103 /* WroopmarkWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000301 /* WroopmarkWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A40000000000000000000101 /* SafariWebExtensionHandler.swift in Sources (safari) */ = {isa = PBXBuildFile; fileRef = A40000000000000000000201 /* SafariWebExtensionHandler.swift */; };
+		A40000000000000000000103 /* SafariExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A40000000000000000000301 /* SafariExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A10000000000000000000190 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000290 /* Localizable.xcstrings */; };
 		A20000000000000000000190 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000290 /* Localizable.xcstrings */; };
 		A30000000000000000000190 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000290 /* Localizable.xcstrings */; };
@@ -28,6 +30,8 @@
 		A10000000000000000000204 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReaderView.swift; path = ../Sources/Wroopmark/ReaderView.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000301 /* wroopmark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = wroopmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000301 /* WroopmarkWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WroopmarkWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A40000000000000000000201 /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SafariWebExtensionHandler.swift; path = ../Safari/SafariWebExtensionHandler.swift; sourceTree = SOURCE_ROOT; };
+		A40000000000000000000301 /* SafariExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SafariExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000290 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Resources/Localizable.xcstrings; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -35,6 +39,7 @@
 		A20000000000000000000401 /* ShareExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ShareExtension; sourceTree = "<group>"; };
 		A10000000000000000000401 /* Wroopmark */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Wroopmark; sourceTree = "<group>"; };
 		A30000000000000000000401 /* Widget */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Widget; sourceTree = "<group>"; };
+		A40000000000000000000401 /* SafariExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; path = SafariExtension; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +57,13 @@
 			remoteGlobalIDString = A30000000000000000000701;
 			remoteInfo = WroopmarkWidget;
 		};
+		A40000000000000000000901 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A40000000000000000000701;
+			remoteInfo = SafariExtension;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +75,7 @@
 			files = (
 				A20000000000000000000103 /* ShareExtension.appex in Embed Foundation Extensions */,
 				A30000000000000000000103 /* WroopmarkWidget.appex in Embed Foundation Extensions */,
+				A40000000000000000000103 /* SafariExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -91,6 +104,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A40000000000000000000501 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -100,6 +120,7 @@
 				A10000000000000000000401 /* Wroopmark */,
 				A20000000000000000000401 /* ShareExtension */,
 				A30000000000000000000401 /* Widget */,
+				A40000000000000000000401 /* SafariExtension */,
 				A10000000000000000000602 /* Shared */,
 				A10000000000000000000603 /* Products */,
 			);
@@ -112,6 +133,7 @@
 				A10000000000000000000202 /* Models.swift */,
 				A10000000000000000000203 /* Spotlight.swift */,
 				A10000000000000000000204 /* ReaderView.swift */,
+				A40000000000000000000201 /* SafariWebExtensionHandler.swift */,
 				A10000000000000000000290 /* Localizable.xcstrings */,
 			);
 			name = Shared;
@@ -123,6 +145,7 @@
 				A10000000000000000000301 /* wroopmark.app */,
 				A20000000000000000000301 /* ShareExtension.appex */,
 				A30000000000000000000301 /* WroopmarkWidget.appex */,
+				A40000000000000000000301 /* SafariExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -145,6 +168,7 @@
 			dependencies = (
 				A20000000000000000000902 /* PBXTargetDependency */,
 				A30000000000000000000902 /* PBXTargetDependency */,
+				A40000000000000000000902 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000401 /* Wroopmark */,
@@ -195,6 +219,28 @@
 			productReference = A30000000000000000000301 /* WroopmarkWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A40000000000000000000701 /* SafariExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A40000000000000000000903 /* Build configuration list for PBXNativeTarget "SafariExtension" */;
+			buildPhases = (
+				A40000000000000000000801 /* Rust core */,
+				A40000000000000000000802 /* Sources */,
+				A40000000000000000000501 /* Frameworks */,
+				A40000000000000000000803 /* Resources */,
+				A40000000000000000000805 /* Web extension files */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A40000000000000000000401 /* SafariExtension */,
+			);
+			name = SafariExtension;
+			productName = SafariExtension;
+			productReference = A40000000000000000000301 /* SafariExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -212,6 +258,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					A30000000000000000000701 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					A40000000000000000000701 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -234,6 +283,7 @@
 				A10000000000000000000701 /* Wroopmark */,
 				A20000000000000000000701 /* ShareExtension */,
 				A30000000000000000000701 /* WroopmarkWidget */,
+				A40000000000000000000701 /* SafariExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -260,6 +310,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A30000000000000000000190 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A40000000000000000000803 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -298,6 +355,38 @@
 			shellScript = "\"$SRCROOT/../scripts/build-ios-core.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		A40000000000000000000801 /* Rust core */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Rust core";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/../scripts/build-ios-core.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A40000000000000000000805 /* Web extension files */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Web extension files";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "DEST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nSRC=\"$SRCROOT/../../extensions/chromium\"\nmkdir -p \"$DEST\"\ncp -R \"$SRC\"/*.js \"$SRC\"/*.html \"$SRC/icons\" \"$DEST/\"\npython3 - \"$SRC/manifest.json\" \"$DEST/manifest.json\" <<'PY'\nimport json, sys\nm = json.load(open(sys.argv[1]))\nfor k in (\"key\", \"minimum_chrome_version\", \"commands\"):\n    m.pop(k, None)\nif \"permissions\" in m:\n    m[\"permissions\"] = [p for p in m[\"permissions\"] if p != \"contextMenus\"]\nsites = m[\"content_scripts\"][0][\"matches\"]\nm[\"content_scripts\"] = [c for c in m[\"content_scripts\"] if c.get(\"world\") != \"MAIN\"]\nm[\"web_accessible_resources\"] = [{\"resources\": [\"hook.js\"], \"matches\": sites}]\njson.dump(m, open(sys.argv[2], \"w\"), ensure_ascii=False, indent=2)\nPY\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -328,6 +417,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A40000000000000000000802 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A40000000000000000000101 /* SafariWebExtensionHandler.swift in Sources (safari) */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -340,6 +437,11 @@
 			isa = PBXTargetDependency;
 			target = A30000000000000000000701 /* WroopmarkWidget */;
 			targetProxy = A30000000000000000000901 /* PBXContainerItemProxy */;
+		};
+		A40000000000000000000902 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A40000000000000000000701 /* SafariExtension */;
+			targetProxy = A40000000000000000000901 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -402,7 +504,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios/release";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios-sim/release";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				OTHER_LDFLAGS = (
 					"-lwroopmark_core",
 					"-framework",
@@ -442,7 +544,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios/release";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios-sim/release";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				OTHER_LDFLAGS = (
 					"-lwroopmark_core",
 					"-framework",
@@ -476,7 +578,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios/release";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios-sim/release";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				OTHER_LDFLAGS = (
 					"-lwroopmark_core",
 					"-framework",
@@ -510,7 +612,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios/release";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios-sim/release";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				OTHER_LDFLAGS = (
 					"-lwroopmark_core",
 					"-framework",
@@ -542,7 +644,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.f0rknturkoglu.wroopmark.ios.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -566,11 +668,83 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.f0rknturkoglu.wroopmark.ios.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A40000000000000000001003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SafariExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 86B8N4LV5Z;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_FILE = "SafariExtension-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = wroopmark;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios/release";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios-sim/release";
+				MARKETING_VERSION = 1.1.0;
+				OTHER_LDFLAGS = (
+					"-lwroopmark_core",
+					"-framework",
+					SafariServices,
+					"-framework",
+					Security,
+					"-framework",
+					SystemConfiguration,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.f0rknturkoglu.wroopmark.ios.safari;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/../Sources/CWroopmark";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A40000000000000000001004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SafariExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 86B8N4LV5Z;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_FILE = "SafariExtension-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = wroopmark;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios/release";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/../../core/target/aarch64-apple-ios-sim/release";
+				MARKETING_VERSION = 1.1.0;
+				OTHER_LDFLAGS = (
+					"-lwroopmark_core",
+					"-framework",
+					SafariServices,
+					"-framework",
+					Security,
+					"-framework",
+					SystemConfiguration,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.f0rknturkoglu.wroopmark.ios.safari;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/../Sources/CWroopmark";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -611,6 +785,15 @@
 			buildConfigurations = (
 				A30000000000000000001003 /* Debug */,
 				A30000000000000000001004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A40000000000000000000903 /* Build configuration list for PBXNativeTarget "SafariExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A40000000000000000001003 /* Debug */,
+				A40000000000000000001004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -54,4 +54,44 @@ struct CoreDecodingTests {
 
         await core.checkpointForQuit()
     }
+
+    @Test func needsVideoAttachFileAndSnapshotRoundTrip() async throws {
+        let dir = try Self.library()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let core = Core(libraryURL: dir)
+
+        try await core.run(.call("import_items", [
+            "items": .array([.object([
+                "platform": .string("tiktok"),
+                "url": .string("https://www.tiktok.com/@a/video/789"),
+                "text": .string("klip"),
+                "media": .array([.object([
+                    "kind": .string("video"),
+                    "url": .string("https://v.example/789.mp4"),
+                ])]),
+            ])]),
+        ]))
+        let waiting: [Item] = try await core.call(.call("needs_video", ["limit": .int(10)]))
+        #expect(waiting.first?.id == "tiktok:789")
+
+        let mov = dir.appendingPathComponent("clip.mov")
+        try Data("ftypqt  ".utf8).write(to: mov)
+        let attached: Bool = try await core.call(.call("attach_file", ["id": .string("tiktok:789"), "path": .string(mov.path)]))
+        #expect(attached)
+        let remaining: [Item] = try await core.call(.call("needs_video", ["limit": .int(10)]))
+        #expect(remaining.isEmpty)
+
+        let snap = dir.appendingPathComponent("page.webarchive")
+        try Data("bplist00".utf8).write(to: snap)
+        let snapName: String = try await core.call(.call("set_snapshot", [
+            "id": .string("tiktok:789"),
+            "path": .string(snap.path),
+            "text": .string("kaydedilen sayfa metni"),
+        ]))
+        let item: Item = try await core.call(.call("get", ["id": .string("tiktok:789")]))
+        #expect(item.media.first?.videoFile?.hasSuffix(".mov") == true)
+        #expect(item.snapshot == snapName)
+
+        await core.checkpointForQuit()
+    }
 }

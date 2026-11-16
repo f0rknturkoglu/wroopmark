@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -287,6 +288,8 @@ struct AddURLView: View {
     @State private var tags = ""
     @State private var saving = false
     @State private var pickingImport = false
+    @State private var pickingPhotos = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
 
     var body: some View {
         NavigationStack {
@@ -318,6 +321,18 @@ struct AddURLView: View {
                         }
                     }
                     .disabled(saving || model.isImporting)
+                    Button {
+                        pickingPhotos = true
+                    } label: {
+                        Label("Fotoğraflar'dan içe aktar…", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .disabled(saving || model.isImporting)
+                    .photosPicker(isPresented: $pickingPhotos, selection: $pickedPhotos, maxSelectionCount: 50, matching: .any(of: [.videos, .images]))
+                    .onChange(of: pickedPhotos) { _, chosen in
+                        guard !chosen.isEmpty else { return }
+                        pickedPhotos = []
+                        Task { await model.importPhotos(chosen) }
+                    }
                     if let msg = model.importMessage, !msg.isEmpty, !model.isImporting {
                         Text(msg).font(.footnote).foregroundStyle(.secondary)
                     }

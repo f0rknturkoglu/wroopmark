@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -6,6 +7,8 @@ struct PhoneSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var picking = false
     @State private var pickingImport = false
+    @State private var pickingPhotos = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
     @State private var confirmOffload = false
 
     var body: some View {
@@ -38,14 +41,18 @@ struct PhoneSettingsView: View {
                         .disabled(model.isSyncing)
                         Button("Senkronu kapat", role: .destructive) { Task { await model.disableSync() } }
                     } else {
-                        Button("Klasörü seç") { picking = true }
+                        Button {
+                            picking = true
+                        } label: {
+                            Label("iCloud Drive klasörü seç…", systemImage: "icloud")
+                        }
                     }
                     if let m = model.syncMessage { Text(m).font(.footnote).foregroundStyle(.secondary) }
                 } header: {
-                    Text("Senkron")
+                    Text("iCloud Yedeği ve Senkron")
                 } footer: {
                     Text(model.syncFolder == nil
-                         ? "Mac'te wroopmark → Ayarlar → Senkron → “iCloud Drive ile başlat” de, sonra burada iCloud Drive içindeki “wroopmark” klasörünü seç. Kayıtlar, etiketler, klasörler ve notlar iki yönlü eşitlenir."
+                         ? "iCloud Drive'da bir klasör seç: arşivin (kayıtlar, etiketler, klasörler, notlar, vurgular, görseller ve eklediğin videolar) orada yedeklenir. Telefonun değişirse aynı klasörü seçmen yeter; Mac'te de wroopmark varsa iki cihaz kendiliğinden eşitlenir."
                          : "Uygulamayı her açışında ve aşağı çekince eşitlenir.")
                 }
 
@@ -94,6 +101,18 @@ struct PhoneSettingsView: View {
                         }
                     }
                     .disabled(model.isImporting)
+                    Button {
+                        pickingPhotos = true
+                    } label: {
+                        Label("Fotoğraflar'dan içe aktar…", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .disabled(model.isImporting)
+                    .photosPicker(isPresented: $pickingPhotos, selection: $pickedPhotos, maxSelectionCount: 50, matching: .any(of: [.videos, .images]))
+                    .onChange(of: pickedPhotos) { _, chosen in
+                        guard !chosen.isEmpty else { return }
+                        pickedPhotos = []
+                        Task { await model.importPhotos(chosen) }
+                    }
                     if let msg = model.importMessage, !msg.isEmpty {
                         Text(msg).font(.footnote).foregroundStyle(.secondary)
                     }
@@ -118,6 +137,9 @@ struct PhoneSettingsView: View {
                             "Özet ve etiket önerisi",
                             value: ai.llmReady ? String(localized: "Hazır") : (ai.llm ?? String(localized: "Kullanılamıyor"))
                         )
+                        if let snap = ai.snapshots, snap.done + snap.pending > 0 {
+                            LabeledContent("Sayfa kopyaları", value: "\(snap.done) / \(snap.done + snap.pending)")
+                        }
                     } else {
                         LabeledContent("Cihazdaki zeka", value: "Denetleniyor…")
                     }
@@ -139,6 +161,8 @@ struct PhoneSettingsView: View {
 
                 Section {
                     Text("Safari'de, X'te, her yerde Paylaş → wroopmark. Listede yoksa paylaşım satırının sonundaki “Diğer”den ekle. Bağlantı hemen kaydedilir; metin ve görseller uygulamayı açınca gelir.")
+                        .font(.footnote)
+                    Text("Safari eklentisi: Ayarlar → Uygulamalar → Safari → Genişletmeler → wroopmark. Açtığında Safari'de x.com yer imleri, Bluesky, Threads ve Instagram kaydedilenleri kendiliğinden arşive akar.")
                         .font(.footnote)
                 } header: {
                     Text("Telefondan kaydetmek")

@@ -320,15 +320,17 @@ hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
 (5.2.3); video telefona kullanıcının kendi dosyasıyla ya da Mac'ten iCloud
 üzerinden gelir, yoksa kaynağından akış olarak oynar.
 
-**v1.1: iPhone tek başına**
+**v1.1: iPhone tek başına** ✅
 - iOS Safari eklentisi: x.com yer imleri, Bluesky, Threads, Instagram
   Kaydedilenler, Reddit, YouTube listeleri telefonda gezinirken arşive akar
-  (masaüstü eklentisinin `hook.js`'i; uygulama grubundaki gelen kutusu üzerinden).
-- Paylaşım eklentisi video ve fotoğraf dosyası da alır; bağlantıyla ya da dosya
-  adındaki numarayla gönderisine bağlanır. Fotoğraflar'dan toplu içe aktarma.
-- iPhone'da OCR (Vision) ve sayfanın tam kopyası (WKWebView webarchive).
-- Mac'siz iCloud yedeği: telefon tek başına bir iCloud Drive klasörüne eşitler;
-  yeni telefon aynı klasörü seçince arşiv geri gelir.
+  (masaüstü eklentisinin `hook.js`'i; uygulama grubundaki ortak kütüphaneye yazar).
+- Paylaşım eklentisi ve Fotoğraflar seçicisi video/fotoğraf dosyasını gönderisine
+  ekler veya toplu içe aktarır; dosya adındaki numarayla eşleşir.
+- iPhone’da sayfadaki kaynak akışından çevrimiçi video oynatma (App Store 5.2.3
+  uyumlu: site indirmesi yapılmaz).
+- iPhone'da OCR (Vision) ve sayfanın tam kopyası (WKWebView `.webarchive`).
+- Mac'siz iCloud yedeği: telefon tek başına da iCloud Drive klasörüne eşitler
+  (eklenen videolar dahil); yeni telefon aynı klasörü seçince arşiv geri gelir.
 - Swift tarafında çekirdek JSON'unu çözme testleri.
 
 **v1.2: Aramada derinlik**
