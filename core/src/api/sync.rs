@@ -39,6 +39,8 @@ pub struct SyncReport {
     /// (up to 200 of) their paths, for the app to ask iCloud for.
     pub waiting: usize,
     pub fetch: Vec<String>,
+    /// Bytes this device's log shrank by, when it was compacted this time.
+    pub compacted: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +121,7 @@ fn shared_state(path: &Path) -> Shared {
 /// A file whose contents are still in the cloud (APFS `SF_DATALESS`).
 /// `stat` does not download it; opening it does, and waits.
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-fn is_dataless(m: &fs::Metadata) -> bool {
+pub(super) fn is_dataless(m: &fs::Metadata) -> bool {
     #[cfg(target_os = "ios")]
     use std::os::ios::fs::MetadataExt;
     #[cfg(target_os = "macos")]
@@ -129,7 +131,7 @@ fn is_dataless(m: &fs::Metadata) -> bool {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-fn is_dataless(_: &fs::Metadata) -> bool {
+pub(super) fn is_dataless(_: &fs::Metadata) -> bool {
     false
 }
 
@@ -211,6 +213,11 @@ impl Library {
         let mut report = SyncReport::default();
         self.queue_media_out(&base)?;
         self.push(&base, &dev, &mut report)?;
+        match self.compact_log(&base, &dev) {
+            Ok(Some((before, after))) => report.compacted = before.saturating_sub(after),
+            Ok(None) => {}
+            Err(e) => append_log(&self.root, &format!("senkron günlüğü sıkıştırılamadı: {e}")),
+        }
         self.pull(&base, &dev, &mut report)?;
         let (came, remote) = self.collect_media(&base)?;
         report.media_in += came;
@@ -233,13 +240,14 @@ impl Library {
         fs::create_dir_all(&dir).map_err(io)?;
         // A crash while applying would leave tracking off for good.
         self.lock_store()?.set_applying(false)?;
+        let epoch = self.log_epoch(&dir)?;
         loop {
             let batch = self.lock_store()?.take_dirty(300)?;
             if batch.is_empty() {
                 break;
             }
             let ts = now_ms();
-            let file = dir.join(format!("{}.jsonl", chrono::Utc::now().format("%Y-%m")));
+            let file = dir.join(super::compact::log_name(epoch));
             let mut out = String::new();
             for (item, fields) in &batch {
                 let op = if let Some(key) = item.strip_prefix("setting:") {
@@ -576,7 +584,14 @@ impl Library {
                 continue;
             }
             let Ok(files) = fs::read_dir(d.path()) else { continue };
-            let mut files: Vec<PathBuf> = files.flatten().map(|f| f.path()).filter(|p| p.extension().is_some_and(|e| e == "jsonl")).collect();
+            let all: Vec<String> = files.flatten().map(|f| f.file_name().to_string_lossy().to_string()).collect();
+            // Files the other device removed (it compacted its log): their
+            // places are of no use any more. One iCloud has not brought
+            // here yet (`.name.icloud`) is still there.
+            let present: Vec<String> =
+                all.iter().map(|n| n.strip_prefix('.').and_then(|n| n.strip_suffix(".icloud")).unwrap_or(n).to_string()).collect();
+            self.lock_store()?.prune_cursors(&other, &present)?;
+            let mut files: Vec<PathBuf> = all.iter().filter(|n| n.ends_with(".jsonl")).map(|n| d.path().join(n)).collect();
             files.sort();
             for path in files {
                 let key = format!("{other}/{}", path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
@@ -811,6 +826,66 @@ mod tests {
         let r = handle_value(lib, req);
         assert_eq!(r.get("ok"), Some(&json!(true)), "{r}");
         r.get("data").cloned().unwrap_or(Value::Null)
+    }
+
+    #[test]
+    fn compacted_log_reaches_everyone() {
+        let root = std::env::temp_dir().join(format!("wm-compact-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let shared = root.join("shared");
+        let a = Library::open(&root.join("a")).unwrap_or_else(|_| std::process::abort());
+        let b = Library::open(&root.join("b")).unwrap_or_else(|_| std::process::abort());
+        call(
+            &a,
+            json!({"cmd": "import_items", "items": [
+            {"platform": "web", "url": "https://example.com/c1", "text": "bir"},
+            {"platform": "web", "url": "https://example.com/c2", "text": "iki"}]}),
+        );
+        let one = item_id_for_url("https://example.com/c1").1;
+        let two = item_id_for_url("https://example.com/c2").1;
+        call(&a, json!({"cmd": "sync_enable", "dir": shared}));
+        call(&b, json!({"cmd": "sync_enable", "dir": shared}));
+
+        // Many edits; B reads now and then, so it holds places in files
+        // that compaction removes.
+        let mut compactions = 0;
+        for i in 0..40 {
+            call(&a, json!({"cmd": "set_note", "id": one, "note": format!("not {i}")}));
+            if i == 20 {
+                call(&a, json!({"cmd": "delete", "id": two}));
+            }
+            let r = call(&a, json!({"cmd": "sync_now"}));
+            if r.get("compacted").and_then(Value::as_u64).unwrap_or(0) > 0 {
+                compactions += 1;
+            }
+            if i % 7 == 0 {
+                call(&b, json!({"cmd": "sync_now"}));
+            }
+        }
+        assert!(compactions >= 2, "{compactions}");
+        // A's later lines go to new names, never a name B already read.
+        let dev = a.device_id().unwrap_or_default();
+        let names: Vec<String> = fs::read_dir(shared.join("ops").join(&dev))
+            .map(|d| d.flatten().map(|f| f.file_name().to_string_lossy().to_string()).collect())
+            .unwrap_or_default();
+        assert!(names.iter().all(|n| n.contains("-e")), "{names:?}");
+
+        call(&b, json!({"cmd": "sync_now"}));
+        assert_eq!(call(&b, json!({"cmd": "get", "id": one})).get("note"), Some(&json!("not 39")));
+        assert!(call(&b, json!({"cmd": "get", "id": two})).is_null());
+        // B's places in A's removed files are forgotten.
+        let stale = b.lock_store().map(|s| s.cursor(&format!("{dev}/{}", super::super::compact::log_name(0))).unwrap_or(0)).unwrap_or(0);
+        assert_eq!(stale, 0);
+
+        // A device that comes later gets the same from the short log.
+        let c = Library::open(&root.join("c")).unwrap_or_else(|_| std::process::abort());
+        call(&c, json!({"cmd": "sync_enable", "dir": shared}));
+        assert_eq!(call(&c, json!({"cmd": "get", "id": one})).get("note"), Some(&json!("not 39")));
+        assert!(call(&c, json!({"cmd": "get", "id": two})).is_null());
+        a.shutdown();
+        b.shutdown();
+        c.shutdown();
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

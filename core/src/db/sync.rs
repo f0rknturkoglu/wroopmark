@@ -195,6 +195,22 @@ impl Store {
         Ok(())
     }
 
+    /// Forgets the places in `device`'s files that are no longer there.
+    pub fn prune_cursors(&mut self, device: &str, present: &[String]) -> Result<()> {
+        let prefix = format!("{device}/");
+        let keys: Vec<String> = {
+            let mut stmt = self.conn.prepare_cached("SELECT file FROM sync_cursor WHERE substr(file, 1, length(?1)) = ?1")?;
+            stmt.query_map([&prefix], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?
+        };
+        for k in keys {
+            let name = k.strip_prefix(&prefix).unwrap_or(&k);
+            if !present.iter().any(|p| p == name) {
+                self.conn.execute("DELETE FROM sync_cursor WHERE file = ?1", [&k])?;
+            }
+        }
+        Ok(())
+    }
+
     /// Writes the parts of a remote item that `upsert` leaves alone.
     pub fn apply_remote_extras(&mut self, item: &Item) -> Result<()> {
         let pk = pk_of(&self.conn, &item.id)?;

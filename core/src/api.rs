@@ -1492,6 +1492,7 @@ fn dispatch_with<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Result
     }
 }
 
+mod compact;
 mod reader;
 mod sync;
 mod v2;
