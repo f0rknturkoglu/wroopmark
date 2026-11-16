@@ -16,9 +16,9 @@ yaptığını anlatıyor (2.3.1).
 | Bundle ID | com.f0rknturkoglu.wroopmark.ios |
 | SKU | wroopmark-ios |
 | Fiyat | (karar senin) |
-| Gizlilik politikası | https://github.com/f0rknturkoglu/wroopmark/blob/main/PRIVACY.md |
-| Destek adresi | https://github.com/f0rknturkoglu/wroopmark/issues |
-| Pazarlama adresi | https://github.com/f0rknturkoglu/wroopmark |
+| Gizlilik politikası | https://f0rknturkoglu.github.io/wroopmark/privacy.html |
+| Destek adresi | https://f0rknturkoglu.github.io/wroopmark/support.html |
+| Pazarlama adresi | https://f0rknturkoglu.github.io/wroopmark/ |
 | Telif | 2026 Furkan Türkoğlu |
 
 ## Tanıtım metni (170)
@@ -95,7 +95,7 @@ Yalnızca standart HTTPS; `ITSAppUsesNonExemptEncryption = NO` Info.plist'te. So
 wroopmark is a personal read-later archive. There is no account, no login and no
 server; everything stays on the device.
 
-How to test:
+How to test (a short setup guide opens first; tap Skip or go through it):
 1. Tap + and paste any article URL (e.g. https://www.apple.com/newsroom/), then
    Save. The title, text and image are fetched and the item appears in the list.
 2. In Safari, open any page, tap Share → wroopmark (add it from "More" the first
@@ -103,8 +103,23 @@ How to test:
 3. Tap an item to read it offline, add tags and a note, move it to a folder.
 4. Search from the field at the bottom (try a word from the saved page).
 
-Sync with the optional Mac app (Settings → Sync) needs the Mac app and is not
-required to use the iPhone app. The app does not download videos from websites.
+Safari extension (optional, off until the user turns it on in Settings → Apps →
+Safari → Extensions and allows a site): on sites such as x.com, instagram.com,
+reddit.com, bsky.app and threads.com it reads the posts that the site itself
+loads on pages the user opens (their own bookmarks or saved posts) and hands
+them to the app through the App Group on the same device. It does not read or
+store passwords or cookies, and sends nothing to us or to any other server.
+Testing it needs the reviewer's own account on one of those sites; the app is
+fully usable without it.
+
+Videos: the app does not download videos from websites. A video in a saved
+post plays from its source while online. A video file is kept on the device
+only when the user adds their own file from Photos or Files, or when their own
+Mac app puts it in their own iCloud Drive folder.
+
+Backup and sync (Settings → iCloud Backup & Sync) write to an iCloud Drive
+folder the user picks; there is no server. The Mac app is optional.
+Privacy policy: https://f0rknturkoglu.github.io/wroopmark/privacy.html
 ```
 
 Demo hesabı: gerekmiyor (giriş yok).

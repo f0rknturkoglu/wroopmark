@@ -183,10 +183,10 @@ struct PhoneSettingsView: View {
                     } label: {
                         Label("Kurulum rehberi", systemImage: "questionmark.circle")
                     }
-                    Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark/blob/main/PRIVACY.md")!) {
+                    Link(destination: URL(string: "https://f0rknturkoglu.github.io/wroopmark/privacy.html")!) {
                         Label("Gizlilik politikası", systemImage: "hand.raised")
                     }
-                    Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark/issues")!) {
+                    Link(destination: URL(string: "https://f0rknturkoglu.github.io/wroopmark/support.html")!) {
                         Label("Destek ve geri bildirim", systemImage: "questionmark.bubble")
                     }
                     LabeledContent("Sürüm", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")

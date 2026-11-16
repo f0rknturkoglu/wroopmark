@@ -76,7 +76,7 @@ struct SetupGuide: View {
         GuidePage(symbol: "square.and.arrow.up", title: "Her uygulamadan kaydet") {
             Text("Safari'de, X'te, Instagram'da: Paylaş → wroopmark. Bağlantı hemen kaydedilir; metin ve görseller uygulamayı açınca gelir.")
             Text("Listede yoksa satırın sonundaki “Diğer”e dokun ve wroopmark'ı sık kullanılanlara ekle. Kendi kaydettiğin videoları ve fotoğrafları da böyle gönderisine ekleyebilirsin.")
-            ShareLink(item: URL(string: "https://github.com/f0rknturkoglu/wroopmark")!) {
+            ShareLink(item: URL(string: "https://f0rknturkoglu.github.io/wroopmark/")!) {
                 Label("Paylaşım menüsünü aç ve dene", systemImage: "square.and.arrow.up")
             }
             .buttonStyle(.bordered)

@@ -1,5 +1,8 @@
 # Gizlilik / Privacy
 
+Güncel ve tam metin / Current full text:
+https://f0rknturkoglu.github.io/wroopmark/privacy.html
+
 **wroopmark hiçbir veri toplamaz.**
 
 - Hesap yok, sunucu yok, analiz (analytics) yok, reklam yok, takip yok.
@@ -52,4 +55,13 @@
 Uygulamada üçüncü taraf SDK, analiz ya da reklam kütüphanesi yoktur. /
 The app contains no third-party SDKs, analytics or ad libraries.
 
-İletişim / Contact: https://github.com/f0rknturkoglu/wroopmark/issues
+## Tarayıcı eklentileri / Browser extensions
+
+- Yalnızca sen açıp bir siteye izin verince çalışır; senin açtığın sayfalarda sitenin
+  kendi yüklediği gönderileri okuyup aynı cihazdaki uygulamaya verir. Şifre ya da
+  çerez okumaz, saklamaz; hiçbir sunucuya bir şey göndermez.
+- They run only after you turn them on and allow a site; they read the posts a site
+  itself loads on pages you open and pass them to the app on the same device. They
+  never read or store passwords or cookies and send nothing to any server.
+
+İletişim / Contact: https://f0rknturkoglu.github.io/wroopmark/support.html
