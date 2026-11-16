@@ -75,6 +75,14 @@ final class FeedPlayer {
     private(set) var current: String?
     var progress: Double = 0
     var duration: Double = 0
+    /// Where the finger is on the progress bar while seeking (0…1).
+    var scrubbing: Double?
+
+    /// "1:05" for a time in seconds.
+    static func clock(_ seconds: Double) -> String {
+        let s = Int(max(0, seconds).rounded())
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
+    }
     var paused = false
     /// The video is coming down from iCloud, or could not be had.
     var loading = false
@@ -281,17 +289,27 @@ struct VideoFeedView: View {
                 }
             }
             topBar
+                .opacity(player.scrubbing == nil ? 1 : 0)
+            if let at = player.scrubbing {
+                // Seeking, like TikTok: the time large in the middle.
+                Text("\(FeedPlayer.clock(at * player.duration)) / \(FeedPlayer.clock(player.duration))")
+                    .font(.system(size: 34, weight: .bold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.7), radius: 6)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.15), value: player.scrubbing == nil)
         .preferredColorScheme(.dark)
         .statusBarHidden()
-        // Swipe right to leave, like going back. On a page of several
-        // pictures sideways swipes page through them, so start at the edge.
+        // Leave by swiping right from the left edge, like going back; a
+        // swipe anywhere else is the video's (seeking) or the pictures'.
         .simultaneousGesture(
             DragGesture(minimumDistance: 24)
                 .onEnded { v in
                     let right = v.translation.width > 90 && abs(v.translation.height) < v.translation.width * 0.6
-                    let onPictures = (source?.entries.first { $0.id == current }).map { $0.video == nil && $0.pictures.count > 1 } ?? false
-                    if right && (!onPictures || v.startLocation.x < 40) { dismiss() }
+                    if right && v.startLocation.x < 30 && player.scrubbing == nil { dismiss() }
                 }
         )
         .confirmationDialog("Bu kayıt silinsin mi?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible, presenting: deleting) { item in
@@ -714,33 +732,45 @@ private struct QuoteLine: View {
     }
 }
 
-/// A thin bar that shows where the video is; drag it to seek.
+/// A thin bar that shows where the video is; drag it to seek. The touch
+/// area is much taller than the bar, and the drag moves from where it is
+/// (not jumping to the finger), as in TikTok.
 private struct ProgressBar: View {
     let player: FeedPlayer
-    @State private var dragging: Double?
+    @State private var from: Double?
 
     var body: some View {
         GeometryReader { g in
-            let p = dragging ?? player.progress
+            let p = player.scrubbing ?? player.progress
             ZStack(alignment: .leading) {
                 Capsule().fill(.white.opacity(0.25))
                 Capsule().fill(.white).frame(width: max(0, min(1, p)) * g.size.width)
+                if player.scrubbing != nil {
+                    Circle().fill(.white).frame(width: 14, height: 14)
+                        .offset(x: max(0, min(1, p)) * g.size.width - 7)
+                }
             }
-            .frame(height: dragging == nil ? 3 : 6)
-            .frame(maxHeight: .infinity)
+            .frame(height: player.scrubbing == nil ? 3 : 8)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 8)
             .contentShape(.rect)
-            .gesture(
+            .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { v in dragging = max(0, min(1, v.location.x / max(1, g.size.width))) }
+                    .onChanged { v in
+                        let start = from ?? player.progress
+                        if from == nil { from = start }
+                        player.scrubbing = max(0, min(1, start + v.translation.width / max(1, g.size.width)))
+                    }
                     .onEnded { _ in
-                        if let d = dragging { player.seek(to: d) }
-                        dragging = nil
+                        if let d = player.scrubbing { player.seek(to: d) }
+                        player.scrubbing = nil
+                        from = nil
                     }
             )
         }
-        .frame(height: 20)
+        .frame(height: 44)
         .padding(.horizontal)
-        .animation(.snappy(duration: 0.15), value: dragging == nil)
+        .animation(.snappy(duration: 0.15), value: player.scrubbing == nil)
         .accessibilityElement()
         .accessibilityLabel("Video ilerlemesi")
         .accessibilityValue("%\(Int(player.progress * 100))")
