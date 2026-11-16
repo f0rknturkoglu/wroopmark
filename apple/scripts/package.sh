@@ -21,7 +21,8 @@ DIST="$ROOT/dist"
 mkdir -p "$DIST"
 rm -f "$DIST/$NAME.zip" "$DIST/$NAME.dmg"
 
-SIGNER="$(codesign -dv "$APP" 2>&1 | awk -F= '/^Authority=/ { print $2; exit }')"
+# -dvv: since macOS 27 a single -v no longer prints the Authority lines.
+SIGNER="$(codesign -dvv "$APP" 2>&1 | awk -F= '/^Authority=/ { print $2; exit }')"
 NOTARIZE=0
 if [[ "$SIGNER" == "Developer ID Application:"* ]] && xcrun notarytool history --keychain-profile wroopmark >/dev/null 2>&1; then
   NOTARIZE=1
