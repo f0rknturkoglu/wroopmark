@@ -99,6 +99,8 @@ enum CoreArg: Sendable, Encodable, Equatable {
     case bool(Bool)
     case strings([String])
     case null
+    indirect case object([String: CoreArg])
+    indirect case array([CoreArg])
 
     func encode(to encoder: any Encoder) throws {
         var c = encoder.singleValueContainer()
@@ -108,6 +110,8 @@ enum CoreArg: Sendable, Encodable, Equatable {
         case .bool(let b): try c.encode(b)
         case .strings(let a): try c.encode(a)
         case .null: try c.encodeNil()
+        case .object(let o): try c.encode(o)
+        case .array(let a): try c.encode(a)
         }
     }
 }
