@@ -66,6 +66,7 @@ final class PhoneModel {
     var rediscover: [Item] = []
     var summarizing = Set<String>()
     @ObservationIgnored private var embedTask: Task<Void, Never>?
+    @ObservationIgnored var ocrTask: Task<Void, Never>?
     @ObservationIgnored private var embedPausedUntil: Date?
 
     // A page to share (one HTML file)
@@ -139,6 +140,7 @@ final class PhoneModel {
         await startSync()
         await loadAIStatus()
         startEmbedding()
+        startOCR()
         Spotlight.reindex()
         // Posts in the widget's new format (folders) after the update.
         WidgetSnapshot.refresh(force: UserDefaults.standard.integer(forKey: "widgetFormat") < 2)
@@ -176,12 +178,14 @@ final class PhoneModel {
         fetchShared()
         await syncNow()
         startEmbedding()
+        startOCR()
     }
 
     /// Going to the background: stop downloads and settle the database, so
     /// iOS does not find the shared library locked while the app sleeps.
     func enteredBackground() {
         embedTask?.cancel()
+        stopOCR()
         embedTask = nil
         PhoneAI.unload()
         let task = BackgroundTask(name: "wroopmark-pause")
@@ -533,6 +537,7 @@ final class PhoneModel {
         await refreshMeta()
         fetchShared()
         startEmbedding()
+        startOCR()
         syncSoon()
     }
 

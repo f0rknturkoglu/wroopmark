@@ -137,6 +137,7 @@ extension PhoneModel {
         }
         if r.applied > 0 {
             startEmbedding()
+            startOCR()
         }
         takeICloudMedia(r)
     }
