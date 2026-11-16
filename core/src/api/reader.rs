@@ -253,6 +253,36 @@ mod tests {
     }
 
     #[test]
+    fn html_page_holds_everything() {
+        let root = std::env::temp_dir().join(format!("wm-html-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let lib = Library::open(&root.join("lib")).unwrap_or_else(|_| std::process::abort());
+        let pic = lib.media.put(b"\x89PNG fake", "png").unwrap_or_default();
+        let r = handle_value(
+            &lib,
+            json!({"cmd": "import_items", "tags": ["okuma"], "items": [
+            {"platform": "web", "url": "https://example.com/a", "text": "<script>alert(1)</script> ilk", "media": [{"kind": "image", "url": "https://e.com/p.png", "file": pic}]},
+            {"platform": "web", "url": "https://example.com/b", "text": "ikinci"}]}),
+        );
+        assert_eq!(r.get("ok"), Some(&json!(true)), "{r}");
+        let out = handle_value(
+            &lib,
+            json!({"cmd": "export", "format": "html", "q": "tag:okuma", "dest": root.join("out"), "title": "Okuma / Listesi", "lang": "en"}),
+        );
+        assert_eq!(out.pointer("/data/count"), Some(&json!(2)), "{out}");
+        assert_eq!(out.pointer("/data/media"), Some(&json!(1)));
+        let path = out.pointer("/data/path").and_then(Value::as_str).unwrap_or_default().to_string();
+        assert!(path.ends_with("Okuma Listesi.html"), "{path}");
+        let html = std::fs::read_to_string(&path).unwrap_or_default();
+        assert!(html.contains("data:image/png;base64,"));
+        assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt; ilk"));
+        assert!(!html.contains("<script>alert"));
+        assert!(html.contains("Search this page") && html.contains("lang=\"en\""));
+        lib.shutdown();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn today_finds_past_years_and_rediscover() {
         let root = std::env::temp_dir().join(format!("wm-today-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);

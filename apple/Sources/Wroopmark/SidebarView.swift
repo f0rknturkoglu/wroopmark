@@ -45,6 +45,11 @@ struct SidebarView: View {
                                     } label: {
                                         Label("Alt klasör ekle…", systemImage: "folder.badge.plus")
                                     }
+                                    Button {
+                                        model.exportPage(query: Scope.folder(id: fid, name: node.id).filter, title: node.name)
+                                    } label: {
+                                        Label("Tek sayfa olarak dışa aktar…", systemImage: "doc.richtext")
+                                    }
                                     Divider()
                                     Button {
                                         folderRenaming = f

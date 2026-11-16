@@ -315,7 +315,51 @@ impl Library {
 
     // --- Export ----------------------------------------------------------------
 
+    /// One HTML page of what `q` finds, pictures inside it up to 80 MB
+    /// (the rest left out), written in `dest` as `<title>.html`.
+    pub fn export_html(&self, q: &str, dest: &Path, title: Option<&str>, english: bool) -> Result<ExportReport> {
+        use base64::Engine;
+        const BUDGET: usize = 80 << 20;
+        let io = |source: std::io::Error| CoreError::IoPath { path: dest.display().to_string(), source };
+        std::fs::create_dir_all(dest).map_err(io)?;
+        let query = Query::parse(q);
+        let folders: HashMap<i64, String> = self.lock_store()?.folders()?.into_iter().map(|f| (f.id, f.name)).collect();
+        let mut items = vec![];
+        let mut offset = 0;
+        loop {
+            let page = self.lock_store()?.search(&query, Sort::SavedNewest, 200, offset)?;
+            if page.items.is_empty() {
+                break;
+            }
+            offset += page.items.len() as i64;
+            items.extend(page.items);
+        }
+        let title = title.map(str::trim).filter(|t| !t.is_empty()).map(str::to_string).unwrap_or_else(|| "wroopmark".into());
+        let mut used = 0usize;
+        let mut media = 0usize;
+        let mut embed = |name: &str| -> Option<String> {
+            let kind = export::image_type(name)?;
+            let path = self.media.path(name);
+            let len = usize::try_from(std::fs::metadata(&path).ok()?.len()).ok()?;
+            if used + len > BUDGET {
+                return None;
+            }
+            let bytes = std::fs::read(&path).ok()?;
+            used += len;
+            media += 1;
+            Some(format!("data:{kind};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+        };
+        let folder_of = |i: &Item| i.folder_id.and_then(|f| folders.get(&f).cloned());
+        let html = export::html_page(&title, &items, &folder_of, english, &mut embed);
+        let path = dest.join(format!("{}.html", export::safe_name(&title)));
+        std::fs::write(&path, html).map_err(io)?;
+        Ok(ExportReport { path: path.display().to_string(), count: items.len(), media })
+    }
+
     pub fn export(&self, q: &str, format: Format, dest: &Path, with_media: bool) -> Result<ExportReport> {
+        if format == Format::Html {
+            return self.export_html(q, dest, None, false);
+        }
         let io = |source: std::io::Error| CoreError::IoPath { path: dest.display().to_string(), source };
         std::fs::create_dir_all(dest).map_err(io)?;
         let query = Query::parse(q);
@@ -325,7 +369,7 @@ impl Library {
         let mut names = Names::default();
         let mut copied: HashSet<String> = HashSet::new();
         let mut out_file = match format {
-            Format::Markdown => {
+            Format::Markdown | Format::Html => {
                 report.path = dest.display().to_string();
                 None
             }
@@ -803,9 +847,19 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
                 dest: String,
                 #[serde(default = "default_true")]
                 media: bool,
+                /// The page's title (HTML).
+                #[serde(default)]
+                title: Option<String>,
+                /// "en" for an English page (HTML).
+                #[serde(default)]
+                lang: Option<String>,
             }
             let a: Export = req.parse()?;
             let format = Format::parse(&a.format).ok_or_else(|| CoreError::UnknownFormat(a.format.clone()))?;
+            if format == Format::Html {
+                let english = a.lang.as_deref().is_some_and(|l| l.starts_with("en"));
+                return S::ok(lib.export_html(&a.q, Path::new(&a.dest), a.title.as_deref(), english)?);
+            }
             S::ok(lib.export(&a.q, format, Path::new(&a.dest), a.media)?)
         }
         "embed_pending" => S::ok(lib.embed_pending(req.parse::<Limit>()?.limit.clamp(1, 256))?),

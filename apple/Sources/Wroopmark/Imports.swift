@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Foundation
+import UniformTypeIdentifiers
 
 // Getting things in and out (v0.2): data downloads and bookmark files,
 // pictures and videos from disk, Markdown / CSV / JSON export, and posters
@@ -96,19 +97,65 @@ extension AppModel {
     // MARK: - Export
 
     enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
-        case markdown = "md", csv, json
+        case markdown = "md", csv, json, html
         var id: String { rawValue }
         var label: String {
             switch self {
             case .markdown: "Markdown (Obsidian)"
             case .csv: "CSV (tablo)"
             case .json: "JSON satırları"
+            case .html: "Tek sayfa (HTML)"
+            }
+        }
+    }
+
+    /// The name of what is on screen, for a page made of it.
+    private var scopeTitle: String {
+        switch scope {
+        case .folder(_, let name): name.split(separator: "/").last.map(String.init) ?? name
+        case .tag(let key): "#\(key)"
+        case .platform(let p): p.label
+        case .saved(let s): s.name
+        default: "wroopmark"
+        }
+    }
+
+    /// One HTML page (pictures inside it) of what `query` finds, saved
+    /// where the user says: something to send to someone, opens anywhere.
+    func exportPage(query: String, title: String) {
+        let panel = NSSavePanel()
+        panel.title = "Tek sayfa olarak dışa aktar"
+        panel.nameFieldStringValue = "\(title).html"
+        panel.allowedContentTypes = [.html]
+        guard panel.runModal() == .OK, let target = panel.url else { return }
+        let english = Locale.current.language.languageCode?.identifier == "en"
+        Task {
+            isTransferring = true
+            defer { isTransferring = false }
+            transferStatus = "Sayfa hazırlanıyor…"
+            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("wm-page-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: tmp) }
+            do {
+                let r: ExportReport = try await core.call(.call("export", [
+                    "q": .string(query), "format": .string("html"), "dest": .string(tmp.path),
+                    "title": .string(title), "lang": .string(english ? "en" : "tr"),
+                ]))
+                try? FileManager.default.removeItem(at: target)
+                try FileManager.default.moveItem(at: URL(fileURLWithPath: r.path), to: target)
+                transferStatus = "\(r.count) kayıt tek sayfada" + (r.media > 0 ? ", \(r.media) görsel" : "")
+                NSWorkspace.shared.activateFileViewerSelecting([target])
+            } catch {
+                transferStatus = error.localizedDescription
             }
         }
     }
 
     /// Exports what is on screen (view + filters + search) to a folder.
     func chooseExport(_ format: ExportFormat) {
+        if format == .html {
+            exportPage(query: effectiveQuery, title: scopeTitle)
+            return
+        }
         let panel = NSOpenPanel()
         panel.title = "Dışa aktar"
         panel.message = "\(total) kayıt (şu anki görünüm ve arama) \(format.label) olarak bu klasöre yazılacak"

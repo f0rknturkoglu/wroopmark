@@ -68,6 +68,10 @@ final class PhoneModel {
     @ObservationIgnored private var embedTask: Task<Void, Never>?
     @ObservationIgnored private var embedPausedUntil: Date?
 
+    // A page to share (one HTML file)
+    var sharedPage: SharedPage?
+    var makingPage = false
+
     // Import (v0.9)
     var isImporting = false
     var importMessage: String?
@@ -418,6 +422,32 @@ final class PhoneModel {
             items.removeAll { $0.id == id }
             total = max(0, total - 1)
             await refreshMeta()
+        }
+    }
+
+    // MARK: Share as one page
+
+    struct SharedPage: Identifiable {
+        let url: URL
+        var id: String { url.path }
+    }
+
+    /// One HTML page (pictures inside) of what `query` finds, for the share sheet.
+    func sharePage(query: String, title: String) async {
+        guard !makingPage else { return }
+        makingPage = true
+        defer { makingPage = false }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("wm-share", isDirectory: true)
+        try? FileManager.default.removeItem(at: dir)
+        let english = Locale.current.language.languageCode?.identifier == "en"
+        do {
+            let r: ExportReport = try await core.call(.call("export", [
+                "q": .string(query), "format": .string("html"), "dest": .string(dir.path),
+                "title": .string(title), "lang": .string(english ? "en" : "tr"),
+            ]))
+            sharedPage = SharedPage(url: URL(fileURLWithPath: r.path))
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

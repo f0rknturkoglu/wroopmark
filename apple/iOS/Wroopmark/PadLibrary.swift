@@ -147,6 +147,13 @@ struct PadLibrary: View {
                         Label(f.name.replacingOccurrences(of: "/", with: " › "), systemImage: "folder")
                             .badge(f.count)
                             .tag(PhoneScope.folder(f.id, f.name))
+                            .contextMenu {
+                                Button {
+                                    Task { await model.sharePage(query: PhoneScope.folder(f.id, f.name).filter, title: PhoneScope.folder(f.id, f.name).title) }
+                                } label: {
+                                    Label("Tek sayfa olarak paylaş", systemImage: "square.and.arrow.up")
+                                }
+                            }
                     }
                 }
             }

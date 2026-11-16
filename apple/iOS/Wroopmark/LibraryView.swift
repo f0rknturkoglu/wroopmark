@@ -5,10 +5,31 @@ import UniformTypeIdentifiers
 /// (scopes, list, post) on the iPad.
 struct LibraryView: View {
     @Environment(\.horizontalSizeClass) private var size
+    @Environment(PhoneModel.self) private var model
 
     var body: some View {
-        if size == .regular { PadLibrary() } else { PhoneLibrary() }
+        @Bindable var model = model
+        Group {
+            if size == .regular { PadLibrary() } else { PhoneLibrary() }
+        }
+        .sheet(item: $model.sharedPage) { ShareSheet(url: $0.url) }
+        .overlay {
+            if model.makingPage {
+                ProgressView("Sayfa hazırlanıyor…")
+                    .padding(20)
+                    .background(.regularMaterial, in: .rect(cornerRadius: 14))
+            }
+        }
     }
+}
+
+/// The system share sheet for one file.
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }
 
 struct PhoneLibrary: View {
@@ -198,6 +219,14 @@ struct ScopeMenu: View {
                     ForEach(model.tags.prefix(40), id: \.key) { t in
                         Button("#\(t.name) (\(t.count))") { model.scope = .tag(t.key) }
                     }
+                }
+            }
+            if model.scope != .all && model.scope != .today {
+                Divider()
+                Button {
+                    Task { await model.sharePage(query: model.effectiveQuery, title: model.scope.title) }
+                } label: {
+                    Label("Tek sayfa olarak paylaş", systemImage: "square.and.arrow.up")
                 }
             }
         } label: {
