@@ -91,6 +91,14 @@ struct PhoneSettingsView: View {
                     }
                 }
 
+                Section("Araçlar ve Dışa Aktarma") {
+                    NavigationLink { PhoneGalleryView() } label: { Label("Galeri", systemImage: "photo.on.rectangle") }
+                    NavigationLink { PhoneLinksView() } label: { Label("Link Havuzu", systemImage: "link") }
+                    NavigationLink { PhoneRulesView() } label: { Label("Kurallar", systemImage: "slider.horizontal.3") }
+                    NavigationLink { PhoneDuplicatesView() } label: { Label("Kopyalar", systemImage: "square.on.square") }
+                    NavigationLink { PhoneExportSheet() } label: { Label("Dışa Aktar…", systemImage: "square.and.arrow.up") }
+                }
+
                 Section {
                     Button {
                         pickingImport = true
@@ -170,6 +178,7 @@ struct PhoneSettingsView: View {
             }
             .navigationTitle("Ayarlar")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: String.self) { ItemView(id: $0) }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Bitti") { dismiss() } } }
             .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
                 if case .success(let url) = result { Task { await model.useSyncFolder(url) } }

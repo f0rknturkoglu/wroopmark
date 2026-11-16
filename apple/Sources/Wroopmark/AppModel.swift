@@ -946,6 +946,15 @@ final class AppModel {
         return transcript
     }
 
+    func attachFiles(id: String, urls: [URL]) async {
+        for url in urls {
+            _ = try? await core.call(.call("attach_file", ["id": .string(id), "path": .string(url.path)])) as Bool
+        }
+        await refreshItem(id)
+        await refreshMeta()
+        startOCR()
+    }
+
     func suggestBatch(q: String = "", limit: Int = 25) async -> [BatchSuggestion] {
         (try? await core.call(.call("suggest_batch", ["q": .string(q), "limit": .int(Int64(limit))]))) ?? []
     }

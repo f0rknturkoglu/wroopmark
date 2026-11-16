@@ -13,6 +13,7 @@ enum PhoneScope: Hashable, Sendable {
     case platform(String)
     case tag(String)
     case folder(Int64, String)
+    case saved(SavedSearch)
 
     var filter: String {
         switch self {
@@ -21,6 +22,7 @@ enum PhoneScope: Hashable, Sendable {
         case .platform(let p): "platform:\(p)"
         case .tag(let t): t.contains(" ") ? "tag:\"\(t)\"" : "tag:\(t)"
         case .folder(let id, _): "folder:\(id)"
+        case .saved(let s): s.query
         }
     }
 
@@ -32,6 +34,7 @@ enum PhoneScope: Hashable, Sendable {
         case .platform(let p): Platform(rawValue: p)?.label ?? p
         case .tag(let t): "#\(t)"
         case .folder(_, let name): name.split(separator: "/").last.map(String.init) ?? name
+        case .saved(let s): s.name
         }
     }
 }
@@ -47,6 +50,7 @@ final class PhoneModel {
     var scope: PhoneScope = .all
     var tags: [TagCount] = []
     var folders: [Folder] = []
+    var savedSearches: [SavedSearch] = []
     var stats: Stats?
     var isLoading = false
     var errorMessage: String?
@@ -412,10 +416,49 @@ final class PhoneModel {
         }
     }
 
+    private static let savedSearchesKey = "ui.saved_searches"
+
+    var searchToSave: String {
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = [scope.filter, typed].filter { !$0.isEmpty }
+        return parts.joined(separator: " ")
+    }
+
+    func loadSavedSearches() async {
+        guard let raw: String = try? await core.callOptional(.uiGet(key: Self.savedSearchesKey), as: String.self),
+              let data = raw.data(using: .utf8),
+              let list = try? JSONDecoder().decode([SavedSearch].self, from: data) else { return }
+        if list != savedSearches { savedSearches = list }
+    }
+
+    private func storeSavedSearches() async {
+        guard let data = try? JSONEncoder().encode(savedSearches),
+              let text = String(data: data, encoding: .utf8) else { return }
+        _ = try? await core.run(.uiSet(key: Self.savedSearchesKey, value: text))
+    }
+
+    func saveSearch(name: String) async {
+        let q = searchToSave
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !clean.isEmpty else { return }
+        let saved = SavedSearch(id: UUID().uuidString, name: clean, query: q)
+        savedSearches.append(saved)
+        await storeSavedSearches()
+        query = ""
+        scope = .saved(saved)
+    }
+
+    func deleteSavedSearch(_ s: SavedSearch) async {
+        savedSearches.removeAll { $0.id == s.id }
+        if case .saved(let cur) = scope, cur.id == s.id { scope = .all }
+        await storeSavedSearches()
+    }
+
     func refreshMeta() async {
         if let t: [TagCount] = try? await core.call(.tags) { tags = t.sorted { $0.count > $1.count } }
         if let f: [Folder] = try? await core.call(.folders) { folders = f.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending } }
         if let s: Stats = try? await core.call(.stats) { stats = s }
+        await loadSavedSearches()
     }
 
     /// Re-reads one item after an edit and puts it back in place.

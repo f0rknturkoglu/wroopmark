@@ -339,9 +339,9 @@ hızlandırır. Apple kurallarına tam uyulur: telefon sitelerden video indirmez
 - Etiketsiz kayıtlara toplu etiket/klasör önerisi (`suggest_batch` / `apply_batch`), tek ekranda onay.
 - Dışa aktarmaya (Markdown, HTML, MCP kaynağı) vurgular ve X yanıtları.
 
-**v1.3: Mac'in araçları telefonda**
-- Kurallar, kopyalar, link havuzu ve kırık link taraması, kayıtlı aramalar,
-  sayfa kopyaları.
+**v1.3: Mac'in araçları telefonda** ✅
+- Kurallar (`PhoneRulesView`), kopyalar (`PhoneDuplicatesView`), link havuzu ve kırık link taraması (`PhoneLinksView`), galeri görünümü (`PhoneGalleryView`), kayıtlı aramalar (`ui.saved_searches`) ve Markdown/CSV/JSON/HTML dışa aktarım (`PhoneExportSheet`); sayfa kopyalarıyla birlikte telefonda tam araç seti.
+- Mac'te herhangi bir kayda doğrudan yerel video/görsel dosyası ekleme (`attach_file`).
 
 **v1.4: Cila**
 - Akışta PiP ve AirPlay, sesli okumada hız, kilit ekranı / Denetim Merkezi

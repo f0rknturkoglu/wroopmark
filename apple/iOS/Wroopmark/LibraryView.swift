@@ -39,6 +39,7 @@ struct PhoneLibrary: View {
     @State private var showSettings = false
     @State private var showFeed = false
     @State private var showTriage = false
+    @State private var activeTool: PhoneTool?
     @State private var path: [String] = []
 
     var body: some View {
@@ -123,11 +124,25 @@ struct PhoneLibrary: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) { ScopeMenu() }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { activeTool = .gallery } label: { Label("Galeri", systemImage: "photo.on.rectangle") }
+                        Button { activeTool = .links } label: { Label("Link Havuzu", systemImage: "link") }
+                        Button { activeTool = .rules } label: { Label("Kurallar", systemImage: "slider.horizontal.3") }
+                        Button { activeTool = .duplicates } label: { Label("Kopyalar", systemImage: "square.on.square") }
+                        Divider()
+                        Button { activeTool = .export } label: { Label("Dışa Aktar…", systemImage: "square.and.arrow.up") }
+                    } label: {
+                        Image(systemName: "wrench.and.screwdriver")
+                    }
+                    .accessibilityLabel("Araçlar")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Bağlantı ekle")
                 }
             }
             .sheet(isPresented: $showAdd) { AddURLView() }
+            .sheet(item: $activeTool) { PhoneToolSheet(tool: $0) }
             .onChange(of: model.openRequest) { _, id in
                 if let id {
                     path = [id]
@@ -189,6 +204,8 @@ struct LibraryBanners: View {
 
 struct ScopeMenu: View {
     @Environment(PhoneModel.self) private var model
+    @State private var savingSearch = false
+    @State private var searchName = ""
 
     var body: some View {
         @Bindable var model = model
@@ -197,6 +214,32 @@ struct ScopeMenu: View {
                 Label("Tümü", systemImage: "tray.full").tag(PhoneScope.all)
                 Label("Bugün", systemImage: "calendar.day.timeline.left").tag(PhoneScope.today)
                 Label("Etiketsiz", systemImage: "tag.slash").tag(PhoneScope.untagged)
+            }
+            if !model.savedSearches.isEmpty {
+                Menu("Kayıtlı aramalar") {
+                    ForEach(model.savedSearches) { s in
+                        Button {
+                            model.query = ""
+                            model.scope = .saved(s)
+                        } label: {
+                            Label(s.name, systemImage: "magnifyingglass")
+                        }
+                    }
+                    if case .saved(let cur) = model.scope {
+                        Divider()
+                        Button("“\(cur.name)” aramasını sil", role: .destructive) {
+                            Task { await model.deleteSavedSearch(cur) }
+                        }
+                    }
+                }
+            }
+            if !model.searchToSave.isEmpty {
+                Button {
+                    searchName = ""
+                    savingSearch = true
+                } label: {
+                    Label("Bu aramayı kaydet…", systemImage: "bookmark")
+                }
             }
             Menu("Platform") {
                 let counts = model.stats?.byPlatform ?? [:]
@@ -234,6 +277,14 @@ struct ScopeMenu: View {
             Image(systemName: model.scope == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
         }
         .accessibilityLabel("Süzgeç")
+        .alert("Aramayı kaydet", isPresented: $savingSearch) {
+            TextField("Arama adı", text: $searchName)
+            Button("Kaydet") {
+                let name = searchName
+                Task { await model.saveSearch(name: name) }
+            }
+            Button("Vazgeç", role: .cancel) {}
+        }
     }
 }
 

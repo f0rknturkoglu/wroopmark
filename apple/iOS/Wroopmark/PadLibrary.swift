@@ -10,6 +10,9 @@ struct PadLibrary: View {
     @State private var showSettings = false
     @State private var showFeed = false
     @State private var showTriage = false
+    @State private var activeTool: PhoneTool?
+    @State private var savingSearch = false
+    @State private var searchName = ""
 
     var body: some View {
         @Bindable var model = model
@@ -69,6 +72,17 @@ struct PadLibrary: View {
                 await model.reload()
             }
             .toolbar {
+                if !model.searchToSave.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            searchName = ""
+                            savingSearch = true
+                        } label: {
+                            Image(systemName: "bookmark")
+                        }
+                        .accessibilityLabel("Bu aramayı kaydet")
+                    }
+                }
                 if model.aiStatus?.embedReady == true {
                     ToolbarItem(placement: .primaryAction) {
                         Button { model.semanticSearch.toggle() } label: {
@@ -111,6 +125,15 @@ struct PadLibrary: View {
         }
         .sheet(isPresented: $showAdd) { AddURLView() }
         .sheet(isPresented: $showSettings) { PhoneSettingsView() }
+        .sheet(item: $activeTool) { PhoneToolSheet(tool: $0) }
+        .alert("Aramayı kaydet", isPresented: $savingSearch) {
+            TextField("Arama adı", text: $searchName)
+            Button("Kaydet") {
+                let name = searchName
+                Task { await model.saveSearch(name: name) }
+            }
+            Button("Vazgeç", role: .cancel) {}
+        }
         .fullScreenCover(isPresented: $showFeed) { VideoFeedView(scope: model.scope, query: model.query) }
         .fullScreenCover(isPresented: $showTriage) { PhoneTriageView(scope: model.scope, query: model.query) }
     }
@@ -129,6 +152,28 @@ struct PadLibrary: View {
             Section {
                 Button { showFeed = true } label: { Label("Akış", systemImage: "play.rectangle.on.rectangle") }
                 Button { showTriage = true } label: { Label("Ayıkla", systemImage: "rectangle.stack.badge.minus") }
+            }
+            Section("Araçlar") {
+                Button { activeTool = .gallery } label: { Label("Galeri", systemImage: "photo.on.rectangle") }
+                Button { activeTool = .links } label: { Label("Link Havuzu", systemImage: "link") }
+                Button { activeTool = .rules } label: { Label("Kurallar", systemImage: "slider.horizontal.3") }
+                Button { activeTool = .duplicates } label: { Label("Kopyalar", systemImage: "square.on.square") }
+                Button { activeTool = .export } label: { Label("Dışa Aktar…", systemImage: "square.and.arrow.up") }
+            }
+            if !model.savedSearches.isEmpty {
+                Section("Kayıtlı aramalar") {
+                    ForEach(model.savedSearches) { s in
+                        Label(s.name, systemImage: "magnifyingglass")
+                            .tag(PhoneScope.saved(s))
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task { await model.deleteSavedSearch(s) }
+                                } label: {
+                                    Label("Sil", systemImage: "trash")
+                                }
+                            }
+                    }
+                }
             }
             let counts = model.stats?.byPlatform ?? [:]
             let platforms = Platform.allCases.filter { (counts[$0.rawValue] ?? 0) > 0 }

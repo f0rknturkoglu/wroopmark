@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ItemDetailView: View {
     @Environment(AppModel.self) private var model
@@ -429,6 +431,15 @@ struct ItemDetailView: View {
                     .disabled(model.isBusy)
                 }
 
+                Button {
+                    attachLocalFile()
+                } label: {
+                    Label("Dosyadan video/görsel ekle…", systemImage: "photo.badge.plus")
+                        .labelStyle(.iconOnly)
+                }
+                .help("Dosyadan video/görsel ekle…")
+                .accessibilityLabel("Dosyadan video/görsel ekle…")
+
                 Button(role: .destructive) {
                     model.requestDelete([item.id])
                 } label: {
@@ -444,6 +455,18 @@ struct ItemDetailView: View {
 
     private var downloadTitle: String {
         item.platform == "youtube" ? String(localized: "Videoyu lokale indir") : String(localized: "Medyayı indir")
+    }
+
+    private func attachLocalFile() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.movie, .image]
+        panel.prompt = String(localized: "Ekle")
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        let urls = panel.urls
+        Task { await model.attachFiles(id: item.id, urls: urls) }
     }
 
     private var footer: some View {
