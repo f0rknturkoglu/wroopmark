@@ -34,6 +34,23 @@
       },
       "shouldTranslate": true
     },
+    "NSPhotoLibraryAddUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saves the video or picture you pick in the Share menu to Photos."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paylaş menüsünden seçtiğin videoyu ya da görseli Fotoğraflar'a kaydeder."
+          }
+        }
+      },
+      "shouldTranslate": true
+    },
     "NSSpeechRecognitionUsageDescription": {
       "localizations": {
         "en": {

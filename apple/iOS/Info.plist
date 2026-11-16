@@ -22,6 +22,8 @@
 		<string>en</string>
 		<string>tr</string>
 	</array>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Paylaş menüsünden seçtiğin videoyu ya da görseli Fotoğraflar'a kaydeder.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Videolardaki konuşmayı cihazda aramak için yazıya döker.</string>
 	<key>UIBackgroundModes</key>
