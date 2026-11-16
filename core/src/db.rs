@@ -13,7 +13,7 @@ use rusqlite::{Connection, OptionalExtension, Row, Transaction, TransactionBehav
 use serde::Serialize;
 
 use crate::media::is_name;
-use crate::model::{Folder, Item, Link, Media, MediaKind, Platform};
+use crate::model::{Folder, Highlight, Item, Link, Media, MediaKind, Platform};
 use crate::query::{Has, Query, Sort, tag_key};
 use crate::text::{fold, host_of, normalize_url, now};
 
@@ -41,7 +41,7 @@ pub struct FolderSuggestion {
     pub reason: String,
 }
 
-const SCHEMA_VERSION: i64 = 19;
+const SCHEMA_VERSION: i64 = 20;
 
 const SCHEMA: &str = r#"
 CREATE TABLE items(
@@ -308,6 +308,14 @@ const MIGRATE_17: &str = "DELETE FROM sync_cursor;";
 const MIGRATE_19: &str = "ALTER TABLE items ADD COLUMN article TEXT;
 ALTER TABLE items ADD COLUMN article_ready INTEGER NOT NULL DEFAULT 0;";
 
+/// v19 → v20: the reader's highlights (JSON), synced as their own group.
+const MIGRATE_20: &str = "ALTER TABLE items ADD COLUMN highlights TEXT;
+CREATE TRIGGER IF NOT EXISTS sync_item_highlights AFTER UPDATE OF highlights ON items
+  WHEN (SELECT enabled AND NOT applying FROM sync_state) AND OLD.highlights IS NOT NEW.highlights
+BEGIN
+  INSERT OR IGNORE INTO sync_dirty VALUES (NEW.id, 'highlights');
+END;";
+
 /// v17 → v18: files another device has not uploaded yet are waited for too
 /// (`since`: when noted). The logs are read once more, so a phone that saw
 /// the Mac's videos before they were in iCloud learns their names.
@@ -317,10 +325,11 @@ DELETE FROM sync_cursor;";
 
 /// Every sync trigger, for tests that rebuild an old schema.
 #[cfg(test)]
-const SYNC_TRIGGERS: [&str; 15] = [
+const SYNC_TRIGGERS: [&str; 16] = [
     "sync_item_ins",
     "sync_item_content",
     "sync_item_media",
+    "sync_item_highlights",
     "sync_item_folder",
     "sync_item_note",
     "sync_item_reviewed",
@@ -644,12 +653,15 @@ const LINK_COLS: &str = "l.id, l.url, l.host, l.title, l.description, l.image, l
 #[allow(clippy::type_complexity)]
 fn reindex_item(conn: &Connection, pk: i64) -> Result<()> {
     type Row8 = (Option<String>, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>);
-    let ((title, text, extra, note, author_h, author_n, quote, ocr), thread): (Row8, Option<String>) =
-        conn.query_row("SELECT title, text, extra, note, author_handle, author_name, quote, ocr, thread FROM items WHERE pk = ?1", [pk], |r| {
-            Ok(((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?), r.get(8)?))
-        })?;
+    let ((title, text, extra, note, author_h, author_n, quote, ocr), (thread, highlights)): (Row8, (Option<String>, Option<String>)) = conn
+        .query_row(
+            "SELECT title, text, extra, note, author_handle, author_name, quote, ocr, thread, highlights FROM items WHERE pk = ?1",
+            [pk],
+            |r| Ok(((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?), (r.get(8)?, r.get(9)?))),
+        )?;
     let thread: Vec<Item> = thread.and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     let quote: Option<Item> = quote.and_then(|q| serde_json::from_str(&q).ok());
+    let highlights: Vec<Highlight> = highlights.and_then(|h| serde_json::from_str(&h).ok()).unwrap_or_default();
 
     let push_part = |buf: &mut String, sep: char, s: &str| {
         if !buf.is_empty() {
@@ -680,6 +692,12 @@ fn reindex_item(conn: &Connection, pk: i64) -> Result<()> {
     }
     for t in &thread {
         push_part(&mut body_raw, '\n', &t.text);
+    }
+    for h in &highlights {
+        push_part(&mut body_raw, '\n', &h.quote);
+        if let Some(n) = h.note.as_deref() {
+            push_part(&mut body_raw, '\n', n);
+        }
     }
     {
         let mut stmt = conn.prepare_cached("SELECT l.url FROM item_links il JOIN links l ON l.id = il.link WHERE il.item = ?1")?;
@@ -843,6 +861,7 @@ fn item_filters(q: &Query, wh: &mut Vec<String>, args: &mut Vec<Sql>) {
                 Has::Note => "coalesce(i.note, '') != ''",
                 Has::Ocr => "coalesce(i.ocr, '') != ''",
                 Has::Quote => "i.quote IS NOT NULL",
+                Has::Highlight => "coalesce(i.highlights, '') != '' AND i.highlights != '[]'",
             };
             wh.push(format!("{neg}({cond})"));
         }
@@ -1095,7 +1114,7 @@ impl Store {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version == 0 {
             conn.execute_batch(&format!(
-                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
+                "BEGIN; {SCHEMA} {MIGRATE_2} {MIGRATE_4} {MIGRATE_5} {MIGRATE_6} {MIGRATE_7} {MIGRATE_8} {MIGRATE_9} {MIGRATE_10} {MIGRATE_11} {MIGRATE_12} {MIGRATE_13} {MIGRATE_14} {MIGRATE_15} {MIGRATE_16} {MIGRATE_17} {MIGRATE_18} {MIGRATE_19} {MIGRATE_20} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"
             ))?;
         } else if version == 1 {
             conn.execute_batch(&format!("BEGIN; {MIGRATE_2} PRAGMA user_version = 2; COMMIT;"))?;
@@ -1154,6 +1173,9 @@ impl Store {
         }
         if (1..19).contains(&version) {
             store.conn.execute_batch(&format!("BEGIN; {MIGRATE_19} PRAGMA user_version = 19; COMMIT;"))?;
+        }
+        if (1..20).contains(&version) {
+            store.conn.execute_batch(&format!("BEGIN; {MIGRATE_20} PRAGMA user_version = 20; COMMIT;"))?;
         }
         Ok(store)
     }
@@ -2346,7 +2368,7 @@ mod tests {
                      DROP INDEX IF EXISTS items_stub; ALTER TABLE items DROP COLUMN summary; ALTER TABLE items DROP COLUMN ai_tags;
                      ALTER TABLE items DROP COLUMN stub; ALTER TABLE items DROP COLUMN stub_tries; DROP TABLE IF EXISTS rules; DROP TABLE IF EXISTS vectors;
                      ALTER TABLE items DROP COLUMN thread; ALTER TABLE items DROP COLUMN snapshot; ALTER TABLE items DROP COLUMN snapshot_tries;
-                     ALTER TABLE items DROP COLUMN article; ALTER TABLE items DROP COLUMN article_ready;
+                     ALTER TABLE items DROP COLUMN article; ALTER TABLE items DROP COLUMN article_ready; ALTER TABLE items DROP COLUMN highlights;
                      PRAGMA user_version = 3;",
                 )
                 .unwrap();

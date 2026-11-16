@@ -296,6 +296,13 @@ struct SearchResult: Decodable, Sendable {
     let links: [LinkRow]
 }
 
+struct TodayResult: Decodable, Sendable {
+    let items: [Item]
+    let total: Int
+    let onThisDay: [Item]
+    let rediscover: [Item]
+}
+
 struct TagCount: Decodable, Hashable, Sendable {
     let name: String
     let key: String

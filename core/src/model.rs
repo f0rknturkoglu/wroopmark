@@ -271,6 +271,23 @@ pub struct Item {
     pub raw: Option<Value>,
 }
 
+/// A passage marked in the reader, found again by its text and the few
+/// words before it (`prefix`), so it survives a re-render.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Highlight {
+    pub id: String,
+    pub quote: String,
+    #[serde(default)]
+    pub prefix: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default)]
+    pub color: String,
+    /// Unix seconds.
+    #[serde(default)]
+    pub at: i64,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Folder {
     pub id: i64,

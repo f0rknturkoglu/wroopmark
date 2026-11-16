@@ -8,6 +8,8 @@ use regex::Regex;
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::model::Highlight;
+
 use super::*;
 
 /// `<img … src="…">` (double or single quotes).
@@ -31,6 +33,43 @@ fn image_urls(html: &str) -> Vec<String> {
 }
 
 impl Library {
+    /// Adds, changes (`note`, `color`) or removes (`delete`) one highlight;
+    /// returns the item's highlights after.
+    pub fn edit_highlight(&self, e: HighlightEdit) -> Result<Vec<Highlight>> {
+        let mut store = self.lock_store()?;
+        let mut list = store.highlights(&e.id)?;
+        match e.hid {
+            Some(hid) if e.delete => list.retain(|h| h.id != hid),
+            Some(hid) => {
+                if let Some(h) = list.iter_mut().find(|h| h.id == hid) {
+                    if let Some(n) = e.note {
+                        h.note = Some(n).filter(|n| !n.trim().is_empty());
+                    }
+                    if let Some(c) = e.color {
+                        h.color = c;
+                    }
+                }
+            }
+            None => {
+                let quote = e.quote.unwrap_or_default();
+                if quote.trim().is_empty() {
+                    return Ok(list);
+                }
+                let at = crate::text::now();
+                list.push(Highlight {
+                    id: format!("{at:x}{}", list.len()),
+                    quote,
+                    prefix: e.prefix.unwrap_or_default(),
+                    note: e.note.filter(|n| !n.trim().is_empty()),
+                    color: e.color.unwrap_or_else(|| "yellow".into()),
+                    at,
+                });
+            }
+        }
+        store.set_highlights(&e.id, &list)?;
+        Ok(list)
+    }
+
     /// Makes missing readable copies and brings their pictures down, up to
     /// `limit` pages. Returns how many were handled.
     pub fn fill_articles(&self, limit: i64) -> Result<usize> {
@@ -98,6 +137,23 @@ impl Library {
     }
 }
 
+#[derive(Deserialize)]
+pub struct HighlightEdit {
+    pub id: String,
+    #[serde(default)]
+    pub hid: Option<String>,
+    #[serde(default)]
+    pub quote: Option<String>,
+    #[serde(default)]
+    pub prefix: Option<String>,
+    #[serde(default)]
+    pub note: Option<String>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub delete: bool,
+}
+
 pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> Option<Result<S::Out>> {
     #[derive(Deserialize)]
     struct Id {
@@ -113,7 +169,10 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
     }
     Some(match cmd {
         "article" => req.parse::<Id>().and_then(|r| lib.article_for_reader(&r.id)).and_then(|html| S::ok(json!({ "html": html }))),
+        "highlights" => req.parse::<Id>().and_then(|r| Ok(lib.lock_store()?.highlights(&r.id)?)).and_then(S::ok),
+        "highlight" => req.parse::<HighlightEdit>().and_then(|e| lib.edit_highlight(e)).and_then(S::ok),
         "fill_articles" => req.parse::<Limit>().and_then(|l| lib.fill_articles(l.limit.clamp(1, 50))).and_then(S::ok),
+        "today" => lib.lock_store().and_then(|s| Ok(s.today()?)).and_then(S::ok),
         _ => return None,
     })
 }
@@ -142,6 +201,86 @@ mod tests {
         assert!(out.contains(&format!("src=\"wroopmark-media:///{name}\"")), "{out}");
         assert!(out.contains("src='https://e.invalid/b.png?x=1&amp;y=2'"), "{out}");
         assert!(!out.contains("srcset"), "{out}");
+        lib.shutdown();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+    #[test]
+    fn highlights_edit_and_sync() {
+        let root = std::env::temp_dir().join(format!("wm-hl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let shared = root.join("shared");
+        let a = Library::open(&root.join("a")).unwrap_or_else(|_| std::process::abort());
+        let b = Library::open(&root.join("b")).unwrap_or_else(|_| std::process::abort());
+        let call = |lib: &Arc<Library>, req: Value| -> Value {
+            let r = handle_value(lib, req);
+            assert_eq!(r.get("ok"), Some(&json!(true)), "{r}");
+            r.get("data").cloned().unwrap_or(Value::Null)
+        };
+        call(&a, json!({"cmd": "import_items", "items": [{"platform": "web", "url": "https://example.com/h", "text": "bir iki üç dört"}]}));
+        let id = item_id_for_url("https://example.com/h").1;
+        call(&a, json!({"cmd": "sync_enable", "dir": shared}));
+        call(&b, json!({"cmd": "sync_enable", "dir": shared}));
+
+        let list = call(&a, json!({"cmd": "highlight", "id": id, "quote": "iki üç", "prefix": "bir "}));
+        let hid = list.pointer("/0/id").and_then(Value::as_str).unwrap_or_default().to_string();
+        assert_eq!(list.pointer("/0/color"), Some(&json!("yellow")));
+        call(&a, json!({"cmd": "highlight", "id": id, "hid": hid, "note": "önemli"}));
+        assert_eq!(call(&a, json!({"cmd": "search", "q": "önemli"})).pointer("/total"), Some(&json!(1)));
+        assert_eq!(call(&a, json!({"cmd": "search", "q": "has:highlight"})).pointer("/total"), Some(&json!(1)));
+        call(&a, json!({"cmd": "sync_now"}));
+        call(&b, json!({"cmd": "sync_now"}));
+        let got = call(&b, json!({"cmd": "highlights", "id": id}));
+        assert_eq!(got.pointer("/0/quote"), Some(&json!("iki üç")), "{got}");
+        assert_eq!(got.pointer("/0/note"), Some(&json!("önemli")));
+        assert_eq!(call(&b, json!({"cmd": "search", "q": "önemli"})).pointer("/total"), Some(&json!(1)));
+        assert_eq!(call(&b, json!({"cmd": "search", "q": "has:highlight"})).pointer("/total"), Some(&json!(1)));
+
+        // Removed on B, gone on A.
+        call(&b, json!({"cmd": "highlight", "id": id, "hid": hid, "delete": true}));
+        call(&b, json!({"cmd": "sync_now"}));
+        call(&a, json!({"cmd": "sync_now"}));
+        assert_eq!(call(&a, json!({"cmd": "highlights", "id": id})), json!([]));
+        assert_eq!(call(&a, json!({"cmd": "search", "q": "has:highlight"})).pointer("/total"), Some(&json!(0)));
+        a.shutdown();
+        b.shutdown();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn today_finds_past_years_and_rediscover() {
+        let root = std::env::temp_dir().join(format!("wm-today-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let lib = Library::open(&root).unwrap_or_else(|_| std::process::abort());
+        let call = |req: Value| -> Value {
+            let r = handle_value(&lib, req);
+            assert_eq!(r.get("ok"), Some(&json!(true)), "{r}");
+            r.get("data").cloned().unwrap_or(Value::Null)
+        };
+        let last_year_today = chrono::Local::now()
+            .date_naive()
+            .checked_sub_months(chrono::Months::new(12))
+            .and_then(|d| d.and_hms_opt(12, 0, 0))
+            .and_then(|dt| dt.and_local_timezone(chrono::Local).earliest())
+            .map(|dt| dt.timestamp())
+            .unwrap_or_else(|| crate::text::now() - 365 * 86_400);
+        let items: Vec<Value> = (0..7)
+            .map(|i| {
+                let saved_at = if i == 0 { last_year_today } else { crate::text::now() - (i + 10) * 86_400 };
+                json!({
+                    "platform": "web",
+                    "url": format!("https://example.com/today/{i}"),
+                    "text": format!("kayıt {i}"),
+                    "saved_at": saved_at,
+                })
+            })
+            .collect();
+        call(json!({"cmd": "import_items", "items": items}));
+        let res = call(json!({"cmd": "today"}));
+        let on_this_day = res.pointer("/on_this_day").and_then(Value::as_array).map(Vec::len).unwrap_or(0);
+        let rediscover = res.pointer("/rediscover").and_then(Value::as_array).map(Vec::len).unwrap_or(0);
+        assert_eq!(on_this_day, 1, "{res}");
+        assert_eq!(rediscover, 5, "{res}");
+        assert_eq!(res.pointer("/total"), Some(&json!(6)));
         lib.shutdown();
         let _ = std::fs::remove_dir_all(&root);
     }

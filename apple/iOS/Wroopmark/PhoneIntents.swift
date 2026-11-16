@@ -49,8 +49,15 @@ struct FindInWroopmarkIntent: AppIntent {
     @Parameter(title: "En çok", default: 10, inclusiveRange: (1, 50))
     var limit: Int
 
+    @Parameter(title: "Anlamına göre", default: false)
+    var semantic: Bool
+
     func perform() async throws -> some IntentResult & ReturnsValue<[String]> {
-        let r: SearchResult = try await Core.shared.call(.search(q: query, sort: "", limit: limit, offset: 0))
+        if semantic { PhoneAI.register() }
+        let cmd: CoreCommand = semantic
+            ? .call("semantic_search", ["q": .string(query), "sort": .string(""), "limit": .int(Int64(limit)), "offset": .int(0)])
+            : .search(q: query, sort: "", limit: limit, offset: 0)
+        let r: SearchResult = try await Core.shared.call(cmd, network: semantic)
         return .result(value: r.items.map { "\($0.headline.prefix(120)) — \($0.url)" })
     }
 }

@@ -23,12 +23,35 @@ struct PhoneLibrary: View {
         NavigationStack(path: $path) {
             List {
                 LibraryBanners()
-                ForEach(model.items) { item in
-                    NavigationLink(value: item.id) { ItemRowView(item: item) }
-                        .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
-                        .swipeActions {
-                            Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                if model.scope == .today && model.query.isEmpty {
+                    if !model.onThisDay.isEmpty {
+                        Section("Geçmişte bugün") {
+                            ForEach(model.onThisDay) { item in
+                                NavigationLink(value: item.id) { ItemRowView(item: item) }
+                                    .swipeActions {
+                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                                    }
+                            }
                         }
+                    }
+                    if !model.rediscover.isEmpty {
+                        Section("Arşivden bugün için") {
+                            ForEach(model.rediscover) { item in
+                                NavigationLink(value: item.id) { ItemRowView(item: item) }
+                                    .swipeActions {
+                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                                    }
+                            }
+                        }
+                    }
+                } else {
+                    ForEach(model.items) { item in
+                        NavigationLink(value: item.id) { ItemRowView(item: item) }
+                            .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
+                            .swipeActions {
+                                Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                            }
+                    }
                 }
                 if model.items.isEmpty && !model.isLoading {
                     if model.query.isEmpty && model.scope == .all {
@@ -45,6 +68,7 @@ struct PhoneLibrary: View {
             .searchable(text: $model.query, prompt: "Ara: kelime, tag:dev, from:@kişi")
             .onChange(of: model.query) { _, _ in model.queryChanged() }
             .onChange(of: model.scope) { _, _ in Task { await model.reload() } }
+            .onChange(of: model.semanticSearch) { _, _ in Task { await model.reload() } }
             .refreshable {
                 await model.syncNow()
                 await model.reload()
@@ -65,6 +89,14 @@ struct PhoneLibrary: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showFeed = true } label: { Image(systemName: "play.rectangle.on.rectangle") }
                         .accessibilityLabel("Akış")
+                }
+                if model.aiStatus?.embedReady == true {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { model.semanticSearch.toggle() } label: {
+                            Image(systemName: model.semanticSearch ? "sparkles.rectangle.stack.fill" : "sparkles")
+                        }
+                        .accessibilityLabel(model.semanticSearch ? "Anlamına göre arama açık" : "Anlamına göre ara")
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) { ScopeMenu() }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -140,6 +172,7 @@ struct ScopeMenu: View {
         Menu {
             Picker("Görünüm", selection: $model.scope) {
                 Label("Tümü", systemImage: "tray.full").tag(PhoneScope.all)
+                Label("Bugün", systemImage: "calendar.day.timeline.left").tag(PhoneScope.today)
                 Label("Etiketsiz", systemImage: "tag.slash").tag(PhoneScope.untagged)
             }
             Menu("Platform") {

@@ -6,6 +6,7 @@ import Synchronization
 /// What the sidebar points at.
 enum Scope: Hashable, Sendable {
     case all
+    case today
     case untagged
     case platform(Platform)
     case tag(String) // tag key path
@@ -33,7 +34,7 @@ enum Scope: Hashable, Sendable {
     /// Filter terms this scope adds to the search box query.
     var filter: String {
         switch self {
-        case .all, .links: ""
+        case .all, .today, .links: ""
         case .triage: "-is:reviewed"
         case .untagged: "is:untagged"
         case .photos: "has:image"
@@ -466,12 +467,13 @@ final class AppModel {
 
         do {
             async let metaTask: Void = refreshMeta()
-            let r: SearchResult = try await core.call(searchCommand(q: effectiveQuery, sort: sortArg, limit: pageSize, offset: 0))
+            let isToday = scope == .today && effectiveQuery.isEmpty
+            let r: SearchResult = try await core.call(isToday ? .call("today", [:]) : searchCommand(q: effectiveQuery, sort: sortArg, limit: pageSize, offset: 0))
             _ = await metaTask
             guard gen == generation, !Task.isCancelled else { return }
             setIfChanged(\.items, visible(r.items))
             setIfChanged(\.total, r.total)
-            reachedEnd = r.items.count < pageSize
+            reachedEnd = isToday ? true : r.items.count < pageSize
             let ids = Set(items.map(\.id))
             setIfChanged(\.selection, scope == .triage ? (items.first.map { [$0.id] } ?? []) : selection.filter(ids.contains))
             if let id = pendingRevealID, ids.contains(id) {

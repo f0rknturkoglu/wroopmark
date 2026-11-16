@@ -9,3 +9,8 @@ WmHandle *wm_open(const char *library_dir);
 char *wm_call(WmHandle *handle, const char *request_json);
 void wm_free(char *s);
 void wm_close(WmHandle *handle);
+
+typedef void (*WmAiOut)(void *ctx, const char *json);
+typedef void (*WmAiFn)(const char *request_json, void *ctx, WmAiOut out);
+/// Optional in-process AI handler (used on iOS where subprocesses cannot be spawned).
+void wm_set_ai(WmAiFn fn);

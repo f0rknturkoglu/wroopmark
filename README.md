@@ -185,7 +185,7 @@ Kütüphane: `~/Library/Application Support/wroopmark/` (veritabanı + `media/`)
 | `tag:dev` `-tag:okundu` | etiket (alt etiketler dahil: `dev` → `dev/rust`) |
 | `from:@jack` `-@jack` | kişi |
 | `platform:x` `platform:tiktok` | platform |
-| `has:image` `has:video` `has:link` `has:note` `has:ocr` `has:quote` | içerik |
+| `has:image` `has:video` `has:link` `has:note` `has:ocr` `has:quote` `has:highlight` | içerik |
 | `folder:ders` `is:unfiled` `is:infolder` | klasör (alt klasörler dahil) |
 | `is:untagged` `is:tagged` `is:reviewed` | durum |
 | `after:2024-01` `before:2025` `savedafter:` `savedbefore:` | paylaşılma / kaydedilme tarihi |

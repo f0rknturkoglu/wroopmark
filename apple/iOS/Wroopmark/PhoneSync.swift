@@ -132,6 +132,9 @@ extension PhoneModel {
             Spotlight.indexRecent()
             WidgetSnapshot.refresh()
         }
+        if r.applied > 0 {
+            startEmbedding()
+        }
         takeICloudMedia(r)
     }
 

@@ -16,6 +16,8 @@ struct SidebarView: View {
         List(selection: $model.selectedScope) {
             Section("Kütüphane") {
                 row("Tümü", "tray.full", model.stats?.items).tag(Scope.all)
+                row("Bugün", "calendar.day.timeline.left", nil).tag(Scope.today)
+                    .help("Geçmiş yıllarda bugün kaydettiklerin ve arşivden 5 kayıt")
                 row("Etiketsiz", "tag.slash", nil).tag(Scope.untagged)
                 linkPoolRow
                     .tag(Scope.links(nil))

@@ -5,6 +5,7 @@ import UIKit
 /// What the list shows besides the search box.
 enum PhoneScope: Hashable, Sendable {
     case all
+    case today
     case untagged
     case platform(String)
     case tag(String)
@@ -12,7 +13,7 @@ enum PhoneScope: Hashable, Sendable {
 
     var filter: String {
         switch self {
-        case .all: ""
+        case .all, .today: ""
         case .untagged: "is:untagged"
         case .platform(let p): "platform:\(p)"
         case .tag(let t): t.contains(" ") ? "tag:\"\(t)\"" : "tag:\(t)"
@@ -23,6 +24,7 @@ enum PhoneScope: Hashable, Sendable {
     var title: String {
         switch self {
         case .all: "wroopmark"
+        case .today: "Bugün"
         case .untagged: "Etiketsiz"
         case .platform(let p): Platform(rawValue: p)?.label ?? p
         case .tag(let t): "#\(t)"
@@ -55,6 +57,15 @@ final class PhoneModel {
     private var generation = 0
     private var searchTask: Task<Void, Never>?
     private let pageSize = 60
+
+    // On-device AI & Today (v0.8)
+    var semanticSearch = false
+    var aiStatus: AIStatus?
+    var onThisDay: [Item] = []
+    var rediscover: [Item] = []
+    var summarizing = Set<String>()
+    @ObservationIgnored private var embedTask: Task<Void, Never>?
+    @ObservationIgnored private var embedPausedUntil: Date?
 
     // Sync (PhoneSync.swift)
     var syncStatus: SyncStatus?
@@ -101,6 +112,7 @@ final class PhoneModel {
     }
 
     func start() async {
+        PhoneAI.register()
         guard await core.ensureOpen() else {
             errorMessage = "Kütüphane açılamadı"
             return
@@ -115,6 +127,8 @@ final class PhoneModel {
         await reload()
         await refreshMeta()
         await startSync()
+        await loadAIStatus()
+        startEmbedding()
         Spotlight.reindex()
         // Posts in the widget's new format (folders) after the update.
         WidgetSnapshot.refresh(force: UserDefaults.standard.integer(forKey: "widgetFormat") < 2)
@@ -151,11 +165,15 @@ final class PhoneModel {
         await checkSpace()
         fetchShared()
         await syncNow()
+        startEmbedding()
     }
 
     /// Going to the background: stop downloads and settle the database, so
     /// iOS does not find the shared library locked while the app sleeps.
     func enteredBackground() {
+        embedTask?.cancel()
+        embedTask = nil
+        PhoneAI.unload()
         let task = BackgroundTask(name: "wroopmark-pause")
         Task {
             _ = try? await core.run(.call("pause", [:]))
@@ -207,6 +225,72 @@ final class PhoneModel {
         try? media.setResourceValues(values)
     }
 
+    // MARK: On-device AI
+
+    static func hasWords(_ q: String) -> Bool {
+        q.split(whereSeparator: \.isWhitespace).contains { tok in
+            let t = String(tok)
+            if t.hasPrefix("\"") { return true }
+            return !t.hasPrefix("-") && !t.hasPrefix("@") && !t.contains(":")
+        }
+    }
+
+    func searchCommand(q: String, sort: String, limit: Int, offset: Int) -> CoreCommand {
+        guard semanticSearch, Self.hasWords(q) else {
+            return .search(q: q, sort: sort, limit: limit, offset: offset)
+        }
+        return .call("semantic_search", ["q": .string(q), "sort": .string(sort), "limit": .int(Int64(limit)), "offset": .int(Int64(offset))])
+    }
+
+    func loadAIStatus() async {
+        aiStatus = try? await core.call(.call("ai_status", [:]), network: true)
+    }
+
+    func startEmbedding() {
+        guard !lowSpace, embedTask == nil, embedPausedUntil.map({ $0 < .now }) ?? true else { return }
+        embedTask = Task(priority: .background) { [weak self] in
+            defer {
+                PhoneAI.unload()
+                self?.embedTask = nil
+            }
+            while let self, !self.lowSpace, !Task.isCancelled {
+                do {
+                    let r: EmbedReport = try await self.core.call(.call("embed_pending", ["limit": .int(32)]), network: true)
+                    if r.done == 0 || r.remaining == 0 { break }
+                    try? await Task.sleep(for: .milliseconds(300))
+                } catch is CancellationError {
+                    break
+                } catch {
+                    self.embedPausedUntil = .now + 1800
+                    break
+                }
+            }
+            await self?.loadAIStatus()
+        }
+    }
+
+    @discardableResult
+    func summarize(_ id: String) async -> Item? {
+        guard !summarizing.contains(id) else { return nil }
+        summarizing.insert(id)
+        defer { summarizing.remove(id) }
+        do {
+            let item: Item = try await core.call(.call("summarize", ["id": .string(id)]), network: true)
+            if let i = items.firstIndex(where: { $0.id == id }) { items[i] = item }
+            syncSoon()
+            return item
+        } catch is CancellationError {
+            return nil
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func related(for id: String) async -> [Item] {
+        (try? await core.call(.call("related", ["id": .string(id), "limit": .int(6)]))) ?? []
+    }
+
     // MARK: Loading
 
     func reload() async {
@@ -215,12 +299,25 @@ final class PhoneModel {
         isLoading = true
         defer { if gen == generation { isLoading = false } }
         do {
-            let r: SearchResult = try await core.call(.search(q: effectiveQuery, sort: "", limit: pageSize, offset: 0))
-            guard gen == generation else { return }
-            items = r.items
-            total = r.total
-            reachedEnd = r.items.count < pageSize
-            errorMessage = nil
+            if scope == .today && effectiveQuery.isEmpty {
+                let r: TodayResult = try await core.call(.call("today", [:]))
+                guard gen == generation else { return }
+                onThisDay = r.onThisDay
+                rediscover = r.rediscover
+                items = r.items
+                total = r.total
+                reachedEnd = true
+                errorMessage = nil
+            } else {
+                let r: SearchResult = try await core.call(searchCommand(q: effectiveQuery, sort: "", limit: pageSize, offset: 0))
+                guard gen == generation else { return }
+                onThisDay = []
+                rediscover = []
+                items = r.items
+                total = r.total
+                reachedEnd = r.items.count < pageSize
+                errorMessage = nil
+            }
         } catch is CancellationError {
             return
         } catch {
@@ -229,11 +326,11 @@ final class PhoneModel {
     }
 
     func loadMore() async {
-        guard !reachedEnd, !isLoading else { return }
+        guard !reachedEnd, !isLoading, !(scope == .today && effectiveQuery.isEmpty) else { return }
         let gen = generation
         isLoading = true
         defer { isLoading = false }
-        if let r: SearchResult = try? await core.call(.search(q: effectiveQuery, sort: "", limit: pageSize, offset: items.count)), gen == generation {
+        if let r: SearchResult = try? await core.call(searchCommand(q: effectiveQuery, sort: "", limit: pageSize, offset: items.count)), gen == generation {
             let known = Set(items.map(\.id))
             items += r.items.filter { !known.contains($0.id) }
             reachedEnd = r.items.count < pageSize

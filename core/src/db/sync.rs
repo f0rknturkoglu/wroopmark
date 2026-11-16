@@ -42,6 +42,8 @@ pub struct SyncOp {
     pub reviewed: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai: Option<SyncFields>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlights: Option<Vec<Highlight>>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub deleted: bool,
     /// A `ui.` setting (saved searches…) and its value.
@@ -66,6 +68,11 @@ impl Store {
                 tx.execute("INSERT OR IGNORE INTO sync_dirty SELECT id, ?1 FROM items", [f])?;
             }
             tx.execute("INSERT OR IGNORE INTO sync_dirty SELECT 'setting:' || key, 'setting' FROM settings WHERE key LIKE 'ui.%'", [])?;
+            // Highlights only where there are some.
+            tx.execute(
+                "INSERT OR IGNORE INTO sync_dirty SELECT id, 'highlights' FROM items WHERE highlights IS NOT NULL AND highlights != '[]'",
+                [],
+            )?;
         } else {
             tx.execute("DELETE FROM sync_dirty", [])?;
         }
@@ -149,6 +156,7 @@ impl Store {
                 "note" => op.note = Some(item.note.clone().unwrap_or_default()),
                 "reviewed" => op.reviewed = Some(row.0.is_some()),
                 "ai" => op.ai = Some(SyncFields { summary: item.summary.clone(), tags: item.ai_tags.clone() }),
+                "highlights" => op.highlights = Some(self.highlights(id)?),
                 _ => {}
             }
         }

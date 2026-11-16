@@ -76,6 +76,17 @@ pub unsafe extern "C" fn wm_free(s: *mut c_char) {
     }
 }
 
+/// Registers an optional in-process AI handler (used on iOS where
+/// subprocesses cannot be spawned).
+///
+/// # Safety
+/// If `f` is `Some`, it must be a valid thread-safe C callback adhering to the
+/// `WmAiFn` contract for the remainder of the process lifetime.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wm_set_ai(f: Option<crate::ai::AiCallback>) {
+    crate::ai::set_callback(f);
+}
+
 /// # Safety
 /// `handle` must come from `wm_open` and is invalid afterwards.
 #[unsafe(no_mangle)]

@@ -30,6 +30,17 @@ pub struct DuplicateGroup {
     pub items: Vec<Item>,
 }
 
+/// Items for the "Bugün" view: saved/created on this day in past years plus a
+/// daily-seeded sample from the archive.
+#[derive(Debug, Default, Serialize)]
+pub struct TodayReport {
+    pub items: Vec<Item>,
+    pub total: i64,
+    pub links: Vec<Link>,
+    pub on_this_day: Vec<Item>,
+    pub rediscover: Vec<Item>,
+}
+
 /// How far archive stubs have been filled in.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct StubInfo {
@@ -539,5 +550,76 @@ impl Store {
     pub fn remember_url(&mut self, url: &str, file: &str) -> Result<()> {
         self.conn.execute("INSERT OR REPLACE INTO media_files(url, file) VALUES (?1, ?2)", [url, file])?;
         Ok(())
+    }
+
+    pub fn highlights(&self, id: &str) -> Result<Vec<Highlight>> {
+        let json: Option<String> = self.conn.query_row("SELECT highlights FROM items WHERE id = ?1", [id], |r| r.get(0)).optional()?.flatten();
+        Ok(json.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default())
+    }
+
+    pub fn set_highlights(&mut self, id: &str, list: &[Highlight]) -> Result<()> {
+        let json = if list.is_empty() { None } else { Some(serde_json::to_string(list)?) };
+        let Some(pk) = self.conn.query_row("SELECT pk FROM items WHERE id = ?1", [id], |r| r.get::<_, i64>(0)).optional()? else {
+            return Ok(());
+        };
+        self.conn.execute("UPDATE items SET highlights = ?2 WHERE pk = ?1", params![pk, json])?;
+        reindex_item(&self.conn, pk)
+    }
+
+    /// Items from previous years on this local calendar day, plus up to 5
+    /// older items picked with a daily seed.
+    pub fn today(&self) -> Result<TodayReport> {
+        let now_local = chrono::Local::now();
+        let mm_dd = now_local.format("%m-%d").to_string();
+        let year = now_local.format("%Y").to_string();
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {ITEM_COLS} FROM items i
+             WHERE i.stub = 0
+               AND ((strftime('%m-%d', i.saved_at, 'unixepoch', 'localtime') = ?1
+                     AND strftime('%Y', i.saved_at, 'unixepoch', 'localtime') < ?2)
+                    OR (i.created_at IS NOT NULL
+                        AND strftime('%m-%d', i.created_at, 'unixepoch', 'localtime') = ?1
+                        AND strftime('%Y', i.created_at, 'unixepoch', 'localtime') < ?2))
+             ORDER BY i.saved_at DESC, i.pk DESC LIMIT 25"
+        ))?;
+        let rows = stmt.query_map(params![mm_dd, year], read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let on_this_day = self.attach(rows)?;
+
+        let seed = ((now().max(0) / 86_400) as u32).max(1);
+        let order = Sort::Random(seed).sql().unwrap_or_else(|| "i.pk".into());
+        let older_cutoff = now().saturating_sub(7 * 86_400);
+        let fetch_random = |only_older: bool, take: usize, seen: &[String]| -> Result<Vec<Item>> {
+            if take == 0 {
+                return Ok(vec![]);
+            }
+            let mut sql = format!("SELECT {ITEM_COLS} FROM items i WHERE i.stub = 0");
+            let mut args: Vec<Sql> = vec![];
+            if only_older {
+                sql.push_str(" AND i.saved_at < ?");
+                args.push(older_cutoff.into());
+            }
+            if !seen.is_empty() {
+                sql.push_str(" AND i.id NOT IN (");
+                append_placeholders(&mut sql, seen.len());
+                sql.push(')');
+                args.extend(seen.iter().map(|id| Sql::from(id.clone())));
+            }
+            sql.push_str(&format!(" ORDER BY {order} LIMIT ?"));
+            args.push((take as i64).into());
+            let mut stmt = self.conn.prepare(&sql)?;
+            let rows = stmt.query_map(params_from_iter(&args), read_item)?.collect::<rusqlite::Result<Vec<_>>>()?;
+            self.attach(rows)
+        };
+        let mut seen: Vec<String> = on_this_day.iter().map(|i| i.id.clone()).collect();
+        let mut rediscover = fetch_random(true, 5, &seen)?;
+        if rediscover.len() < 5 {
+            seen.extend(rediscover.iter().map(|i| i.id.clone()));
+            rediscover.extend(fetch_random(false, 5 - rediscover.len(), &seen)?);
+        }
+
+        let mut items = on_this_day.clone();
+        items.extend(rediscover.iter().cloned());
+        let total = items.len() as i64;
+        Ok(TodayReport { items, total, links: vec![], on_this_day, rediscover })
     }
 }

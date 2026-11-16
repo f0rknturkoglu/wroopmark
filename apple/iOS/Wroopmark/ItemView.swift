@@ -13,6 +13,8 @@ struct ItemView: View {
     @State private var viewer: Media?
     @State private var newFolder = false
     @State private var folderName = ""
+    @State private var summarizing = false
+    @State private var related: [Item] = []
 
     var body: some View {
         ScrollView {
@@ -31,6 +33,24 @@ struct ItemView: View {
                             .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(PhoneTheme.accent.opacity(0.08), in: .rect(cornerRadius: 12))
+                    } else if model.aiStatus?.llmReady == true {
+                        Button {
+                            summarizing = true
+                            Task {
+                                if let updated = await model.summarize(item.id) {
+                                    self.item = updated
+                                }
+                                summarizing = false
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                if summarizing { ProgressView().controlSize(.small) } else { Image(systemName: "sparkles") }
+                                Text(summarizing ? "Özetleniyor…" : "Özetle ve etiket öner")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(summarizing)
                     }
                     tagsSection(item)
                     folderSection(item)
@@ -52,6 +72,19 @@ struct ItemView: View {
                     Text("Kaydedildi \(item.saved.formatted(date: .long, time: .shortened))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if !related.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Benzerleri").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            ForEach(related) { r in
+                                NavigationLink(value: r.id) {
+                                    ItemRowView(item: r)
+                                        .padding(10)
+                                        .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
                 }
                 .padding()
             } else {
@@ -92,8 +125,11 @@ struct ItemView: View {
             Button("Vazgeç", role: .cancel) {}
         }
         .task(id: id) {
-            item = await model.refresh(id)
+            async let loaded = model.refresh(id)
+            async let rel = model.related(for: id)
+            item = await loaded
             note = item?.note ?? ""
+            related = await rel
         }
         .onDisappear(perform: saveNote)
     }

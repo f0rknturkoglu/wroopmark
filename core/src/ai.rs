@@ -10,11 +10,12 @@
 //! 512-dimension model) and compared by brute force: a few thousand dot
 //! products is far below a millisecond.
 
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 use base64::Engine;
@@ -261,6 +262,21 @@ pub type Embedded = (String, Vec<Option<Vec<u8>>>);
 
 // --- Helper process -----------------------------------------------------------
 
+pub type AiOutFn = unsafe extern "C" fn(*mut c_void, *const c_char);
+pub type AiCallback = unsafe extern "C" fn(*const c_char, *mut c_void, AiOutFn);
+
+static CALLBACK: OnceLock<AiCallback> = OnceLock::new();
+
+pub fn set_callback(f: Option<AiCallback>) {
+    if let Some(f) = f {
+        let _ = CALLBACK.set(f);
+    }
+}
+
+pub fn has_callback() -> bool {
+    CALLBACK.get().is_some()
+}
+
 struct Proc {
     child: Child,
     stdin: ChildStdin,
@@ -316,8 +332,29 @@ impl Helper {
 
     /// Sends one request line and waits for its answer line.
     pub fn request(&self, req: &Value, timeout: Duration) -> Result<Value, AiError> {
+        unsafe extern "C" fn take_reply(ctx: *mut c_void, json: *const c_char) {
+            if !ctx.is_null() && !json.is_null() {
+                // SAFETY: ctx points to `Option<String>` on the caller's stack; json is valid for this call.
+                let slot = unsafe { &mut *ctx.cast::<Option<String>>() };
+                // SAFETY: caller guarantees json is a valid NUL-terminated C string.
+                *slot = Some(unsafe { CStr::from_ptr(json) }.to_string_lossy().into_owned());
+            }
+        }
         let mut slot = self.proc.lock().map_err(|_| AiError::Helper("kilit bozuldu".into()))?;
         let line = serde_json::to_string(req)?;
+        if let Some(&cb) = CALLBACK.get() {
+            let clean = if line.as_bytes().contains(&0) { line.replace('\0', " ") } else { line };
+            let c_req = CString::new(clean).map_err(|_| AiError::Helper("geçersiz istek".into()))?;
+            let mut answer: Option<String> = None;
+            // SAFETY: c_req is a valid C string and answer lives on this stack frame for the duration of cb.
+            unsafe { cb(c_req.as_ptr(), (&raw mut answer).cast(), take_reply) };
+            let raw = answer.ok_or_else(|| AiError::Helper("yanıt yok".into()))?;
+            let v: Value = serde_json::from_str(&raw)?;
+            if let Some(e) = v.get("error").and_then(Value::as_str) {
+                return Err(AiError::Helper(e.to_string()));
+            }
+            return Ok(v);
+        }
         for attempt in 0..2 {
             if slot.as_mut().is_none_or(|p| p.child.try_wait().ok().flatten().is_some()) {
                 *slot = Some(Self::spawn()?);

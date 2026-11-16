@@ -723,6 +723,12 @@ impl Library {
             store.set_ai(&id, ai.summary.as_deref(), &ai.tags)?;
             changed = true;
         }
+        if let Some(h) = &op.highlights
+            && take(&mut store, "highlights")?
+        {
+            store.set_highlights(&id, h)?;
+            changed = true;
+        }
         Ok(changed)
     }
 

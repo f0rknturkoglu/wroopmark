@@ -18,13 +18,38 @@ struct PadLibrary: View {
         } content: {
             List(selection: $selection) {
                 LibraryBanners()
-                ForEach(model.items) { item in
-                    ItemRowView(item: item)
-                        .tag(item.id)
-                        .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
-                        .swipeActions {
-                            Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                if model.scope == .today && model.query.isEmpty {
+                    if !model.onThisDay.isEmpty {
+                        Section("Geçmişte bugün") {
+                            ForEach(model.onThisDay) { item in
+                                ItemRowView(item: item)
+                                    .tag(item.id)
+                                    .swipeActions {
+                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                                    }
+                            }
                         }
+                    }
+                    if !model.rediscover.isEmpty {
+                        Section("Arşivden bugün için") {
+                            ForEach(model.rediscover) { item in
+                                ItemRowView(item: item)
+                                    .tag(item.id)
+                                    .swipeActions {
+                                        Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                                    }
+                            }
+                        }
+                    }
+                } else {
+                    ForEach(model.items) { item in
+                        ItemRowView(item: item)
+                            .tag(item.id)
+                            .onAppear { if item.id == model.items.last?.id { Task { await model.loadMore() } } }
+                            .swipeActions {
+                                Button("Sil", role: .destructive) { Task { await model.delete(item.id) } }
+                            }
+                    }
                 }
                 if model.items.isEmpty && !model.isLoading {
                     if model.query.isEmpty && model.scope == .all {
@@ -44,6 +69,14 @@ struct PadLibrary: View {
                 await model.reload()
             }
             .toolbar {
+                if model.aiStatus?.embedReady == true {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { model.semanticSearch.toggle() } label: {
+                            Image(systemName: model.semanticSearch ? "sparkles.rectangle.stack.fill" : "sparkles")
+                        }
+                        .accessibilityLabel(model.semanticSearch ? "Anlamına göre arama açık" : "Anlamına göre ara")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Bağlantı ekle")
@@ -51,13 +84,17 @@ struct PadLibrary: View {
             }
         } detail: {
             if let id = selection {
-                NavigationStack { ItemView(id: id) }
-                    .id(id)
+                NavigationStack {
+                    ItemView(id: id)
+                        .navigationDestination(for: String.self) { ItemView(id: $0) }
+                }
+                .id(id)
             } else {
                 ContentUnavailableView("Bir kayıt seç", systemImage: "bookmark", description: Text("Soldan bir kapsam, ortadan bir kayıt."))
             }
         }
         .onChange(of: model.query) { _, _ in model.queryChanged() }
+        .onChange(of: model.semanticSearch) { _, _ in Task { await model.reload() } }
         .onChange(of: model.scope) { _, _ in
             selection = nil
             Task { await model.reload() }
@@ -86,6 +123,7 @@ struct PadLibrary: View {
         List(selection: scope) {
             Section {
                 Label("Tümü", systemImage: "tray.full").tag(PhoneScope.all)
+                Label("Bugün", systemImage: "calendar.day.timeline.left").tag(PhoneScope.today)
                 Label("Etiketsiz", systemImage: "tag.slash").tag(PhoneScope.untagged)
             }
             Section {

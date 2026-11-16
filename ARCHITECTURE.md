@@ -50,8 +50,8 @@ text, created_at, saved_at, media[], links[], quote?, tags[], note, raw`.
   `İ I ı → i`, aksanlar atılır (`ş→s, ğ→g, ö→o…`). "istanbul" ⇔ "İSTANBUL" ⇔ "ıstanbul".
 - Sözdizimi: `rust async tag:dev -tag:okundu from:@jack platform:x has:image
   before:2025-06 after:2024 "tam ifade" -kelime is:untagged is:tagged`,
-  ayrıca `has:ocr` (görselde yazı), `has:quote`, `is:reviewed` (ayıklamada
-  saklanan), `savedafter:` / `savedbefore:` (kaydedilme tarihi),
+  ayrıca `has:ocr` (görselde yazı), `has:quote`, `has:highlight` (okuyucu vurgusu),
+  `is:reviewed` (ayıklamada saklanan), `savedafter:` / `savedbefore:` (kaydedilme tarihi),
   `folder:ad` (alt klasörler dahil), `is:unfiled`, `id:x:123` (tam o kayıt).
   Her süzgeç başına `-` alarak tersine döner: `-from:@jack`, `-@jack`,
   `-platform:tiktok`, `-has:video`, `-is:untagged`.
@@ -284,11 +284,12 @@ indirilecek model ya da kalıcı RAM yükü yok; ne gerekiyorsa sistemde hazır 
 - Akış: önceden hazırlama, kalınan saniyeden devam, izlenenler.
 - Panodan kaydetme, iPhone'da Spotlight, ana ekran widget'ı, iPad'de üç sütun.
 
-**v0.8: Telefonda zeka ve okuma**
+**v0.8: Telefonda zeka ve okuma** ✅
 - Ortak okuyucu (Mac + iPhone): Readability ile yapıyı koruyan çevrimdışı HTML,
-  tema/yazı/genişlik, okuma süresi ve ilerleme, vurgulama + not (senkronlu), sesli
-  okuma; X zincirleri makale gibi.
-- iPhone'da anlamsal arama ve cihazda özet/etiket önerisi; "Bugün" (geçen yıl bugün).
+  tema/yazı/genişlik, okuma süresi ve ilerleme, vurgulama + not (senkronlu, aramaya
+  girer), sesli okuma; X zincirleri makale gibi.
+- iPhone'da anlamsal arama (`wm_set_ai` geri çağrısıyla cihaz içi model),
+  cihazda özet/etiket önerisi, benzerleri ve "Bugün" (geçmişte bugün + arşivden 5 kayıt).
 
 **v0.9: Sosyal**
 - X yanıtları; eklentiyle sürekli X/Bluesky yer imi eşitleme; Reddit, Threads içe

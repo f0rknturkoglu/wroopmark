@@ -113,6 +113,7 @@ pub enum Has {
     /// Text was read from its pictures.
     Ocr,
     Quote,
+    Highlight,
 }
 
 /// Splits on whitespace, keeping `"quoted phrases"` (and `key:"quoted"`) whole.
@@ -260,6 +261,8 @@ impl Query {
                         Some(Has::Ocr)
                     } else if eq_any_ci(val, &["quote", "alinti"]) {
                         Some(Has::Quote)
+                    } else if eq_any_ci(val, &["highlight", "highlights", "vurgu"]) {
+                        Some(Has::Highlight)
                     } else {
                         None
                     };
@@ -444,11 +447,11 @@ mod tests {
 
     #[test]
     fn review_saved_dates_and_sort() {
-        let q = Query::parse("-is:reviewed savedafter:2026-01 savedbefore:2026-10 has:ocr -has:quote");
+        let q = Query::parse("-is:reviewed savedafter:2026-01 savedbefore:2026-10 has:ocr -has:quote has:highlight");
         assert_eq!(q.reviewed, Some(false));
         assert_eq!(q.saved_after, parse_date("2026-01", true));
         assert_eq!(q.saved_before, parse_date("2026-10", false));
-        assert_eq!((q.has.as_slice(), q.not_has.as_slice()), (&[Has::Ocr][..], &[Has::Quote][..]));
+        assert_eq!((q.has.as_slice(), q.not_has.as_slice()), (&[Has::Ocr, Has::Highlight][..], &[Has::Quote][..]));
         assert_eq!(Sort::parse("random:42"), Sort::Random(42));
         assert_eq!(Sort::parse("posted_asc"), Sort::PostedOldest);
         assert_eq!(Sort::parse("nonsense"), Sort::Default);

@@ -543,12 +543,14 @@ impl Library {
         let store = self.lock_store()?;
         let (done, total) = store.vector_progress()?;
         let stubs = store.stub_info()?;
+        let helper =
+            crate::ai::Helper::path().map(|p| p.display().to_string()).or_else(|| crate::ai::has_callback().then(|| "in-process".to_string()));
         if let Some(obj) = status.as_object_mut() {
             obj.insert("vectors".into(), json!({"done": done, "total": total}));
             obj.insert("stubs".into(), serde_json::to_value(stubs)?);
             let (copies, pending) = store.snapshot_count()?;
             obj.insert("snapshots".into(), json!({"done": copies, "pending": pending}));
-            obj.insert("helper".into(), json!(crate::ai::Helper::path().map(|p| p.display().to_string())));
+            obj.insert("helper".into(), json!(helper));
         }
         Ok(status)
     }
@@ -882,7 +884,9 @@ pub(super) fn dispatch<S: Sink>(lib: &Arc<Library>, cmd: &str, req: Req<'_>) -> 
             lib.ignore_duplicates(&req.parse::<Ids>()?.ids)?;
             S::ok(true)
         }
-        "article" | "fill_articles" => super::reader::dispatch::<S>(lib, cmd, req).unwrap_or_else(|| Err(CoreError::UnknownCmd(cmd.to_string()))),
+        "article" | "fill_articles" | "highlights" | "highlight" | "today" => {
+            super::reader::dispatch::<S>(lib, cmd, req).unwrap_or_else(|| Err(CoreError::UnknownCmd(cmd.to_string())))
+        }
         other => match super::sync::dispatch::<S>(lib, other, req) {
             Some(r) => r,
             None => Err(CoreError::UnknownCmd(other.to_string())),

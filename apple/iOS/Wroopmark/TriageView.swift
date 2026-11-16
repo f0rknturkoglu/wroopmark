@@ -26,6 +26,7 @@ final class TriageQueue {
     /// Everything decided here, so a refill does not bring it back while
     /// its deletion still waits.
     private var decided: Set<String> = []
+    private var summarizing = Set<String>()
     private let filter: String
     private let undoDepth = 10
     private let core = Core.shared
@@ -104,6 +105,29 @@ final class TriageQueue {
         reachedEnd = false
         await refill()
     }
+
+    func addTag(_ tag: String) async {
+        guard let item = items.first, !item.tags.contains(tag) else { return }
+        try? await core.run(.setTags(id: item.id, tags: item.tags + [tag]))
+        if let updated: Item = try? await core.call(.get(id: item.id)),
+           let idx = items.firstIndex(where: { $0.id == item.id }) {
+            items[idx] = updated
+        }
+    }
+
+    func prefetchSummaries(llmReady: Bool) async {
+        guard llmReady else { return }
+        let targets = items.prefix(2).filter { $0.summary == nil && !summarizing.contains($0.id) }.map(\.id)
+        for id in targets {
+            guard !Task.isCancelled else { return }
+            summarizing.insert(id)
+            defer { summarizing.remove(id) }
+            if let updated: Item = try? await core.call(.call("summarize", ["id": .string(id)]), network: true),
+               let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx] = updated
+            }
+        }
+    }
 }
 
 struct PhoneTriageView: View {
@@ -168,7 +192,9 @@ struct PhoneTriageView: View {
         .task(id: queue?.current?.id) {
             guard let queue else { return }
             if let v = queue.current.flatMap(Self.video)?.videoFile { player.play(v) } else { player.stop() }
-            await queue.loadSuggestions(hasFolders: !model.folders.isEmpty)
+            async let sug: Void = queue.loadSuggestions(hasFolders: !model.folders.isEmpty)
+            async let sum: Void = queue.prefetchSummaries(llmReady: model.aiStatus?.llmReady == true)
+            _ = await (sug, sum)
         }
         .onDisappear {
             player.stop()
@@ -266,6 +292,13 @@ struct PhoneTriageView: View {
                         }
                         .buttonStyle(.bordered)
                     }
+                    if let current = queue.current {
+                        ForEach(current.aiTags.filter { !current.tags.contains($0) }, id: \.self) { t in
+                            Button("+ #\(t)") { Task { await queue.addTag(t) } }
+                                .buttonStyle(.bordered)
+                                .font(.subheadline)
+                        }
+                    }
                 }
                 .padding(.horizontal)
             }
@@ -353,6 +386,14 @@ private struct TriageCard: View {
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.secondary.opacity(0.1), in: .rect(cornerRadius: 10))
+            }
+            if let s = item.summary, !s.isEmpty {
+                Label { Text(s) } icon: { Image(systemName: "sparkles") }
+                    .font(.footnote)
+                    .lineLimit(3)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PhoneTheme.accent.opacity(0.08), in: .rect(cornerRadius: 10))
             }
             if !item.tags.isEmpty {
                 Text(item.tags.map { "#\($0)" }.joined(separator: " ")).font(.caption.weight(.semibold)).foregroundStyle(PhoneTheme.accent).lineLimit(1)

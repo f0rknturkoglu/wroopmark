@@ -83,6 +83,27 @@ struct PhoneSettingsView: View {
                     }
                 }
 
+                Section {
+                    if let ai = model.aiStatus {
+                        LabeledContent(
+                            "Anlam araması",
+                            value: ai.embedReady
+                                ? ai.vectors.map { "\($0.done) / \($0.total) kayıt" } ?? "Hazır"
+                                : (ai.embedError ?? "Hazırlanıyor")
+                        )
+                        LabeledContent(
+                            "Özet ve etiket önerisi",
+                            value: ai.llmReady ? "Hazır" : (ai.llm ?? "Kullanılamıyor")
+                        )
+                    } else {
+                        LabeledContent("Cihazdaki zeka", value: "Denetleniyor…")
+                    }
+                } header: {
+                    Text("Zeka")
+                } footer: {
+                    Text("Arama anlamı ve özetler cihazda çalışır; internete veri gönderilmez.")
+                }
+
                 Section("Hakkında") {
                     Link(destination: URL(string: "https://github.com/f0rknturkoglu/wroopmark/blob/main/PRIVACY.md")!) {
                         Label("Gizlilik politikası", systemImage: "hand.raised")
@@ -109,6 +130,7 @@ struct PhoneSettingsView: View {
             .task {
                 await model.loadSyncStatus()
                 await model.refreshMeta()
+                await model.loadAIStatus()
             }
         }
     }

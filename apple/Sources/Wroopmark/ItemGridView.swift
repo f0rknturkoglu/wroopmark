@@ -229,6 +229,7 @@ struct TagStrip: View {
     private var scopeTitle: String {
         switch model.scope {
         case .all: "Tümü"
+        case .today: "Bugün"
         case .untagged: "Etiketsiz"
         case .platform(let p): p.label
         case .tag(let key): "#\(key)"
