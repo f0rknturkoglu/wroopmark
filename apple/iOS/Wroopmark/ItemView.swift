@@ -169,6 +169,7 @@ struct ItemView: View {
                         }
                         Button(role: .destructive) { confirmDelete = true } label: { Label("Sil", systemImage: "trash") }
                     } label: { Image(systemName: "ellipsis.circle") }
+                    .accessibilityLabel("Diğer işlemler")
                 }
             }
         }
@@ -419,6 +420,7 @@ struct MediaStrip: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(m.isVideo ? String(localized: "Videoyu aç") : (m.alt ?? String(localized: "Görseli büyüt")))
     }
 }
 
@@ -464,6 +466,7 @@ struct MediaViewerView: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark.circle.fill").font(.title).foregroundStyle(.white, .black.opacity(0.4))
             }
+            .accessibilityLabel("Kapat")
             .padding()
         }
     }

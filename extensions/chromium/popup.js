@@ -172,6 +172,13 @@ async function setupSiteImport() {
       await chrome.tabs.update(tab.id, { url: "https://www.threads.com/saved" });
       setMsg($("collectMsg"), t("Kaydedilenler'de aşağı kaydır (ya da Otomatik Kaydır); gönderiler eşitlenir.", "Scroll down in Saved (or use Auto Scroll); posts sync."));
     };
+  } else if (host === "pinterest.com" || host.endsWith(".pinterest.com")) {
+    row.style.display = "";
+    btn.textContent = t("📌 Pinterest panoları eşitle", "📌 Sync Pinterest boards");
+    btn.onclick = async () => {
+      await chrome.tabs.update(tab.id, { url: "https://www.pinterest.com/" });
+      setMsg($("collectMsg"), t("Panona girip aşağı kaydır (ya da Otomatik Kaydır); pinler eşitlenir.", "Open a board and scroll down (or use Auto Scroll); pins sync."));
+    };
   }
 }
 
@@ -206,6 +213,7 @@ async function syncCollected() {
     if (r.data.youtube > 0) parts.push(`${r.data.youtube} YouTube`);
     if (r.data.bluesky > 0) parts.push(`${r.data.bluesky} Bluesky`);
     if (r.data.threads > 0) parts.push(`${r.data.threads} Threads`);
+    if (r.data.pinterest > 0) parts.push(`${r.data.pinterest} Pinterest`);
     if (pages > 0) parts.push(t(`${pages} sayfa/link`, `${pages} pages/links`));
     $("collectedSummary").textContent = t(`Kuyrukta: ${parts.join(" · ")}. Tek tıkla aktarabilirsiniz.`, `Queued: ${parts.join(" · ")}. Import with one click.`);
   } else {

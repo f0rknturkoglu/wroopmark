@@ -442,7 +442,7 @@ final class ReaderSpeech: NSObject, AVSpeechSynthesizerDelegate {
         synth.delegate = self
     }
 
-    func toggle(_ text: String) {
+    func toggle(_ text: String, speed: Double = 1.0) {
         if synth.isSpeaking {
             if synth.isPaused { synth.continueSpeaking() } else { synth.pauseSpeaking(at: .word) }
             paused = synth.isPaused
@@ -451,6 +451,8 @@ final class ReaderSpeech: NSObject, AVSpeechSynthesizerDelegate {
         let u = AVSpeechUtterance(string: text)
         let lang = NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue ?? "tr"
         u.voice = AVSpeechSynthesisVoice(language: lang)
+        let scaled = AVSpeechUtteranceDefaultSpeechRate * Float(speed)
+        u.rate = min(AVSpeechUtteranceMaximumSpeechRate, max(AVSpeechUtteranceMinimumSpeechRate, scaled))
         synth.speak(u)
         speaking = true
         paused = false
@@ -565,6 +567,7 @@ struct ReaderView: View {
     @AppStorage("readerSerif") private var serif = true
     @AppStorage("readerSize") private var size = 19
     @AppStorage("readerWidth") private var width: ReaderWidth = .normal
+    @AppStorage("readerSpeechRate") private var speechRate: Double = 1.0
 
     private struct ArticleReply: Decodable, Sendable { let html: String? }
 
@@ -621,7 +624,7 @@ struct ReaderView: View {
                     }
                     .help("Vurgular ve notlar")
                     .disabled(highlights.isEmpty)
-                    Button { speech.toggle(spokenText) } label: {
+                    Button { speech.toggle(spokenText, speed: speechRate) } label: {
                         Image(systemName: speech.speaking && !speech.paused ? "pause.circle" : "speaker.wave.2")
                     }
                     .help("Sesli oku")
@@ -658,6 +661,13 @@ struct ReaderView: View {
             }
             Picker("Genişlik", selection: $width) {
                 ForEach(ReaderWidth.allCases) { Text($0.label).tag($0) }
+            }
+            Picker("Konuşma hızı", selection: $speechRate) {
+                Text("0.75x").tag(0.75)
+                Text("1x").tag(1.0)
+                Text("1.25x").tag(1.25)
+                Text("1.5x").tag(1.5)
+                Text("2x").tag(2.0)
             }
             Button("Büyüt", systemImage: "textformat.size.larger") { size = min(28, size + 1) }
             Button("Küçült", systemImage: "textformat.size.smaller") { size = max(13, size - 1) }

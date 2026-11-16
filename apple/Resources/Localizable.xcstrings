@@ -2437,6 +2437,16 @@
         }
       }
     },
+    "Diğer işlemler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More actions"
+          }
+        }
+      }
+    },
     "Dosya": {
       "localizations": {
         "en": {
@@ -3223,6 +3233,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Text in the picture"
+          }
+        }
+      }
+    },
+    "Görseli büyüt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom image"
           }
         }
       }
@@ -4447,6 +4467,16 @@
         }
       }
     },
+    "Konuşma hızı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech rate"
+          }
+        }
+      }
+    },
     "Konuşma okunuyor…": {
       "localizations": {
         "en": {
@@ -5227,12 +5257,72 @@
         }
       }
     },
+    "Panoda kaydedilecek bağlantı bulunamadı.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No link found on the clipboard to save."
+          }
+        }
+      }
+    },
     "Panoda link yok": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "No link on the clipboard"
+          }
+        }
+      }
+    },
+    "Panodaki bağlantı kaydedildi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved link from clipboard."
+          }
+        }
+      }
+    },
+    "Panodaki bağlantıyı tek dokunuşla wroopmark'a ekler.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adds the link on your clipboard to wroopmark with one tap."
+          }
+        }
+      }
+    },
+    "Panodaki bağlantıyı wroopmark'a kaydeder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saves the link on your clipboard to wroopmark."
+          }
+        }
+      }
+    },
+    "Panodan kaydet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save from clipboard"
+          }
+        }
+      }
+    },
+    "Panodan yapıştır": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste from clipboard"
           }
         }
       }
@@ -5313,6 +5403,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Color"
+          }
+        }
+      }
+    },
+    "Resim İçinde Resim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picture in Picture"
           }
         }
       }
@@ -6623,6 +6723,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Add the Video from Photos"
+          }
+        }
+      }
+    },
+    "Videoyu aç": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open video"
           }
         }
       }

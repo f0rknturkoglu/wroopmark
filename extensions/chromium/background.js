@@ -81,6 +81,8 @@ function defaultCollected() {
     bsky_ids: [],
     threads_payloads: [],
     threads_ids: [],
+    pinterest_payloads: [],
+    pinterest_ids: [],
     page_items: [],
     page_urls: [],
   };
@@ -124,6 +126,7 @@ function getTotalCollectedCount(c) {
     (c.yt_ids?.length || 0) +
     (c.bsky_ids?.length || 0) +
     (c.threads_ids?.length || 0) +
+    (c.pinterest_ids?.length || 0) +
     (c.page_items?.length || 0)
   );
 }
@@ -310,6 +313,26 @@ async function handleCapture({ kind, payload }, tabId) {
     return;
   }
 
+  if (kind === "pinterest_list") {
+    const items = payload?.items || [];
+    const tag = payload?.tag || "pinterest/panolar";
+    if (auto && items.length) {
+      const d = await sendAutoSync("Pinterest", "import_items", { items, tags: [tag] });
+      if (d) {
+        log(`Pinterest otomatik eşitlendi: ${d.ids?.length || 0} pin (+${d.new || 0} yeni)`);
+        return;
+      }
+    }
+    c.pinterest_ids ||= [];
+    c.pinterest_payloads ||= [];
+    const fresh = items.filter((it) => it?.url && !c.pinterest_ids.includes(it.url));
+    for (const it of fresh) c.pinterest_ids.push(it.url);
+    if (fresh.length) c.pinterest_payloads.push({ tag, items: fresh });
+    await setCollected(c);
+    log(`Pinterest: ${items.length} pin görüldü (+${fresh.length} yeni, kuyrukta: ${c.pinterest_ids.length})`);
+    return;
+  }
+
   if (kind === "x_url") {
     const url = `https://x.com/i/status/${payload}`;
     if (!c.page_urls.includes(url)) {
@@ -407,6 +430,14 @@ async function importCollected() {
     }
   }
   for (const p of c.threads_payloads || []) {
+    const report = await call("import_items", { items: p.items, tags: [p.tag] });
+    if (report.ok) {
+      totalNew += report.data?.new || 0;
+      totalUpdated += report.data?.updated || 0;
+      if (report.data?.ids) importedIds.push(...report.data.ids);
+    }
+  }
+  for (const p of c.pinterest_payloads || []) {
     const report = await call("import_items", { items: p.items, tags: [p.tag] });
     if (report.ok) {
       totalNew += report.data?.new || 0;
@@ -1186,6 +1217,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
             youtube: c.yt_ids?.length || 0,
             bluesky: c.bsky_ids?.length || 0,
             threads: c.threads_ids?.length || 0,
+            pinterest: c.pinterest_ids?.length || 0,
             pages: c.page_items?.length || 0,
           },
         });

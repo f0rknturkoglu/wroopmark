@@ -106,7 +106,7 @@ final class PhoneModel {
     /// An item to show (from a `wroopmark://item/<id>` link).
     var openRequest: String?
 
-    /// `wroopmark://item/<id>`, `wroopmark://search?q=…`.
+    /// `wroopmark://item/<id>`, `wroopmark://search?q=…`, `wroopmark://add-clipboard`.
     func open(_ url: URL) {
         guard url.scheme == "wroopmark" else { return }
         let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -117,6 +117,9 @@ final class PhoneModel {
         case "search":
             scope = .all
             query = parts?.queryItems?.first { $0.name == "q" }?.value ?? ""
+        case "add-clipboard":
+            clipboardSaveTask?.cancel()
+            clipboardSaveTask = Task { await saveFromClipboard() }
         default:
             break
         }
@@ -124,6 +127,7 @@ final class PhoneModel {
 
     /// Set by the "search wroopmark" shortcut before the app comes up.
     static var pendingQuery: String?
+    @ObservationIgnored private var clipboardSaveTask: Task<Void, Never>?
 
     var effectiveQuery: String {
         [scope.filter, query.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: " ")
@@ -177,6 +181,19 @@ final class PhoneModel {
     func dismissClipboard() {
         UserDefaults.standard.set(clipboardChange, forKey: "clipboardOffered")
         clipboardHasLink = false
+    }
+
+    func saveFromClipboard() async {
+        _ = await core.ensureOpen()
+        let pb = UIPasteboard.general
+        guard let link = pb.url?.absoluteString ?? pb.string.flatMap(firstLink(in:)) else {
+            notice = String(localized: "Panoda kaydedilecek bağlantı bulunamadı.")
+            return
+        }
+        dismissClipboard()
+        if await addURL(link, tags: []) {
+            notice = String(localized: "Panodaki bağlantı kaydedildi.")
+        }
     }
 
     func becameActive() async {

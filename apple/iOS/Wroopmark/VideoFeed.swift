@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import SwiftUI
 import UIKit
 
@@ -87,6 +88,7 @@ final class FeedPlayer {
     /// The video is coming down from iCloud, or could not be had.
     var loading = false
     var unavailable = false
+    @ObservationIgnored var pipController: AVPictureInPictureController?
     var muted = UserDefaults.standard.bool(forKey: "feedMuted") {
         didSet {
             player.isMuted = muted
@@ -134,6 +136,8 @@ final class FeedPlayer {
     }
 
     private func start(_ url: URL) {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        try? AVAudioSession.sharedInstance().setActive(true)
         looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
         // Back where it was left.
         if let f = current, let at = FeedMemory.position(f) {
@@ -141,6 +145,15 @@ final class FeedPlayer {
         }
         player.rate = 1
         player.play()
+    }
+
+    func togglePiP() {
+        guard let pipController else { return }
+        if pipController.isPictureInPictureActive {
+            pipController.stopPictureInPicture()
+        } else {
+            pipController.startPictureInPicture()
+        }
     }
 
     private func rememberPosition() {
@@ -182,6 +195,7 @@ final class FeedPlayer {
         rememberPosition()
         looper?.disableLooping()
         looper = nil
+        pipController = nil
         player.pause()
         player.removeAllItems()
         current = nil
@@ -544,6 +558,14 @@ private struct FeedPage: View {
                         sideButton(player.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: player.muted ? String(localized: "Sesi aç") : String(localized: "Sesi kapat")) {
                             player.muted.toggle()
                         }
+                        if AVPictureInPictureController.isPictureInPictureSupported() {
+                            sideButton("pip.enter", label: String(localized: "Resim İçinde Resim")) {
+                                player.togglePiP()
+                            }
+                        }
+                        AirPlayButton()
+                            .frame(width: 44, height: 44)
+                            .accessibilityLabel("AirPlay")
                     }
                     if !item.replies.isEmpty {
                         sideButton("bubble.left.and.bubble.right", label: String(localized: "Yanıtlar")) { showReplies = true }
@@ -599,7 +621,9 @@ private struct VideoLayer: View {
                 LocalImage(file: poster, maxPixel: 1200, fill: portrait)
             }
             if active {
-                PlayerLayer(player: player.player, fill: portrait)
+                PlayerLayer(player: player.player, fill: portrait) { pip in
+                    player.pipController = pip
+                }
                     .contentShape(.rect)
                     .onTapGesture {
                         player.togglePause()
@@ -811,25 +835,54 @@ private struct RepliesSheet: View {
     }
 }
 
+/// AirPlay output route button styled for dark video overlay.
+private struct AirPlayButton: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let v = AVRoutePickerView()
+        v.tintColor = .white
+        v.activeTintColor = UIColor(PhoneTheme.accent)
+        v.prioritizesVideoDevices = true
+        return v
+    }
+
+    func updateUIView(_ v: AVRoutePickerView, context: Context) {}
+}
+
 /// AVPlayerLayer without the system controls, filling or fitting the page.
 private struct PlayerLayer: UIViewRepresentable {
     let player: AVPlayer
     let fill: Bool
+    let bindPiP: (AVPictureInPictureController?) -> Void
 
     final class View: UIView {
         override static var layerClass: AnyClass { AVPlayerLayer.self }
         var playerLayer: AVPlayerLayer? { layer as? AVPlayerLayer }
     }
 
+    final class Coordinator {
+        var pip: AVPictureInPictureController?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> View {
         let v = View()
         v.backgroundColor = .clear
         v.playerLayer?.player = player
+        if AVPictureInPictureController.isPictureInPictureSupported(), let layer = v.playerLayer {
+            let pip = AVPictureInPictureController(playerLayer: layer)
+            pip?.canStartPictureInPictureAutomaticallyFromInline = true
+            context.coordinator.pip = pip
+            Task { @MainActor in bindPiP(pip) }
+        }
         return v
     }
 
     func updateUIView(_ v: View, context: Context) {
         if v.playerLayer?.player !== player { v.playerLayer?.player = player }
         v.playerLayer?.videoGravity = fill ? .resizeAspectFill : .resizeAspect
+        if let pip = context.coordinator.pip {
+            Task { @MainActor in bindPiP(pip) }
+        }
     }
 }

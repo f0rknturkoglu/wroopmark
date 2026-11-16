@@ -357,6 +357,7 @@ struct AddURLView: View {
                         }
                         .labelStyle(.iconOnly)
                         .buttonBorderShape(.capsule)
+                        .accessibilityLabel("Panodan yapıştır")
                     }
                     TextField("Etiketler (virgülle)", text: $tags)
                         .textInputAutocapitalization(.never)

@@ -28,6 +28,7 @@
   const isYT = host === "youtube.com" || host === "m.youtube.com";
   const isBsky = host === "bsky.app";
   const isThreads = host === "threads.net" || host === "threads.com";
+  const isPinterest = host === "pinterest.com" || host.endsWith(".pinterest.com");
   const seen = new Map(); // post id -> raw object, oldest first
   const SEEN_MAX = 4000;
 
@@ -56,7 +57,7 @@
   document.addEventListener("DOMContentLoaded", readMe);
   // Watch for the element only until it is read or the page has loaded.
   const meWatch = new MutationObserver(() => readMe() && meWatch.disconnect());
-  if (!isX && !isIG && !isYT && !isBsky && !isThreads && !me) {
+  if (!isX && !isIG && !isYT && !isBsky && !isThreads && !isPinterest && !me) {
     meWatch.observe(document.documentElement, { childList: true, subtree: true });
     window.addEventListener("load", () => meWatch.disconnect(), { once: true });
   }
@@ -154,6 +155,42 @@
       return;
     }
     for (const k in v) indexThreads(v[k], found);
+  }
+
+  function indexPinterest(v, found, outSeen) {
+    if (!v || typeof v !== "object") return;
+    if (Array.isArray(v)) return v.forEach((x) => indexPinterest(x, found, outSeen));
+    if (typeof v.id === "string" && /^\d{6,}$/.test(v.id) && (v.images?.orig?.url || v.videos?.video_list)) {
+      if (!outSeen.has(v.id)) {
+        outSeen.add(v.id);
+        const media = [];
+        const imgUrl = v.images?.orig?.url || v.images?.["736x"]?.url;
+        const vidList = v.videos?.video_list;
+        const vid = vidList ? vidList.V_720P || Object.values(vidList).find((x) => x?.url && !String(x.url).endsWith(".m3u8")) : null;
+        if (vid?.url) {
+          media.push({ kind: "video", url: vid.url, thumb_url: imgUrl || null, width: vid.width || null, height: vid.height || null });
+        } else if (imgUrl) {
+          media.push({ kind: "image", url: imgUrl, width: v.images?.orig?.width || null, height: v.images?.orig?.height || null });
+        }
+        if (media.length) {
+          const pinner = v.pinner || v.native_creator || {};
+          const title = v.grid_title || v.title || null;
+          const desc = (v.description || "").trim();
+          found.push({
+            url: `https://www.pinterest.com/pin/${v.id}/`,
+            platform: "pinterest",
+            title,
+            text: desc || title || "",
+            author_handle: pinner.username || null,
+            author_name: pinner.full_name || pinner.username || null,
+            links: v.link ? [v.link] : [],
+            media,
+          });
+        }
+      }
+      return;
+    }
+    for (const k in v) indexPinterest(v[k], found, outSeen);
   }
 
   // Only what the core reads: one picture size, one video file.
@@ -322,6 +359,17 @@
       }
       return;
     }
+    if (isPinterest) {
+      const found = [];
+      indexPinterest(json, found, new Set());
+      if (found.length) {
+        const parts = location.pathname.split("/").filter(Boolean);
+        const board = parts.length >= 2 && parts[0] !== "pin" ? parts[1].replace(/-/g, " ") : null;
+        const tag = board ? `pinterest/${board}` : "pinterest/panolar";
+        post("pinterest_list", { tag, items: found });
+      }
+      return;
+    }
     if (isIG) {
       const found = [];
       indexIG(json, found);
@@ -376,7 +424,9 @@
             ? url.includes("/xrpc/app.bsky.")
             : isThreads
               ? url.includes("/graphql") || url.includes("/api/v1/")
-              : url.includes("/api/");
+              : isPinterest
+                ? url.includes("/resource/")
+                : url.includes("/api/");
 
   const origFetch = window.fetch;
   window.fetch = async function (input, init) {

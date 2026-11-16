@@ -212,9 +212,32 @@ struct RandomPostWidget: Widget {
     }
 }
 
+struct SaveClipboardIntent: AppIntent {
+    static let title: LocalizedStringResource = "Panodaki linki kaydet"
+    static let description = IntentDescription("Panodaki bağlantıyı wroopmark'a kaydeder.")
+    static let openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult & OpensIntent {
+        .result(opensIntent: OpenURLIntent(URL(string: "wroopmark://add-clipboard")!))
+    }
+}
+
+struct SaveClipboardControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "save-clipboard") {
+            ControlWidgetButton(action: SaveClipboardIntent()) {
+                Label("Panodan kaydet", systemImage: "plus.viewfinder")
+            }
+        }
+        .displayName("Panodan kaydet")
+        .description("Panodaki bağlantıyı tek dokunuşla wroopmark'a ekler.")
+    }
+}
+
 @main
 struct WroopmarkWidgets: WidgetBundle {
     var body: some Widget {
         RandomPostWidget()
+        SaveClipboardControl()
     }
 }
